@@ -1,0 +1,4 @@
+dist/
+web/dist/
+squad-task-map-*.json
+squad-task-map-*.json.*

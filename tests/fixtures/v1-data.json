@@ -1,0 +1,379 @@
+{
+ "version": 1,
+ "source": "manual",
+ "cats": [
+  {
+   "id": "unsorted",
+   "name": "Unsorted",
+   "color": "#c7c5b3",
+   "icon": "hexagon",
+   "visible": true,
+   "builtin": "unsorted"
+  },
+  {
+   "id": "go",
+   "name": "Go somewhere",
+   "color": "#2fbf3a",
+   "icon": "circle",
+   "visible": true,
+   "builtin": "go"
+  },
+  {
+   "id": "mark",
+   "name": "Mark / place something",
+   "color": "#e0a400",
+   "icon": "diamond",
+   "visible": true,
+   "builtin": "mark"
+  },
+  {
+   "id": "retrieve",
+   "name": "Go and retrieve",
+   "color": "#e0404f",
+   "icon": "square",
+   "visible": true,
+   "builtin": "retrieve"
+  },
+  {
+   "id": "other",
+   "name": "Other",
+   "color": "#9b7ff0",
+   "icon": "triangle",
+   "visible": true,
+   "builtin": "other"
+  }
+ ],
+ "tasks": {
+  "597a0b2986f77426d66c0633": {
+   "cat": "retrieve",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "59c512ad86f7741f0d09de9b": {
+   "cat": "other",
+   "progress": 64,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "5b4795fb86f7745876267770": {
+   "cat": "other",
+   "progress": 50,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "5979eee086f774311955e614": {
+   "cat": "other",
+   "progress": 66,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "60e71d6d7fcf9c556f325055": {
+   "cat": "other",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "675c085d59b0575973005f52": {
+   "cat": "other",
+   "progress": 75,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "639136fa9444fb141f4e6eee": {
+   "cat": "retrieve",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "639135e0fa894f0a866afde6": {
+   "cat": "retrieve",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "665eeacf5d86b6c8aa03c79b": {
+   "cat": "other",
+   "progress": 33,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "5bc479e586f7747f376c7da3": {
+   "cat": "other",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "5d25bfd086f77442734d3007": {
+   "cat": "other",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "64f6aafd67e11a7c6206e0d0": {
+   "cat": "retrieve",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "5d25e2ee86f77443e35162ea": {
+   "cat": "other",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "60c0c018f7afb4354815096a": {
+   "cat": "other",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "666314b4d7f171c4c20226c3": {
+   "cat": "other",
+   "progress": 40,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "639135e8c115f907b14700aa": {
+   "cat": "retrieve",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "673f348dd3346c21670217e7": {
+   "cat": "retrieve",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "67a09636b8725511260bc421": {
+   "cat": "retrieve",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "5ae4497b86f7744cf402ed00": {
+   "cat": "other",
+   "progress": 50,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "675c1d6d59b0575973008fc7": {
+   "cat": "go",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "6a5ccda873f06065630d61b0": {
+   "cat": "other",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "5ac3477486f7741d651d6885": {
+   "cat": "go",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "639135f286e646067c176a87": {
+   "cat": "mark",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "63a5cf262964a7488f5243ce": {
+   "cat": "other",
+   "progress": 40,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "639135d89444fb141f4e6eea": {
+   "cat": "retrieve",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "5969f9e986f7741dde183a50": {
+   "cat": "retrieve",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "5a03153686f77442d90e2171": {
+   "cat": "other",
+   "progress": 60,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "669fa38fad7f1eac2607ed46": {
+   "cat": "other",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "658027799634223183395339": {
+   "cat": "other",
+   "progress": 90,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "66aa58245ab22944110db6e9": {
+   "cat": "go",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "60e71dc0a94be721b065bbfc": {
+   "cat": "other",
+   "progress": 75,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "5b47926a86f7747ccc057c15": {
+   "cat": "mark",
+   "progress": 50,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "5a27b87686f77460de0252a8": {
+   "cat": "other",
+   "progress": 45,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "6a5c1578f2689567c30eb0f3": {
+   "cat": "other",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "5a68665c86f774255929b4c7": {
+   "cat": "retrieve",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "639872f9decada40426d3447": {
+   "cat": "other",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "5c0d190cd09282029f5390d8": {
+   "cat": "other",
+   "progress": 20,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "639136d68ba6894d155e77cf": {
+   "cat": "go",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "64f5aac4b63b74469b6c14c2": {
+   "cat": "retrieve",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "596a1e6c86f7741ddc2d3206": {
+   "cat": "other",
+   "progress": 33,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "669fa3a08b4a64b332041ff7": {
+   "cat": "retrieve",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "64e7b9bffd30422ed03dad38": {
+   "cat": "other",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "639dbaf17c898a131e1cffff": {
+   "cat": "go",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "65734c186dc1e402c80dc19e": {
+   "cat": "other",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "65733403eefc2c312a759ddb": {
+   "cat": "go",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "5f04886a3937dc337a6b8238": {
+   "cat": "go",
+   "progress": 50,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "639136e84ed9512be67647db": {
+   "cat": "go",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "60e71b9bbd90872cb85440f3": {
+   "cat": "other",
+   "progress": 8,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "626bd75e47ea7f506e5493c5": {
+   "cat": "mark",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "64f5e20652fc01298e2c61e3": {
+   "cat": "retrieve",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "638fcd23dc65553116701d33": {
+   "cat": "retrieve",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "59c9392986f7742f6923add2": {
+   "cat": "other",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "6752f6d83038f7df520c83e8": {
+   "cat": "retrieve",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  },
+  "669fa3910c828825de06d69f": {
+   "cat": "retrieve",
+   "progress": 0,
+   "added": 1790291879105,
+   "manual": true
+  }
+ },
+ "hidden": {},
+ "subs": [],
+ "draw": {},
+ "prefs": {},
+ "collapsed": {},
+ "dcolor": "#ff4d4d",
+ "dwidth": 4
+}

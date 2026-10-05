@@ -1,0 +1,104 @@
+{
+ "map": "streets-of-tarkov",
+ "svg": "StreetsOfTarkov.svg",
+ "viewBox": [
+  0.0,
+  0.0,
+  605.32395,
+  831.57753
+ ],
+ "bounds": [
+  [
+   323,
+   -295
+  ],
+  [
+   -280,
+   532
+  ]
+ ],
+ "transform": [
+  0.38,
+  0,
+  0.38,
+  0
+ ],
+ "coordinateRotation": 180,
+ "vectors": [
+  {
+   "name": "Ballet Lover apartment zone",
+   "game": {
+    "x": 47.63,
+    "z": 153.12
+   },
+   "svg_viewbox": {
+    "x": 276.39,
+    "y": 450.6
+   },
+   "fraction": {
+    "u": 0.4566,
+    "v": 0.5419
+   }
+  },
+  {
+   "name": "Klimov Street (Flare) extract",
+   "game": {
+    "x": -263.41,
+    "z": 43.19
+   },
+   "svg_viewbox": {
+    "x": 589.15,
+    "y": 340.06
+   },
+   "fraction": {
+    "u": 0.9733,
+    "v": 0.4089
+   }
+  },
+  {
+   "name": "Primorsky Ave Taxi V-Ex extract",
+   "game": {
+    "x": -2.19,
+    "z": 461.23
+   },
+   "svg_viewbox": {
+    "x": 326.48,
+    "y": 760.42
+   },
+   "fraction": {
+    "u": 0.5394,
+    "v": 0.9144
+   }
+  },
+  {
+   "name": "Label 'Pinewood Hotel'",
+   "game": {
+    "x": -35,
+    "z": 64
+   },
+   "svg_viewbox": {
+    "x": 359.47,
+    "y": 360.99
+   },
+   "fraction": {
+    "u": 0.5939,
+    "v": 0.4341
+   }
+  },
+  {
+   "name": "Label 'Cinema'",
+   "game": {
+    "x": -175,
+    "z": 400
+   },
+   "svg_viewbox": {
+    "x": 500.25,
+    "y": 698.85
+   },
+   "fraction": {
+    "u": 0.8264,
+    "v": 0.8404
+   }
+  }
+ ]
+}

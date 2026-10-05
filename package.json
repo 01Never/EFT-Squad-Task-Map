@@ -1,0 +1,13 @@
+{
+  "name": "squad-task-map",
+  "version": "2.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:web": "bun build web/js/main.js --outfile web/dist/app.js --minify --target browser --format esm",
+    "dev": "bun run build:web && bun server/main.ts",
+    "test": "bun test",
+    "build": "bun run build:web && bun build --compile --minify --target=bun-windows-x64 server/main.ts --outfile dist/SquadTaskMap.exe",
+    "build:linux": "bun run build:web && bun build --compile --minify server/main.ts --outfile dist/squad-task-map-linux"
+  }
+}
