@@ -1,0 +1,58 @@
+2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|notifications|Got notification | ChatMessageReceived
+{
+  "type": "new_message",
+  "eventId": "x",
+  "message": {
+    "_id": "abc",
+    "type": 10,
+    "templateId": "5967530a86f77462ba22226b description",
+    "text": ""
+  }
+}
+2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|notifications|Got notification | ChatMessageReceived
+{
+  "type": "new_message",
+  "eventId": "x",
+  "message": {
+    "_id": "abc",
+    "type": 12,
+    "templateId": "5967530a86f77462ba22226c description",
+    "text": ""
+  }
+}
+2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|notifications|Got notification | ChatMessageReceived
+{
+  "type": "new_message",
+  "eventId": "x",
+  "message": {
+    "_id": "abc",
+    "type": 11,
+    "templateId": "5967530a86f77462ba22226d description",
+    "text": ""
+  }
+}
+2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|application|Session mode: PvpSeason
+2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|application|Session mode: Pve
+2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|application|Session mode: Regular
+2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|application|scene preset path:maps/city_preset.bundle rcid:x
+2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|application|TRACE-NetworkGameCreate profileStatus: 'Profileid: 0, Status: Busy, Location: TarkovStreets, Sid: x'
+2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|application|GameStarted:12.3 real:4.5
+2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|application|SelectProfile ProfileId:5f1 AccountId:123
+2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|push-notifications|Got notification | UserMatchOver
+{
+  "type": "userMatchOver"
+}
+2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|application|Network game matching cancelled
+2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|application|Network game matching aborted
+2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|application|Control settings:
+{
+"keyBindings": [{"keyName": "MakeScreenshot", "variants": [{"keyCode": []}]}]
+}
+2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|application|Control settings:
+{
+"keyBindings": [{"keyName": "MakeScreenshot", "variants": [{"keyCode": ["SysReq"]}]}]
+}
+2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|application|Control settings:
+{
+"keyBindings": [{"keyName": "MakeScreenshot", "variants": [{"keyCode": ["F12"]}]}]
+}

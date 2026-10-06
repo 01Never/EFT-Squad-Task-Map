@@ -13,7 +13,7 @@ off-screen, and only with "Follow my position" on, as in v2; the zoom never chan
 When "Follow my position" switches maps, the new map opens at its default zoom, centred on you.
 
 **Where the data comes from:** Tarkov writes your position and facing into each screenshot's file
-name. The server parses it (`server/gpsname.ts`), works out the map from the game log, and sends a
+name. The server parses it (`internal/features/gps`), works out the map from the game log (`internal/features/raid`), and sends a
 `gps` event (live only, not saved) with the position and the last 5 positions (the trail).
 
 **The rules** (`rules.js`):
@@ -36,7 +36,7 @@ name. The server parses it (`server/gpsname.ts`), works out the map from the gam
   `map.js`), then runs once you let go.
 
 **Flow:**
-`screenshot file → server/screens.ts → gpsname.ts → main.ts gps() → event "gps" → live.js →
+`screenshot file → internal/screenshots → app.onScreenshot → gps.ParseFileName → gps.Tracker.Update → event "gps" → live.js →
 onNewPosition() (starts the pulse) → renderPlayer() → moveViewForNewPosition() → map.js apply() →
 placeFindMeOverlays()`
 

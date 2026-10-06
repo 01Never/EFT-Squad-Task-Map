@@ -2,13 +2,13 @@
 
 For Claude Code picking up this project. Read this file, then `CLAUDE.md` (rules), then `SPEC.md` (the v2 design, still the source of truth for intended behavior), then `docs/ROADMAP.md` (the tickets being built now) and `docs/CODE-STYLE.md` (how new code is written). `README.md` is the user-facing manual.
 
-Current version: see `VERSION` in `server/main.ts` and `version` in `package.json` (kept equal).
+Current version: see `Version` in `internal/app/run.go` (also `version` in `package.json` and the version info in `winres/winres.json`; keep all three equal).
 
 ---
 
 ## 1. Read this first
 
-1. **What it is:** a Windows desktop helper for Escape from Tarkov. One Bun program compiled to `SquadTaskMap.exe` that:
+1. **What it is:** a Windows desktop helper for Escape from Tarkov. One Go program compiled to `SquadTaskMap.exe` (~12 MB; v2 up to 2.3.0 was Bun/TypeScript) that:
    - serves a map web page on `http://127.0.0.1:7777`;
    - watches the game's **log files** (tasks accepted/finished, raid start/end, game mode);
    - watches the **screenshots folder** (in-raid GPS position from file names; task-list scans read by OpenAI vision);
@@ -16,7 +16,7 @@ Current version: see `VERSION` in `server/main.ts` and `version` in `package.jso
    The owner and their squad use it while playing, often with the map on half the screen.
 2. **The game is CPU-bound and runs at the same time.** Lightness is a hard requirement, not a nice-to-have. See §7.
 3. **The owner decides features.** They like to talk a feature through before anything is built. Don't change behavior that wasn't asked for. When a request is ambiguous, ask. Squadmates' feedback arrives through the owner; build what the owner asks for, which can differ from the raw feedback (e.g., the friend asked for red highlights and the owner said "not red").
-4. **v2 has never run against the real game, real Windows paths, live json.tarkov.dev or a real OpenAI key.** It was built and tested in a Linux sandbox against stand-ins (§9). The owner hasn't reported in-game results yet. Treat the items in §10 as unverified until they confirm.
+4. **Checked against real data on 2026-10-04/05 (ticket 04 step 0):** the live json.tarkov.dev files, the owner's real log files (one session, anonymised in `testdata/logs/real-session`) and real screenshot names (`testdata/screenshots/names.txt`), and Windows folder detection on the owner's PC. Still not seen in-game: the items in §10.
 5. **Deliverables the owner expects:** the Windows exe (zipped; also `.7z` if the zip is over 30 MB) **and** the source. See §3.
 6. **Git:** the project is a local git repo (no remote). `main` holds released work; each roadmap ticket gets its own branch (`ticket-NN-<name>`), merged into `main` when the owner accepts it.
 
@@ -26,9 +26,10 @@ Current version: see `VERSION` in `server/main.ts` and `version` in `package.jso
 
 - **TarkovMonitor is GPL-3.0.** Read it for formats and behavior; never copy its code.
 - **File deletion:** never delete anything outside the app's own files except:
-  1. screenshots the user confirmed in a scan (`Screens.deleteCaptured`, only names in the current capture list);
-  2. GPS screenshots created during the raid that just ended (`Screens.deleteRaidShots`, only files it saw being created).
-- **API keys** stay server-side, stored in plain text in `squad-task-map-settings.json`, and are only sent to `api.openai.com`. The page never sees the full key (`mask()`).
+  1. screenshots the user confirmed in a scan (`taskscan.Scan.Confirm`, only names in the current capture list);
+  2. GPS screenshots created during the raid that just ended (`raid.Tracker.End`, only files it saw being created).
+  Both go through `screenshots.Watcher.DeleteFile`, which refuses anything but a plain file name in the folder.
+- **API keys** stay server-side, stored in plain text in `squad-task-map-settings.json`, and are only sent to `api.openai.com`. The page never sees the full key (`storage.MaskKey`).
 - **Projection (`web/js/logic/projection.js` `makeProj`) is exact** and verified against tarkov.dev test vectors. Keep its tests passing.
 - **Saved-state changes need a migration path** (see §6.2).
 - Use a scratch `STM_DATA_DIR` while developing so the owner's real `squad-task-map-data.json` isn't touched.
@@ -37,20 +38,19 @@ Current version: see `VERSION` in `server/main.ts` and `version` in `package.jso
 
 ## 3. Run, test, build
 
-Bun is installed at `%USERPROFILE%\.bun\bin\bun.exe` (on the user PATH; a VS Code window opened before the install may need a full restart to see it). Git is at `E:\coding\Git\cmd\git.exe`. Go and Node are **not** installed yet; ticket 04/04b need them. Bun is uninstalled as the last step of ticket 04 (owner's decision), not before.
+Go 1.27 and Node 24 are portable installs in `E:\coding\toolchains` (`go\bin`, `node`), on the user PATH (the owner chose portable after the admin prompt for a system-wide install was cancelled). Git is at `E:\coding\Git\cmd\git.exe`. Bun was uninstalled after the Go port passed its parity check (owner's decision).
 
-No dependencies to install (empty `dependencies`; there's no `tsconfig` or `@types/bun`, so the editor may flag `Bun` globals and `import … with { type: "text" }`. `bun add -d @types/bun` fixes that if wanted).
+Go dependencies: `github.com/fsnotify/fsnotify` (screenshots folder notifications), `golang.org/x/sys` (Windows registry and the Documents known folder). The page has no dependencies and no build step.
 
 | Task | Command |
 |---|---|
-| Dev run | `bun run dev` (bundles the page, then runs `server/main.ts`) |
-| Unit tests | `bun test` (`tests/*.test.ts` plus `web/js/features/**/rules.test.js`) |
-| Windows exe | `bun run build` → `dist/SquadTaskMap.exe` (~120 MB) |
-| Linux binary (smoke tests) | `bun run build:linux` |
+| Dev run | `go run .` (page files are served from disk, so edits show on reload) |
+| Server tests | `go test ./...` |
+| Page tests | `npm test` (= `node --test "tests/*.test.js" "web/js/**/*.test.js"`) |
+| Windows exe | `go build -trimpath -ldflags "-s -w" -o dist/SquadTaskMap.exe .` (~12 MB) |
+| Icon / version info | edit `winres/winres.json`, then `go-winres make --arch amd64 --out rsrc` (writes `rsrc_windows_amd64.syso`, picked up by `go build`) |
 
-**Gotcha:** `server/main.ts` embeds `web/dist/app.js`. If you run `bun server/main.ts` directly after editing `web/js/*`, you get the **old** page (or an import error if `web/dist/` doesn't exist). Always go through `bun run dev` / `bun run build`, or run `bun run build:web` first.
-
-**Environment variables** (PowerShell: `$env:NAME="value"; bun run dev`):
+**Environment variables** (PowerShell: `$env:NAME="value"; go run .`):
 
 | Variable | Effect |
 |---|---|
@@ -60,13 +60,16 @@ No dependencies to install (empty `dependencies`; there's no `tsconfig` or `@typ
 | `STM_LOGS_DIR` / `STM_SCREENSHOTS_DIR` | Override detected game folders |
 | `STM_JSON_BASE` | Game-data base URL (default `https://json.tarkov.dev`) |
 | `STM_OPENAI_API` / `STM_WIKI_API` | OpenAI and wiki endpoints (for the mock server) |
+| `STM_ASSETS_DIR` | Serve the page files from this folder instead of the ones built into the exe (automatic under `go run`) |
+
+**One copy at a time:** the running copy writes `squad-task-map-instance.json` (port, pid) in the data folder; a second launch on the same data folder opens that copy's page and exits. Copies with different `STM_DATA_DIR`s run side by side (tests, squad dev setups).
 
 **Release checklist**
-1. Bump `VERSION` in `server/main.ts` and `version` in `package.json`.
-2. `bun test`, then the manual checks in §9 that touch your change.
-3. `bun run build`.
-4. Zip `SquadTaskMap.exe` + `README.md` in a `SquadTaskMap-v2/` folder. If over 30 MB (2.1.0: 39 MB), also make a `.7z` with LZMA2 max (2.1.0: 29.3 MB). The owner receives files through a chat with a 30 MB limit. 7-Zip isn't needed; Windows' own tar writes 7z: `tar --format 7zip --options "7zip:compression=lzma2,7zip:compression-level=9" -cf SquadTaskMap-<version>.7z SquadTaskMap-v2`.
-5. Zip the source without `node_modules/`, `dist/`, `web/dist/`: `git archive --format=zip --prefix=squad-task-map-<version>-source/ -o <file>.zip HEAD`.
+1. Bump `Version` in `internal/app/run.go`, `version` in `package.json` and the versions in `winres/winres.json` (then `go-winres make --arch amd64 --out rsrc`).
+2. `go test ./...`, `npm test`, then the manual checks in §9 that touch your change.
+3. `go build -trimpath -ldflags "-s -w" -o dist/SquadTaskMap.exe .`
+4. Zip `SquadTaskMap.exe` + `README.md` in a `SquadTaskMap-v2/` folder. The Go exe zips well under the chat's 30 MB limit; only if a zip is over 30 MB, also make a `.7z` with Windows' own tar: `tar --format 7zip --options "7zip:compression=lzma2,7zip:compression-level=9" -cf SquadTaskMap-<version>.7z SquadTaskMap-v2`.
+5. Zip the source: `git archive --format=zip --prefix=squad-task-map-<version>-source/ -o <file>.zip HEAD`.
 6. Update `README.md` for user-visible changes, and this file.
 
 ---
@@ -74,10 +77,10 @@ No dependencies to install (empty `dependencies`; there's no `tsconfig` or `@typ
 ## 4. Architecture
 
 ```
-Tarkov logs ──(5 s size check)──► LogWatcher ─┐
-Screenshots ──(fs.watch)────────► Screens ────┤
-json.tarkov.dev ──(hourly check)─► gamedata ──┼─► server/main.ts ──HTTP/SSE──► page (web/js) ──PUT /api/state──► squad-task-map-data.json
-OpenAI ◄──(scan, categorize)───── ai.ts ──────┘        127.0.0.1 only
+Tarkov logs ──(5 s size check)──► features/gamelog ─┐
+Screenshots ──(OS notifications)─► screenshots ─────┤
+json.tarkov.dev ──(hourly check)─► gamedata ────────┼─► internal/app ──httpapi (HTTP/SSE)──► page (web/js) ──PUT /api/state──► squad-task-map-data.json
+OpenAI ◄──(scan, categorize)───── taskscan / aicategorize ┘          127.0.0.1 only
 ```
 
 - **The page owns the saved data.** It loads `GET /api/state`, migrates it, and saves the whole object with `PUT /api/state` (500 ms debounce, `flush()` on tab hide/unload). The server just stores it (atomic write plus a `.bak`).
@@ -87,19 +90,24 @@ OpenAI ◄──(scan, categorize)───── ai.ts ──────┘   
 - The page handles events in `web/js/live.js` `handle()`.
 - **The page never polls,** with one exception: it polls `/api/ai/job/:id` while an AI Categorize request runs.
 
-### Server (`server/`)
-| File | Role |
+### Server (Go; start with `internal/app/app.go`)
+| Package | Role |
 |---|---|
-| `main.ts` | Embeds assets; every HTTP route (one `handler`); raid/GPS state; wiring of log events. Routes: `/api/config`, `/api/data`, `/api/status`, `/api/events(+/ack)`, `/api/state`, `/api/settings`, `/api/data/refresh`, `/api/ai/key`, `/api/ai/categorize`, `/api/ai/job/:id`, `/api/scan/{start,stop,cancel,remove,image,read,confirm}`, `/maps/*`, `/fonts/*`. |
-| `gamedata.ts` | Loads the cache or bundled snapshot; refreshes from json.tarkov.dev when data is over 24 h old (checked hourly); validates (at least max(200, 50% of previous) tasks and at least 5 maps, else keeps the old data). `dataStatus().origin` is `live`, `cache` or `built-in`. |
-| `convert.ts` | json.tarkov.dev raw files → the internal `stm-v2` format (§6.1). Also converts the bundled snapshot (`assets/game-data.json`). Has the scene-path → map and nameId → map tables. |
-| `logs.ts` | `LogWatcher`: newest session folder, `notifications`/`application` log files, reads only new bytes, starts at the end (no catch-up), rescans the folder every 6th poll (30 s). |
-| `logparse.ts` | Splits log text into entries (header line plus optional JSON block; keeps an incomplete tail) → events. |
-| `screens.ts` | `fs.watch` on the screenshots folder (400 ms debounce). GPS-named files → `gps` callback. Capture mode for scans. The only code that deletes files. |
-| `gpsname.ts` | Parses `YYYY-MM-DD[HH-MM]_x, y, z_qx, qy, qz, qw (n).png`; yaw uses TarkovMonitor's component order (x, z, y, w). |
-| `paths.ts` | Data file names; Windows detection: Documents via PowerShell `GetFolderPath('MyDocuments')` (OneDrive-safe); logs via the registry uninstall key `EscapeFromTarkov` → `InstallLocation`, or Steam `libraryfolders.vdf` → `appmanifest_3932890.acf`. |
-| `store.ts` | Settings (drops old `tt*` TarkovTracker keys), state file, v1 backup, pending event queue. |
-| `ai.ts` | OpenAI Responses API, strict JSON schemas. `categorize()` works on **parts** and has a `get_wiki_page` tool. `readTaskList()` does the vision scan. Wiki cache kept 7 days. |
+| `main.go`, `embed.go` | Entry point; `//go:embed` of `web/` and `assets/` (the page is served as-is, no bundler). |
+| `internal/app` | Creates every part and wires them (`app.go`: log event → raid/gps/events; screenshot → gps or scan), the backend behind every route (`backend.go`), start-up (`run.go`: data folder, single copy, port 7777→7800, banner, browser). |
+| `internal/httpapi` | Route table and thin handlers (`routes.go`), static files with explicit content types and an ETag = version (`static.go`), the `Backend` interface listing everything the page can ask for. |
+| `internal/events` | Event names (`names.go`, spelled as `web/js/live.js` expects) and the SSE hub: `Deliver` (queued in `squad-task-map-pending.json` until acked) and `Broadcast` (live only). |
+| `internal/storage` | Files next to the exe: settings (unknown fields kept, `tt*` dropped), the page's saved data as opaque text (atomic write + `.bak`), v1 backup. |
+| `internal/gamedata` | Saved copy or built-in snapshot; refresh when over 24 h old (checked hourly); validation (≥ max(200, 50% of previous) tasks, ≥ 5 maps); `convert.go`/`snapshot.go` = 1:1 port of v2's converter, JSON-equal to the v2 goldens. |
+| `internal/gamefolders` | Logs folder via the launcher's registry entry or Steam libraries; Documents via `FOLDERID_Documents` (OneDrive-safe). |
+| `internal/screenshots` | Watches the screenshots folder (fsnotify); a file is handed on once quiet for 400 ms with a stable size; the only file deletion, limited to plain names in the folder. |
+| `internal/openai` | Responses API client, error hints, key/model shape checks. |
+| `internal/features/gamelog` | `rules.go` parser (entries → events, screenshot-key check) and `watcher.go` (5 s size check, new bytes only, newest session folder, no catch-up). |
+| `internal/features/raid` | Raid state (loading map, start, end, session mode) and that raid's GPS shots; `rules.go`: `ModeMatches`, `EndsOnMenuReturn`. |
+| `internal/features/gps` | Position from screenshot names (`rules.go`), last position + trail (`tracker.go`). |
+| `internal/features/taskscan` | Capture mode, serving captured images, the vision read, confirm/cancel. |
+| `internal/features/aicategorize` | AI Categorize (prompt, tool loop, review of the answer), wiki fetch/clean/cache (7 days), jobs. |
+| `cmd/mock` | Offline stand-ins for json.tarkov.dev, OpenAI and the wiki (byte-equal to v2's Bun mock). |
 
 ### Page (`web/`)
 - `index.html`: all CSS (tarkov.dev palette, Bender font) and the shell. Mobile breakpoints at 860 px and 600 px. Feature CSS added by roadmap tickets sits in its own clearly labelled block until ticket 04b moves CSS into files.
@@ -187,21 +195,21 @@ Log task events count only when the log's `Session mode` matches the game-mode s
 - Maps: `{key, scene, nameId, extracts[{n, fa, x, y, z, ol?}], transits[{n, x, y, z}]}`
 - Map keys: `streets-of-tarkov`, `ground-zero`, `customs`, `factory`, `interchange`, `lighthouse`, `reserve`, `shoreline`, `woods`. Labs, Labyrinth and Terminal have no SVG; their tasks are listed on the picker as "not shown on a map".
 
-The raw json.tarkov.dev format (`{mode}/tasks`, `tasks_en`, `maps`, `maps_en`, `traders`, `traders_en`, `items_en`; names are translation keys) was **inferred** from tarkovtaskmap's converter and tarkov-api's GraphQL schema, because the sandbox couldn't reach json.tarkov.dev. If the real files differ, the download fails validation and the app keeps the bundled snapshot (Settings shows the error). **Fetch the real files and compare against `fromRaw()` before trusting live data** (ticket 04 step 0).
+The raw json.tarkov.dev format (`{mode}/tasks`, `tasks_en`, `maps`, `maps_en`, `traders`, `traders_en`, `items_en`; names are translation keys) was first **inferred**, then **checked against the real files on 2026-10-05**: the assumptions hold, nothing is left untranslated, 515 tasks with the same ids as the snapshot, payload ~1.8 MB. The real files are kept (gzip) in `testdata/jsontarkovdev/`, and the Go converter is JSON-equal to v2 on them (`internal/gamedata/convert_test.go`).
 
 ### 6.2 Saved state (`squad-task-map-data.json`, `version: 2`)
 See SPEC §12. Fields: `cats`, `tasks{id: {active, source, addedAt, gamePct, scannedAt, noSplit, pinned, partCats}}`, `ticks`, `have`, `used`, `subs`, `draw`, `prefs{map: {ext, extMarked, labels, drawOn}}`, `pinnedOnly`, `panelTab`, `panelHidden`, `collapsed`, `dcolor`, `dwidth`, `aiOpen`, `showScanBanner`, `migratedFrom`.
 - **Adding a field:** add its default to `freshState()`. `fill()` adds missing defaults when loading. Only bump `version` and add a `migrate` step for structural changes; keep the v1 → v2 path working (fixture: `tests/fixtures/v1-data.json`, the owner's real v1 file).
 
 ### 6.3 Files next to the exe
-`squad-task-map-data.json` (+ `.bak`), `squad-task-map-settings.json` (OpenAI key/model/effort, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`), `squad-task-map-gamedata-<mode>.json`, `squad-task-map-pending.json`, `squad-task-map-wikicache.json`, `squad-task-map-data.v1-backup.json`.
+`squad-task-map-data.json` (+ `.bak`), `squad-task-map-settings.json` (OpenAI key/model/effort, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`), `squad-task-map-gamedata-<mode>.json`, `squad-task-map-pending.json`, `squad-task-map-wikicache.json`, `squad-task-map-data.v1-backup.json`, `squad-task-map-instance.json` (port of the running copy).
 
 ---
 
 ## 7. Performance rules
 
-Measured idle cost: **~0.2% of one core, ~90–100 MB RSS.** A bare Bun process holding the same heap costs the same; it's Bun's GC timer. Keep it there:
-- Server timers stay as they are: log poll 5 s (a `statSync`, then read only new bytes); folder rescan 30 s; missing-folder retry 60 s; game-data check hourly (downloads at most daily). Screenshots use `fs.watch`. **No faster timers.**
+Measured idle cost with the page open (2 min, 2026-10-05): **Go 2.4.0: 0.000% of one core, 34 MB working set** (Bun 2.3.0 was 0.18% and 57 MB). Keep it there:
+- Server timers stay as they are: log poll 5 s (an `os.Stat`, then read only new bytes); folder rescan 30 s; missing-folder retry 60 s; game-data check hourly (downloads at most daily). Screenshots use OS file notifications (fsnotify). **No faster timers.**
 - **The page:** no polling, no timers, no continuous animation, with these exceptions:
   - **The selection flash** is HTML rings in `#fx` over the map, animated only with CSS `transform`/`opacity`. That runs on the compositor with zero main-thread paint. A trace showed 0 Paint/Layout per second, versus ~120 paints per second for the old SVG `r` animation.
   - **The find-me pulse** (ticket 01) uses the same technique, and only for ~20 s after a new position or a Find me click.
@@ -213,67 +221,73 @@ Measured idle cost: **~0.2% of one core, ~90–100 MB RSS.** A bare Bun process 
 
 ## 8. Recipes
 
-- **New API route:** add a branch in `handler()` in `server/main.ts`; use `json()`/`body()`. Keep it on 127.0.0.1.
-- **New live event:** server `deliver()` if it must reach saved data, else `broadcast()`; handle it in `live.js` `handle()`.
+- **New API route:** add a method to `httpapi.Backend`, a line in the route table in `internal/httpapi/routes.go` and a thin handler; implement the method in `internal/app/backend.go`. Keep it on 127.0.0.1.
+- **New live event:** add its name to `internal/events/names.go`; `hub.Deliver()` if it must reach saved data, else `hub.Broadcast()` (from `internal/app`); handle it in `live.js` `handle()`.
+- **New server feature:** a package in `internal/features/<name>/` with `rules.go` (pure), its I/O in another file, `*_test.go` and a README; connect it in `internal/app/app.go` only.
 - **New panel button:** markup with `data-act="x"` in `panel.js`; add `case "x":` in `bindPanel`'s switch; `save()` then `renderAll()`/`renderPanel()`.
 - **Toast with Undo:** `toast(msg, { label: "Undo", run: () => … })`. Snapshot with `snapshotCats()`/`restoreCats()` for category changes.
-- **New map:** add the SVG to `assets/` and import it in `main.ts` `SVGS`. Add an entry to `assets/maps-config.json` (key, name, svg, transform, rotation, bounds, svgBounds, baseLayer, heightRange, layers, labels). These values come from tarkov.dev's maps data (the-hideout/tarkov-dev). Check that the scene/nameId tables in `convert.ts` map to the key.
-- **Change splitting/categories:** edit `parts.js`/`state.js` and add a case to `tests/core.test.ts` (tasks are looked up by name from the snapshot).
+- **New map:** add the SVG to `assets/` and `embed.go` already embeds `assets/*.svg`. Add an entry to `assets/maps-config.json` (key, name, svg, transform, rotation, bounds, svgBounds, baseLayer, heightRange, layers, labels). These values come from tarkov.dev's maps data (the-hideout/tarkov-dev). Check that `SceneToMap`/`NameIDToMap` in `internal/gamedata/snapshot.go` map to the key.
+- **Change splitting/categories:** edit `parts.js`/`state.js` and add a case to `tests/logic.test.js` (tasks are looked up by name in `testdata/golden/data-snapshot.json.gz`).
 - **New roadmap feature:** a folder in `web/js/features/<name>/` with `README.md`, `rules.js`, `rules.test.js` and `map-layer.js`/`panel.js`; add a row to `docs/FEATURES.md`.
 
 ---
 
 ## 9. Testing
 
-**Unit:** `bun test`.
-- `tests/core.test.ts`: projection vectors, conversion, parts, readiness/bring list, migration, matching, GPS names.
-- `tests/watchers.test.ts`: log parsing and the watchers, using temp folders.
-- `web/js/features/**/rules.test.js`: the roadmap features' rules.
+**Server:** `go test ./...`. Table-driven tests whose names read like the rules. The important ones:
+- `internal/gamedata/convert_test.go`: the converter is JSON-equal to v2's output (golden files captured from the TypeScript server before the port) for the bundled snapshot, the mock files and the **real** json.tarkov.dev files of 2026-10-05.
+- `internal/features/gamelog/gamelog_test.go`: the parser gives v2's events for synthetic samples and the owner's anonymised real session (`testdata/logs/real-session`); split writes, a shrinking file, a new session folder, no catch-up, UTF-8 cut between reads; the screenshot-key check.
+- `internal/features/gps/rules_test.go`: positions for the owner's 102 real screenshot names (43 with a position) match v2.
+- `internal/features/raid/raid_test.go`: mode matching, raid start/end, only that raid's GPS shots are deleted.
+- `cmd/mock`: its own tests.
 
-**Offline end-to-end:** `bun tests/mock-server.ts` (port 7820) fakes json.tarkov.dev (built from the snapshot by `tests/helpers.ts` `snapshotToRaw`), OpenAI (accepted key `sk-test_1234567890abcdefghijkl`; vision returns preset rows, changeable via `POST /set-rows`; categorize moves keyed parts to "Key runs"), and the wiki. `POST /fail {"fail":true}` simulates a json.tarkov.dev outage; `GET /log` lists requests. Then run the app with:
+**Page:** `npm test` (`node --test`): `tests/logic.test.js` (projection vectors, parts, readiness/bring list, migration, matching, simplify) and `web/js/features/**/rules.test.js`.
+
+**Golden files** (`testdata/golden/`) were captured from the v2 TypeScript code before it was removed: converter outputs, the mock's raw documents, log events, GPS names. If a rule changes on purpose, regenerate the affected golden and say so in the commit.
+
+**Offline end-to-end:** `go run ./cmd/mock` (port 7820) fakes json.tarkov.dev (the snapshot-based documents v2's mock served; `MOCK_DOCS=real` serves the real files in `testdata/jsontarkovdev`), OpenAI (accepted key `sk-test_1234567890abcdefghijkl`; vision returns preset rows, changeable via `POST /set-rows`; categorize moves keyed parts to "Key runs"), and the wiki. `POST /fail {"fail":true}` simulates a json.tarkov.dev outage; `GET /log` lists requests. Then run the app with:
 ```
 STM_DATA_DIR=<scratch>  STM_LOGS_DIR=<scratch>\logs  STM_SCREENSHOTS_DIR=<scratch>\shots  STM_NO_BROWSER=1
 STM_JSON_BASE=http://127.0.0.1:7820  STM_OPENAI_API=http://127.0.0.1:7820/v1  STM_WIKI_API=http://127.0.0.1:7820/wiki
 ```
-Create `<scratch>\logs\log_2026.10.01_10-00-00_1.1.5.1\` containing empty `x notifications.log` and `x application.log`, then **append** lines to simulate the game (the formats are the same as the helpers in `tests/watchers.test.ts`):
+Create `<scratch>\logs\log_2026.10.01_10-00-00_1.1.5.1\` containing empty `x push-notifications_000.log` and `x application_000.log` (the real names end like that), then **append** lines to simulate the game (real format, see `testdata/logs/real-session`):
 ```
-2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|notifications|Got notification | ChatMessageReceived
+2026-10-01 11:25:03.123|1.1.5.1.47510|Info|push-notifications|Got notification | ChatMessageReceived
 {
   "message": { "type": 10, "templateId": "<taskId> description" }
 }
-2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|application|Session mode: Regular
-2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|application|scene preset path:maps/city_preset.bundle rcid:x
-2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|application|GameStarted:12.3 real:4.5
-2026-10-01 11:25:03.123 -05:00|1.1.5.1|Info|application|SelectProfile ProfileId:5f1 AccountId:123
+2026-10-01 11:25:03.123|1.1.5.1.47510|Info|application|Session mode: Regular
+2026-10-01 11:25:03.123|1.1.5.1.47510|Info|application|scene preset path:maps/city_preset.bundle rcid:x
+2026-10-01 11:25:03.123|1.1.5.1.47510|Info|application|GameStarted:12.3 real:4.5
+2026-10-01 11:25:03.123|1.1.5.1.47510|Info|application|PrepareSelectedProfileLocally ProfileId:0 AccountId:1
 ```
 - Message `type` is 10 = started, 11 = failed, 12 = finished.
-- GPS: create a file in the shots folder named `2026-10-01[14-05]_-120.53, 3.10, 210.77_0.00000, 0.70711, 0.00000, 0.70711 (0).png`.
+- GPS: create a file in the shots folder named `2026-10-01[14-05]_-120.53, 3.10, 210.77_0.00000, 0.70711, 0.00000, 0.70711 (0).png` (real names may add `_13.51` before ` (0)`).
 - Scan: start a scan, then drop any images into the shots folder.
 
-Browser end-to-end checks are driven with `puppeteer-core` + the installed Microsoft Edge (headless), from scratch scripts outside the repo. Ticket 04b turns them into a permanent suite. Note the page keeps an SSE connection open, so wait for an element rather than for network idle.
+**Port parity (ticket 04):** before the TypeScript server was deleted, both servers ran side by side against the mock with the same inputs: static files byte-identical; `/api/data` JSON-equal; `/api/status` same shape and values; state round trip and `.bak`; the same SSE events in the same order for the same log lines and GPS file; the same pending queue and acks; settings; AI key, categorize, scan read/confirm/cancel and their errors (34 checks, all passing). Browser checks for tickets 01–04 (headless Edge via `puppeteer-core`, scratch scripts) passed against the Go server. Ticket 04b turns them into a permanent suite. The page keeps an SSE connection open, so wait for an element rather than for network idle.
 
 ---
 
-## 10. Unverified: needs the owner in-game or on Windows
+## 10. Unverified: needs the owner in-game
 
-1. **Windows folder detection:** the registry/Steam logs lookup and the PowerShell Documents lookup. Settings shows ✓/✗ for each folder; both can be pasted by hand.
-2. **Real log lines:** accept a task → added within ~5 s; finish one → removed; PvE events ignored while the setting is PvP Season; the raid start/end lines and the keybind JSON (`Control settings:` → `keyBindings[].keyName == "MakeScreenshot"`).
-3. **GPS arrow direction:** two screenshots facing along a straight road. If it's off by 90° or 180°, fix the component order in `yawFromQuaternion` or the correction in `arrowRotation`. Keep the projection itself untouched.
-4. **Raid end:** the toast appears, `have` is 0, and only that raid's GPS shots are gone.
-5. **json.tarkov.dev live format** (§6.1).
-6. **Scan accuracy** with real screenshots and a real model (default `gpt-5.4-mini`), and that a full scan leaves exactly the in-game list.
+Verified on the owner's PC since 2.3.0: folder detection (registry → `E:\Games\tarkov\Logs`; Documents via the Windows API); the real log formats and the order of raid lines; real screenshot names; live json.tarkov.dev data. Still open:
+1. **Log events live:** accept a task → added within ~5 s; finish one → removed; PvE events ignored while the setting is PvP Season.
+2. **GPS arrow direction:** two screenshots facing along a straight road. If it's off by 90° or 180°, fix the component order in `gps.YawFromQuaternion` or the correction in `arrowRotation`. Keep the projection itself untouched.
+3. **Raid end:** the toast appears, `have` is 0, and only that raid's GPS shots are gone.
+4. **Scan accuracy** with real screenshots and a real model (default `gpt-5.4-mini`), and that a full scan leaves exactly the in-game list.
+5. **The Go exe on the owner's PC:** replace the exe, data and settings still there; one raid with logs, GPS, raid end and a scan.
 
 ---
 
 ## 11. Known gaps and quirks (not bugs the owner has reported; ask before changing behavior)
 
-- **Phantom tasks (reported by squadmates, not diagnosed):** tasks show that the player doesn't have. Suspects, from reading the code: (1) the v1 → v2 migration activates the whole v1 manual list, including tasks finished since; (2) `modeMatches()` accepts every log task event while the session mode is unknown, which is the case whenever the app starts after the game; (3) several open tabs each save the whole state, so a stale tab can restore a removed task; (4) a scan of a trader's available-tasks page, or a fuzzy match to the wrong name. The owner chose not to diagnose for now; a full scan now clears them. Each task entry's `source` and `addedAt` show which path added it.
-- **Scan ignores the Reasoning setting:** `readTaskList` always sends `effort: "low"` for gpt-5/gpt-6/o-series models. SPEC §8 says to reuse the setting, defaulting to low.
-- **No single-instance guard:** a second exe binds the next port, and both watch the logs and write the same data file.
+- **Phantom tasks (reported by squadmates, not diagnosed):** tasks show that the player doesn't have. Suspects, from reading the code: (1) the v1 → v2 migration activates the whole v1 manual list, including tasks finished since; (2) `raid.ModeMatches()` accepts every log task event while the session mode is unknown, which is the case whenever the app starts after the game; (3) several open tabs each save the whole state, so a stale tab can restore a removed task; (4) a scan of a trader's available-tasks page, or a fuzzy match to the wrong name. The owner chose not to diagnose for now; a full scan now clears them. Each task entry's `source` and `addedAt` show which path added it.
+- **Scan ignores the Reasoning setting:** `taskscan.Scan.Read` always sends `effort: "low"` for gpt-5/gpt-6/o-series models. SPEC §8 says to reuse the setting, defaulting to low.
 - **Don't split vs moved parts:** a manual move stored on `<id>:<action>` doesn't apply once the task is unsplit (`<id>:*`); it falls back to the precedence default.
 - GPS trail labels ("x min ago") overlap when zoomed far out.
 - Item icons load from assets.tarkov.dev; offline they remove themselves (`onerror`).
-- AI Categorize jobs live in server memory (`JOBS`); a restart drops a running job.
+- AI Categorize jobs live in server memory (`aicategorize.Jobs`); a restart drops a running job.
 - Story chapters on the in-game Tasks screen aren't in tarkov.dev data, so they show as "Not recognised" in scans. That's expected.
 - The map SVGs are CC BY-NC-SA 4.0: non-commercial only.
 - The pending-event `seq` restarts at the highest queued id (0 if the queue is empty) when the server restarts, while an open page keeps its old `ackUpTo`.
@@ -293,6 +307,7 @@ Browser end-to-end checks are driven with `puppeteer-core` + the installed Micro
 - **2.1.0 (ticket 01, Find me):** player marker in its own colour and ring shape with a "You" label; a new position (or 📍 Find me) pulses for ~20 s, then nothing animates (owner replaced the ticket's continuous radar with this); off-screen chip with distance; Find me and the chip centre without changing zoom; fainter trail. Includes the scan-replaces-list change.
 - **2.2.0 (ticket 02, auto-center):** setting `autoCenter` (off by default) + ◎ Follow toolbar toggle: each new position centres the map at your zoom. With it off, only off-screen positions are brought into view (if Follow my position is on). The zoom-changing `centerOn()` is gone: nothing changes zoom automatically any more. A position that arrives mid-drag waits for the release (`afterUserLetsGo`).
 - **2.3.0 (ticket 03, closest extract):** after each position, the closest marked extract (or, with none marked, the closest one the chips show; transits only when marked) gets a ring, a dashed line with "~N m" and a "Closest: …" link in the position bar. No runner-ups (owner). Code in `web/js/features/extracts/`. Also: the Follow toggle icon is ◎ (⌖ didn't render). Last Bun-only release before the Go port.
+- **2.4.0 (ticket 04, Go backend):** the server is Go (`internal/`), one 12 MB exe (was ~89 MB), idle 0.000% CPU / 34 MB. Same routes, JSON, SSE events and data files (34-check parity run against the Bun server, JSON-equal converter on real data). The page is served unbundled (`/js/main.js`). New: one copy at a time per data folder; exe icon and version info; `cmd/mock` in Go; page tests on `node --test`. Found and fixed against the owner's real files first: a false "SysReq" screenshot-key warning (one working slot is enough) and a stale game-mode prompt (the game logs "Pve" then "PvpSeason" at start-up). Kill targets: "The Wedge" counts as a Scav kill (not in the boss list); left as is, raised with the owner. Bun uninstalled.
 - **Roadmap (`docs/ROADMAP.md`):** tickets 01 → 10, one branch each. Progress is tracked in `docs/FEATURES.md` and below.
 
 **References:**

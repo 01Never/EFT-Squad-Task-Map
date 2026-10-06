@@ -9,6 +9,7 @@ It shows the tasks you actually have on each map, split by kind of work, with wh
 2. Double-click **SquadTaskMap.exe**. A console window opens and your browser goes to `http://127.0.0.1:7777`.
    - The first time, Windows SmartScreen may say "Windows protected your PC", because the program isn't code-signed. Click **More info → Run anyway**.
 3. Keep the console window open while you play. Close it to stop.
+   - Starting it again while it runs just opens the page of the running copy.
 
 The site only listens on your own PC (127.0.0.1). Nobody else on your network can open it.
 
@@ -101,7 +102,7 @@ The **🤖 AI Categorize** box in the panel sorts parts by your instructions, e.
 - The app deletes only two kinds of files: screenshots you confirmed in a scan, and GPS screenshots from the raid that just ended.
 
 ## Light on your PC
-While idle the program uses about 0.2% of one CPU core and about 100 MB of memory. It checks the two log files every 5 seconds by comparing their size and reads only new lines (the same approach as TarkovMonitor). It watches the screenshots folder with the system's file-change events instead of polling. The page in your browser runs nothing in the background and updates only when something happens. The one exception is the flashing ring on a selected task: it's animated so the graphics card moves it without redrawing the map, and it stops when nothing is selected. Game data is checked once an hour and downloaded at most once a day.
+While idle the program uses practically no CPU (measured 0.00% of one core over 2 minutes with the page open) and about 35 MB of memory. It checks the two log files every 5 seconds by comparing their size and reads only new lines (the same approach as TarkovMonitor). It watches the screenshots folder with the system's file-change events instead of polling. The page in your browser runs nothing in the background and updates only when something happens. The one exception is the flashing ring on a selected task: it's animated so the graphics card moves it without redrawing the map, and it stops when nothing is selected. Game data is checked once an hour and downloaded at most once a day.
 
 ## Files next to the exe
 | File | What |
@@ -123,11 +124,11 @@ To back up or move to another PC, copy `squad-task-map-data.json` (and the setti
 - Not affiliated with Battlestate Games.
 
 ## Building from source
-Install Bun (https://bun.sh), then in this folder:
-- `bun run dev`: build the page and run the server.
-- `bun test`: unit tests.
-- `bun run build`: Windows exe at `dist/SquadTaskMap.exe`.
+The server is written in Go; the page is plain JavaScript modules served as they are (no bundler). You need Go 1.27+ and, for the page's tests, Node 24+.
+- `go run .`: run the app from the source folder. The page files are read from disk, so a page edit shows on reload.
+- `go test ./...`: the server's tests. `npm test` (or `node --test "tests/*.test.js" "web/js/**/*.test.js"`): the page's logic tests.
+- Windows exe: `go build -trimpath -ldflags "-s -w" -o dist/SquadTaskMap.exe .` (about 12 MB). The icon and version info come from `rsrc_windows_amd64.syso`, made from `winres/` with `go-winres make --arch amd64 --out rsrc`.
 
-The page is written as ES modules in `web/js/`, bundled to one `web/dist/app.js` with Bun's bundler, and embedded in the exe with `import … with { type: "text" }`, like the map SVGs and fonts. That keeps the exe a single file, and the bundle step is the same on every OS.
+Start with `internal/app/app.go`: it shows how the parts connect. `docs/FEATURES.md` lists every feature with its Go package and page folder; each has a README.
 
-**Offline development:** `bun tests/mock-server.ts` serves stand-ins for json.tarkov.dev, OpenAI and the wiki on port 7820. Point the app at it with `STM_JSON_BASE=http://127.0.0.1:7820`, `STM_OPENAI_API=http://127.0.0.1:7820/v1`, `STM_WIKI_API=http://127.0.0.1:7820/wiki`. Other variables: `STM_DATA_DIR`, `STM_LOGS_DIR`, `STM_SCREENSHOTS_DIR`, `STM_NO_BROWSER=1`, `PORT`.
+**Offline development:** `go run ./cmd/mock` serves stand-ins for json.tarkov.dev, OpenAI and the wiki on port 7820 (`MOCK_DOCS=real` serves the real json.tarkov.dev files saved in `testdata/`). Point the app at it with `STM_JSON_BASE=http://127.0.0.1:7820`, `STM_OPENAI_API=http://127.0.0.1:7820/v1`, `STM_WIKI_API=http://127.0.0.1:7820/wiki`. Other variables: `STM_DATA_DIR`, `STM_LOGS_DIR`, `STM_SCREENSHOTS_DIR`, `STM_NO_BROWSER=1`, `PORT`, `STM_ASSETS_DIR` (serve the page from a folder on disk).

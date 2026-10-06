@@ -84,7 +84,9 @@ function handle(ev) {
     case "data": reloadData(); break;
     case "mode":
       app.STATUS.raid = { ...app.STATUS.raid, sessionMode: ev.mode };
-      if (ev.mode !== app.STATUS.settings.gameMode && app.modeDismissed !== ev.mode) { app.modePrompt = ev.mode; renderNav(); }
+      // The game logs a mode more than once at start-up (real logs: "Pve" then "PvpSeason"); the last one counts.
+      if (ev.mode === app.STATUS.settings.gameMode) { if (app.modePrompt) { app.modePrompt = null; renderNav(); } }
+      else if (app.modeDismissed !== ev.mode) { app.modePrompt = ev.mode; renderNav(); }
       break;
     case "keybind": app.STATUS.keybind = { ok: ev.ok, warning: ev.warning }; if (!ev.ok) toast(ev.warning); break;
   }

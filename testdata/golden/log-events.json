@@ -1,0 +1,240 @@
+{
+ "real-session/x application_000.log": [
+  {
+   "type": "keybind",
+   "ok": true,
+   "warning": null
+  },
+  {
+   "type": "mode",
+   "mode": "pve",
+   "raw": "Pve"
+  },
+  {
+   "type": "mode",
+   "mode": "pvp-season",
+   "raw": "PvpSeason"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "mapLoading",
+   "scene": "maps/rezerv_base_preset.bundle"
+  },
+  {
+   "type": "mapLoaded",
+   "nameId": "RezervBase"
+  },
+  {
+   "type": "raidStart",
+   "at": "2026-10-04T22:15:02.944"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "mapLoading",
+   "scene": "maps/sandbox_high_preset.bundle"
+  },
+  {
+   "type": "mapLoaded",
+   "nameId": "Sandbox_high"
+  },
+  {
+   "type": "raidStart",
+   "at": "2026-10-04T22:46:07.905"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "mapLoading",
+   "scene": "maps/lighthouse_preset.bundle"
+  },
+  {
+   "type": "matchingAborted"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "mapLoading",
+   "scene": "maps/lighthouse_preset.bundle"
+  },
+  {
+   "type": "mapLoaded",
+   "nameId": "Lighthouse"
+  },
+  {
+   "type": "raidStart",
+   "at": "2026-10-04T23:05:22.241"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "profileSelected"
+  }
+ ],
+ "real-session/x push-notifications_000.log": [
+  {
+   "type": "raidLeft"
+  },
+  {
+   "type": "task",
+   "id": "626bd75b05f287031503c7f6",
+   "status": "finished",
+   "at": "2026-10-04T23:37:24.279"
+  },
+  {
+   "type": "task",
+   "id": "596a218586f77420d232807c",
+   "status": "finished",
+   "at": "2026-10-04T23:37:34.432"
+  },
+  {
+   "type": "task",
+   "id": "61604635c725987e815b1a46",
+   "status": "finished",
+   "at": "2026-10-04T23:38:09.449"
+  },
+  {
+   "type": "task",
+   "id": "6179ad56c760af5ad2053587",
+   "status": "finished",
+   "at": "2026-10-04T23:38:23.990"
+  },
+  {
+   "type": "task",
+   "id": "665eec1f5e47a79f8605565a",
+   "status": "started",
+   "at": "2026-10-04T23:38:56.663"
+  },
+  {
+   "type": "task",
+   "id": "6a880acc9216d0f5aa078305",
+   "status": "started",
+   "at": "2026-10-04T23:39:20.327"
+  },
+  {
+   "type": "task",
+   "id": "63a511ea30d85e10e375b045",
+   "status": "started",
+   "at": "2026-10-04T23:39:48.703"
+  }
+ ],
+ "synthetic.log": [
+  {
+   "type": "task",
+   "id": "5967530a86f77462ba22226b",
+   "status": "started",
+   "at": "2026-10-01T11:25:03.123"
+  },
+  {
+   "type": "task",
+   "id": "5967530a86f77462ba22226c",
+   "status": "finished",
+   "at": "2026-10-01T11:25:03.123"
+  },
+  {
+   "type": "task",
+   "id": "5967530a86f77462ba22226d",
+   "status": "failed",
+   "at": "2026-10-01T11:25:03.123"
+  },
+  {
+   "type": "mode",
+   "mode": "pvp-season",
+   "raw": "PvpSeason"
+  },
+  {
+   "type": "mode",
+   "mode": "pve",
+   "raw": "Pve"
+  },
+  {
+   "type": "mode",
+   "mode": "regular",
+   "raw": "Regular"
+  },
+  {
+   "type": "mapLoading",
+   "scene": "maps/city_preset.bundle"
+  },
+  {
+   "type": "mapLoaded",
+   "nameId": "TarkovStreets"
+  },
+  {
+   "type": "raidStart",
+   "at": "2026-10-01T11:25:03.123"
+  },
+  {
+   "type": "profileSelected"
+  },
+  {
+   "type": "raidLeft"
+  },
+  {
+   "type": "matchingAborted"
+  },
+  {
+   "type": "matchingAborted"
+  },
+  {
+   "type": "keybind",
+   "ok": false,
+   "warning": "No screenshot key is bound in Tarkov's control settings. Bind one so the map can show your position."
+  },
+  {
+   "type": "keybind",
+   "ok": false,
+   "warning": "Tarkov's screenshot key is bound in a way that doesn't work (SysReq). Rebind it in the game's control settings."
+  },
+  {
+   "type": "keybind",
+   "ok": true,
+   "warning": null
+  }
+ ]
+}

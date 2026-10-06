@@ -1,13 +1,20 @@
 # Features: start here
 
-One row per feature. Open the feature's page folder (and, after ticket 04, its Go package) to see
-everything about it. Each folder has a README with the rules, the flow and the tests.
+One row per feature. Open the feature's Go package and page folder to see everything about it.
+Each has a README with the rules, the flow and the tests. How the parts connect is in
+`internal/app/app.go`.
 
-Features built before the roadmap (tasks, parts, readiness, scan, logs, AI Categorize, drawing…)
-still live in the v2 layout (`web/js/*.js`, `web/js/logic/`, `server/*.ts`); see `HANDOFF.md` §4.
-Ticket 04 adds their Go packages and ticket 04b moves their page code into `web/js/features/`.
+The page code of features built before the roadmap (task list, parts, readiness, scan review,
+drawing…) still lives in the v2 layout (`web/js/*.js`, `web/js/logic/`); ticket 04b moves it into
+`web/js/features/` and fills in their page columns.
 
 | Feature | Ticket | Go package | Page folder | Saved data it owns | Events | Settings |
 |---|---|---|---|---|---|---|
-| Find me: player marker, pulse, off-screen chip, Find me button, auto-center (◎ Follow) | 01, 02 | (server: `server/gpsname.ts`, `main.ts` until 04) | `web/js/features/find-me/` | none (pulse start in memory) | receives `gps` | `followPosition` (switch map), `autoCenter` |
-| Closest extract: ring + dashed line to the closest of your (marked / shown) extracts, "Closest: …" in the position bar | 03 | (none until 04) | `web/js/features/extracts/` | reads `prefs[map].extMarked`, `prefs[map].ext` | receives `gps`, `raidEnd` | none |
+| Game log: tasks accepted/finished/failed, raid lines, game mode, screenshot key | v2, 04 | `internal/features/gamelog` | `web/js/live.js` | none | sends `task` (deliver), `mode`, `keybind` | `logsPath`, `gameMode` |
+| Raid: loading map, start, end; deletes that raid's GPS shots | v2, 04 | `internal/features/raid` | `web/js/live.js` | none (page resets `have`, `used`, extract marks) | sends `raidMap`, `raidStart`, `raidEnd` (deliver) | `gameMode` |
+| Position from screenshot names, trail | v2, 04 | `internal/features/gps` | `web/js/features/find-me/` | none | sends `gps` | `screenshotsPath` |
+| Find me: player marker, pulse, off-screen chip, Find me button, auto-center (◎ Follow) | 01, 02 | (uses `gps`) | `web/js/features/find-me/` | none (pulse start in memory) | receives `gps` | `followPosition` (switch map), `autoCenter` |
+| Closest extract: ring + dashed line to the closest of your (marked / shown) extracts, "Closest: …" in the position bar | 03 | (uses `gps`) | `web/js/features/extracts/` | reads `prefs[map].extMarked`, `prefs[map].ext` | receives `gps`, `raidEnd` | none |
+| Scan tasks: capture, AI read, review, replace the list | v2, 04 | `internal/features/taskscan` | `web/js/scan.js` | `tasks` (replaced on confirm) | sends `capture` | OpenAI key/model |
+| AI Categorize | v2, 04 | `internal/features/aicategorize` | `web/js/ai.js` | `cats`, `tasks[].partCats` (on apply) | none (job polled while it runs) | OpenAI key/model/effort |
+| Game data: json.tarkov.dev, cache, built-in snapshot | v2, 04 | `internal/gamedata` | `web/js/live.js` (`reloadData`) | `squad-task-map-gamedata-<mode>.json` | sends `data` | `gameMode` |
