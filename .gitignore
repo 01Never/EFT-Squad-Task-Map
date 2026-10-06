@@ -2,3 +2,4 @@ node_modules/
 dist/
 squad-task-map-*.json
 squad-task-map-*.json.*
+.claude/worktrees/
