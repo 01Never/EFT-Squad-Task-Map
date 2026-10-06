@@ -1,11 +1,71 @@
 // @ts-check
-// Extracts: which extracts count as "yours" and which of them is closest to you.
-// Plain functions only: no DOM, no network. map-layer.js draws the result.
+// Extracts: their kinds and colours, which extracts count as "yours" and which of them is closest
+// to you. Plain functions only: no DOM, no network. map-layer.js and panel.js draw the result.
+
+/** @import { MapInfo } from "../../app/types.js" */
 
 /**
- * @typedef {{ n: string, k: "pmc" | "scav" | "shared" | "transit", x: number, z: number }} Extract
+ * @typedef {{ n: string, k: "pmc" | "scav" | "shared" | "transit", x: number, z: number, ol?: number[][] }} Extract
  *   An extract or transit on the open map. `n` is its name, `k` its kind (the chip it belongs to).
  */
+
+/** Which kinds a map shows before you change its chips: PMC, Shared and Transits, not Scav. */
+export const DEFAULT_SHOWN_EXTRACT_KINDS = { pmc: true, scav: false, shared: true, transit: true };
+
+/** The chips in the panel, in order: kind and label. */
+export const EXTRACT_CHIPS = [
+  ["pmc", "PMC"],
+  ["scav", "Scav"],
+  ["shared", "Shared"],
+  ["transit", "Transits"],
+];
+
+/** Each kind's colour (tarkov.dev's green, blue, orange and purple; see --green etc. in base.css). */
+export const EXTRACT_KIND_COLORS = { pmc: "#00a700", scav: "#0292c0", shared: "#ca8a00", transit: "#8c6edf" };
+
+/**
+ * An extract's kind from its faction in the game data: "scav", "pmc", else "shared".
+ * @param {{ fa: string }} extract
+ * @returns {"pmc" | "scav" | "shared"}
+ */
+export function extractKind(extract) {
+  if (extract.fa === "scav") return "scav";
+  if (extract.fa === "pmc") return "pmc";
+  return "shared";
+}
+
+/**
+ * Every extract and transit of a map, each with its kind (`k`): extracts first, then transits.
+ * @param {MapInfo} mapInfo
+ * @returns {Extract[]}
+ */
+export function extractsAndTransits(mapInfo) {
+  /** @type {Extract[]} */
+  const extracts = mapInfo.extracts.map((extract) => ({ ...extract, k: extractKind(extract) }));
+  /** @type {Extract[]} */
+  const transits = mapInfo.transits.map((transit) => ({ ...transit, k: "transit" }));
+  return extracts.concat(transits);
+}
+
+/**
+ * How many extracts of each kind a map has (the numbers on the chips).
+ * @param {Extract[]} extracts
+ */
+export function countExtractsByKind(extracts) {
+  const counts = { pmc: 0, scav: 0, shared: 0, transit: 0 };
+  for (const extract of extracts) counts[extract.k]++;
+  return counts;
+}
+
+/**
+ * Mark or unmark an extract as one of yours (a click on the map). Marks are per map.
+ * @param {Record<string, unknown>} markedByName prefs[map].extMarked, changed in place
+ * @param {string} name
+ */
+export function toggleExtractMark(markedByName, name) {
+  if (markedByName[name]) delete markedByName[name];
+  else markedByName[name] = true;
+}
 
 /**
  * The extracts that count when looking for the closest one (ticket 03, owner's rules):

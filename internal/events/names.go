@@ -8,7 +8,8 @@
 //     open they're simply dropped.
 package events
 
-// Event names, spelled exactly as the page's live-event router (web/js/live.js) expects them.
+// Event names. The page spells them identically in web/js/app/event-names.js, and its router
+// (web/js/app/live-events.js) maps each one to a handler; names_test.go checks the two lists match.
 const (
 	Task      = "task"      // deliver: a task was started, finished or failed in the game
 	RaidEnd   = "raidEnd"   // deliver: the raid ended; reset bag counts, extract marks and the trail

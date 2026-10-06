@@ -1,12 +1,15 @@
+// @ts-check
 // Find me: draws your position on the map (marker, "You" label, floor badge, trail), the pulse
 // after a new position, the off-screen chip, the Find me button and the Follow (auto-center)
 // toggle. The rules are in rules.js.
 // The pulse and the chip are HTML over the map, moved with CSS transform only: nothing animates
 // inside the map SVG (repainting the map art is expensive while Tarkov runs).
-import { app, mapName } from "../../store.js";
-import { esc, mk, api, toast } from "../../util.js";
-import { floorBadge, arrowRotation } from "../../logic/projection.js";
-import { apply, panTo, afterUserLetsGo } from "../../map.js";
+import { app } from "../../app/state.js";
+import { escapeHtml, createSvgElement, showToast } from "../../app/dom.js";
+import { callApi } from "../../app/api.js";
+import { mapDisplayName } from "../../app/game-data.js";
+import { floorBadge, arrowRotation } from "../../map/projection.js";
+import { applyView, panTo, afterUserLetsGo } from "../../map/view.js";
 import {
   CHIP_EDGE_GAP_PIXELS,
   ON_SCREEN_MARGIN_PIXELS,
@@ -23,7 +26,7 @@ import {
 
 const SVG_FONT = "bender, Arial, sans-serif";
 
-// The player colour is the CSS variable --player (index.html), so it's set in one place.
+// The player colour is the CSS variable --player (web/css/base.css), so it's set in one place.
 const PLAYER_FILL = "fill:var(--player)";
 
 /** A new GPS position arrived from the game: start the pulse. */
@@ -36,7 +39,7 @@ export function onNewPosition() {
  * auto-center rule says (ticket 02). Never changes the zoom. Waits if you're mid-drag or mid-pinch.
  */
 export function moveViewForNewPosition() {
-  const settings = app.STATUS.settings;
+  const settings = app.status.settings;
   const placement = playerPointInArea();
   if (!placement) {
     return;
@@ -56,7 +59,7 @@ export function moveViewForNewPosition() {
  * another map. A position whose map is unknown is shown on whichever map is open.
  */
 export function positionOnThisMap() {
-  const mapView = app.M;
+  const mapView = app.mapView;
   const position = app.gps;
   if (!mapView || !position) {
     return null;
@@ -67,15 +70,30 @@ export function positionOnThisMap() {
   return position;
 }
 
+/**
+ * "Follow my position": open the raid's map when another page or map is showing (a raid started,
+ * a new position). Returns true when it switched; the map then draws you as it opens.
+ * @param {string | null} mapKey
+ */
+export function switchToMapIfFollowing(mapKey) {
+  const hasMapArt = app.mapConfigs.some((config) => config.key === mapKey);
+  if (!app.status.settings.followPosition || !mapKey || !hasMapArt) return false;
+  if (!app.mapView || app.mapView.key !== mapKey) {
+    location.hash = "#/map/" + mapKey;
+    return true;
+  }
+  return false;
+}
+
 // ---------------------------------------------------------------- drawing (called on every re-render)
 
 /** Draw (or clear) everything about your position on the open map. */
 export function renderPlayer() {
-  const mapView = app.M;
+  const mapView = app.mapView;
   if (!mapView) {
     return;
   }
-  const layer = mapView.gGps;
+  const layer = mapView.layers.player;
   layer.innerHTML = "";
   const position = positionOnThisMap();
   updateFindMeButton(position);
@@ -88,18 +106,18 @@ export function renderPlayer() {
   }
   drawTrail(layer, app.trail, mapView);
   drawPlayerMarker(layer, position, mapView);
-  apply(); // gives the new marker its on-screen size and places the pulse and chip
+  applyView(); // gives the new marker its on-screen size and places the pulse and chip
 }
 
 /** The last few positions, small and faint so they don't compete with the marker. Oldest is faintest. */
 function drawTrail(layer, trail, mapView) {
   trail.forEach((point, index) => {
-    const [svgX, svgY] = mapView.proj.toSvg(point.x, point.z);
+    const [svgX, svgY] = mapView.projection.toSvg(point.x, point.z);
     const opacity = 0.15 + (0.3 * (index + 1)) / (trail.length + 1);
-    const dot = mk("g", { class: "sc", "data-x": svgX, "data-y": svgY, opacity, "pointer-events": "none" }, layer);
-    mk("circle", { r: 3, style: PLAYER_FILL, stroke: "#000", "stroke-width": 1 }, dot);
+    const dot = createSvgElement("g", { class: "sc", "data-x": svgX, "data-y": svgY, opacity, "pointer-events": "none" }, layer);
+    createSvgElement("circle", { r: 3, style: PLAYER_FILL, stroke: "#000", "stroke-width": 1 }, dot);
     const minutesAgo = Math.round((Date.now() - point.t) / 60000);
-    const label = mk("text", {
+    const label = createSvgElement("text", {
       x: 6, y: 3, "font-size": 9, "font-family": SVG_FONT, fill: "#ddd",
       stroke: "#000", "stroke-width": 2.5, "paint-order": "stroke",
     }, dot);
@@ -114,28 +132,28 @@ function drawTrail(layer, trail, mapView) {
  * It's in the top map layer, above task markers and extracts. Nothing here animates.
  */
 function drawPlayerMarker(layer, position, mapView) {
-  const [svgX, svgY] = mapView.proj.toSvg(position.x, position.z);
-  const headingDegrees = arrowRotation(mapView.cfg, position.yaw).toFixed(1);
+  const [svgX, svgY] = mapView.projection.toSvg(position.x, position.z);
+  const headingDegrees = arrowRotation(mapView.config, position.yaw).toFixed(1);
 
   // This part turns with your heading.
-  const disc = mk("g", { class: "sc", "data-x": svgX, "data-y": svgY, "data-r": headingDegrees, "pointer-events": "none" }, layer);
-  mk("circle", { r: 27, fill: "none", stroke: "#000", "stroke-width": 6.5 }, disc);
-  mk("circle", { r: 27, fill: "none", style: "stroke:var(--player)", "stroke-width": 3.5 }, disc);
-  mk("circle", { r: 18, fill: "none", stroke: "#000", "stroke-width": 3 }, disc);
-  mk("circle", { r: 15, style: PLAYER_FILL, stroke: "#fff", "stroke-width": 3 }, disc);
-  mk("path", { d: "M0,-10L7,2.5H2.2V9.5H-2.2V2.5H-7Z", fill: "#fff", stroke: "#000", "stroke-width": 1.2, "stroke-linejoin": "round" }, disc);
+  const disc = createSvgElement("g", { class: "sc", "data-x": svgX, "data-y": svgY, "data-r": headingDegrees, "pointer-events": "none" }, layer);
+  createSvgElement("circle", { r: 27, fill: "none", stroke: "#000", "stroke-width": 6.5 }, disc);
+  createSvgElement("circle", { r: 27, fill: "none", style: "stroke:var(--player)", "stroke-width": 3.5 }, disc);
+  createSvgElement("circle", { r: 18, fill: "none", stroke: "#000", "stroke-width": 3 }, disc);
+  createSvgElement("circle", { r: 15, style: PLAYER_FILL, stroke: "#fff", "stroke-width": 3 }, disc);
+  createSvgElement("path", { d: "M0,-10L7,2.5H2.2V9.5H-2.2V2.5H-7Z", fill: "#fff", stroke: "#000", "stroke-width": 1.2, "stroke-linejoin": "round" }, disc);
 
   // This part stays upright.
-  const upright = mk("g", { class: "sc", "data-x": svgX, "data-y": svgY, "pointer-events": "none" }, layer);
-  const youLabel = mk("text", {
+  const upright = createSvgElement("g", { class: "sc", "data-x": svgX, "data-y": svgY, "pointer-events": "none" }, layer);
+  const youLabel = createSvgElement("text", {
     x: 33, y: 5.5, "font-size": 16, "font-weight": 700, "font-family": SVG_FONT,
     style: PLAYER_FILL, stroke: "#000", "stroke-width": 4, "paint-order": "stroke",
   }, upright);
   youLabel.textContent = "You";
-  const floor = floorBadge(mapView.cfg, position.x, position.y, position.z);
+  const floor = floorBadge(mapView.config, position.x, position.y, position.z);
   if (floor) {
-    mk("circle", { cx: 19, cy: -19, r: 6.5, fill: "#000", stroke: "#fff", "stroke-width": 1.2 }, upright);
-    const floorText = mk("text", {
+    createSvgElement("circle", { cx: 19, cy: -19, r: 6.5, fill: "#000", stroke: "#fff", "stroke-width": 1.2 }, upright);
+    const floorText = createSvgElement("text", {
       x: 19, y: -15.6, "text-anchor": "middle", "font-size": 9.5, "font-weight": 700,
       "font-family": SVG_FONT, fill: "#fff",
     }, upright);
@@ -154,11 +172,11 @@ function renderPositionBar(position) {
     bar.hidden = true;
     return;
   }
-  const mapView = app.M;
-  const floor = floorBadge(mapView.cfg, position.x, position.y, position.z);
+  const mapView = app.mapView;
+  const floor = floorBadge(mapView.config, position.x, position.y, position.z);
   const minutesAgo = Math.round((Date.now() - position.t) / 60000);
   const when = minutesAgo < 1 ? "just now" : minutesAgo + " min ago";
-  const floorText = floor ? ` (floor ${esc(floor)})` : "";
+  const floorText = floor ? ` (floor ${escapeHtml(floor)})` : "";
   bar.hidden = false;
   youPart.innerHTML = `📍 You${floorText} · ${when} <button class="lnk" id="gpsgo">Show</button>`;
   const showButton = document.getElementById("gpsgo");
@@ -177,7 +195,7 @@ function updateFindMeButton(position) {
   if (position) {
     button.title = "Centre the map on you (keeps your zoom)";
   } else if (app.gps && app.gps.map) {
-    button.title = `Your last position is on ${mapName(app.gps.map)}`;
+    button.title = `Your last position is on ${mapDisplayName(app.gps.map)}`;
   } else {
     button.title = "No position yet. In a raid, press your screenshot key.";
   }
@@ -227,7 +245,7 @@ function onPulseRingEnded(event) {
 
 /**
  * Move the pulse to your position and show the off-screen chip when you're out of view.
- * Called from the map's apply() on each pan/zoom frame: it only sets CSS transforms, plus the
+ * Called from map/view.js applyView() on each pan/zoom frame: it only sets CSS transforms, plus the
  * chip's text when the distance changes.
  */
 export function placeFindMeOverlays() {
@@ -243,7 +261,7 @@ export function placeFindMeOverlays() {
     hideChip();
     return;
   }
-  showChip(area, point, distanceFromViewCentre(app.M, position));
+  showChip(area, point, distanceFromViewCentre(app.mapView, position));
 }
 
 /**
@@ -251,7 +269,7 @@ export function placeFindMeOverlays() {
  * size. Null when there's no position on this map (or the map isn't laid out yet).
  */
 function playerPointInArea() {
-  const mapView = app.M;
+  const mapView = app.mapView;
   const overlay = document.getElementById("findme-fx");
   const position = positionOnThisMap();
   if (!mapView || !overlay || !position) {
@@ -262,7 +280,7 @@ function playerPointInArea() {
     return null;
   }
   const overlayBox = overlay.getBoundingClientRect();
-  const [svgX, svgY] = mapView.proj.toSvg(position.x, position.z);
+  const [svgX, svgY] = mapView.projection.toSvg(position.x, position.z);
   const point = {
     x: screenMatrix.a * svgX + screenMatrix.c * svgY + screenMatrix.e - overlayBox.left,
     y: screenMatrix.b * svgX + screenMatrix.d * svgY + screenMatrix.f - overlayBox.top,
@@ -273,8 +291,8 @@ function playerPointInArea() {
 
 /** Straight-line metres from the middle of what you're looking at to your position. */
 function distanceFromViewCentre(mapView, position) {
-  const viewBox = mapView.vb;
-  const [centreX, centreZ] = mapView.proj.toGame(viewBox.x + viewBox.w / 2, viewBox.y + viewBox.h / 2);
+  const viewBox = mapView.viewBox;
+  const [centreX, centreZ] = mapView.projection.toGame(viewBox.x + viewBox.w / 2, viewBox.y + viewBox.h / 2);
   return distanceMeters({ x: centreX, z: centreZ }, position);
 }
 
@@ -320,7 +338,7 @@ function centreOnPlayer() {
   if (!position) {
     return false;
   }
-  const [svgX, svgY] = app.M.proj.toSvg(position.x, position.z);
+  const [svgX, svgY] = app.mapView.projection.toSvg(position.x, position.z);
   panTo(svgX, svgY);
   return true;
 }
@@ -340,7 +358,7 @@ function updateFollowButton() {
   if (!button) {
     return;
   }
-  button.setAttribute("aria-pressed", String(!!app.STATUS.settings.autoCenter));
+  button.setAttribute("aria-pressed", String(!!app.status.settings.autoCenter));
 }
 
 /**
@@ -348,18 +366,18 @@ function updateFollowButton() {
  * server, so the toolbar and Settings always agree, also after a reload.
  */
 async function onFollowClicked() {
-  const isTurningOn = !app.STATUS.settings.autoCenter;
+  const isTurningOn = !app.status.settings.autoCenter;
   try {
-    const response = await api("/api/settings", { method: "PUT", body: { autoCenter: isTurningOn } });
-    app.STATUS = response.status;
+    const response = await callApi("/api/settings", { method: "PUT", body: { autoCenter: isTurningOn } });
+    app.status = response.status;
   } catch (error) {
-    toast(String(error.message || error));
+    showToast(String(error.message || error));
     return;
   }
   updateFollowButton();
   if (isTurningOn) {
     centreOnPlayer();
-    toast("Following you: each screenshot centres the map on you (your zoom stays)");
+    showToast("Following you: each screenshot centres the map on you (your zoom stays)");
   }
 }
 

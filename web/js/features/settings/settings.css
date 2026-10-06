@@ -1,0 +1,6 @@
+/* Settings: the label + field rows of the Settings dialog. */
+.frow{display:flex;gap:10px;align-items:center;margin:10px 0 2px} .frow > span{width:150px;flex:none;font-size:14px;color:var(--gold-one)} .frow input[type=text],.frow select{flex:1;min-width:0}
+
+@media (max-width:860px){
+  .frow{flex-wrap:wrap} .frow > span{width:100%}
+}

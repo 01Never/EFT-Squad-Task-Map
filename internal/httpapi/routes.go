@@ -31,7 +31,8 @@ func NewServer(backend Backend, static *staticFiles) *Server {
 		// The page and its files.
 		{"GET /{$}", static.serveIndex},
 		{"GET /index.html", static.serveIndex},
-		{"GET /js/", static.serveScript},
+		{"GET /css/", static.serveStylesheet},
+		{"GET /js/", static.servePageCode},
 		{"GET /fonts/{name}", static.serveFont},
 		{"GET /maps/{file}", static.serveMapArt},
 		{"GET /api/config", static.serveMapsConfig},

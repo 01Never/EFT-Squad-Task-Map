@@ -1,0 +1,30 @@
+/* The map page's frame: the map area beside the task list, the map art, the toolbar, the hint
+   while placing a pin, and the flashing rings around the selected task (map/selection-flash.js). */
+.app{display:grid;grid-template-columns:1fr 420px;height:100%}
+.stage{position:relative;background:rgb(45 45 47);overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+.stage svg.map{width:100%;height:100%;display:block}
+.stage .lyr.off{display:none}
+.stage.draw svg.map{cursor:crosshair} .stage.place svg.map{cursor:copy}
+.mapui{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:6px;z-index:3;max-width:calc(100% - 20px)}
+.mapui .grp{display:flex;gap:2px;background:rgb(0 0 0 / .75);border:1px solid var(--glass-border);padding:3px;flex-wrap:wrap;align-items:center}
+.mapui .grp[hidden]{display:none}
+.mapui button{background:transparent;border:0;color:var(--gold-one);min-width:32px;height:32px;padding:0 9px;cursor:pointer;font-weight:700}
+.mapui button:hover{color:var(--accent)} .mapui button[aria-pressed="true"]{background:var(--gold-two);color:#000}
+.mapui select{height:30px;padding:0 6px;border-width:1px}
+.hint{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;background:rgb(0 0 0 / .85);border:1px solid var(--accent);color:var(--gold-one);padding:8px 14px;z-index:4;display:none;font-weight:700}
+
+/* selected task: rings over its markers (HTML overlay, transform/opacity only = no map repaint) */
+.fx{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:hidden}
+.ping{position:absolute;left:0;top:0;width:0;height:0}
+.ping i{position:absolute;left:-26px;top:-26px;width:52px;height:52px;border-radius:50%;box-sizing:border-box}
+.ping .halo{border:3px solid var(--selection-ring);box-shadow:0 0 0 2px rgb(0 0 0 / .85),inset 0 0 0 2px rgb(0 0 0 / .85);animation:halo 1.2s ease-in-out infinite;will-change:opacity}
+.ping .wave{border:4px solid var(--selection-ring);box-shadow:0 0 0 2px rgb(0 0 0 / .6);animation:wave 1.2s ease-out infinite;will-change:transform,opacity}
+@keyframes wave{0%{transform:scale(.55);opacity:1}100%{transform:scale(2.4);opacity:0}}
+@keyframes halo{0%,100%{opacity:1}50%{opacity:.45}}
+@media (prefers-reduced-motion:reduce){.ping .wave{display:none}.ping .halo{animation:none}}
+
+@media (max-width:860px){
+  .app{display:block;height:auto}
+  .stage{position:sticky;top:56px;height:52vh;z-index:5;border-bottom:1px solid #000}
+  .mapui .grp{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+}
