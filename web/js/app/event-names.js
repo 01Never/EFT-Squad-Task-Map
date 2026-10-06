@@ -13,4 +13,5 @@ export const EVENT_NAMES = Object.freeze({
   mode: "mode", // broadcast: the game reported which game mode it's in
   keybind: "keybind", // broadcast: whether a screenshot key is bound in the game
   data: "data", // broadcast: the game data changed (new download, mode switch)
+  updates: "updates", // broadcast: Check for updates status (ticket 04c; the page handles it in part 2)
 });
