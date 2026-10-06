@@ -85,6 +85,17 @@ You need a **screenshot key** bound in Tarkov's control settings. The app warns 
 - **Center the map on me when I take a screenshot:** off by default. When on, every new position pans the map so you're in the middle, keeping your zoom, like a minimap. Same as **◎ Follow** on the map toolbar. If you're dragging the map when a screenshot comes in, it waits until you let go.
 - **Game data:** where it came from and **Update game data now**.
 - **OpenAI:** key, model and reasoning level.
+- **Updates:** the version you're on and **Check for updates** (see "Updating" below).
+
+## Updating
+When the owner publishes a new version, you update from inside the app. **Nothing happens unless you click:** the app never checks, downloads or installs by itself.
+1. **⚙ Settings → Updates → Check for updates.** It says "You're up to date", or "2.7.0 is available" with what's new and the download size. After a check that found something, a small dot shows on **⚙ Settings** until you've updated.
+2. **Download and restart**, then confirm. A progress bar shows the download (**Cancel** stops it and deletes the partial file).
+3. The app checks the file is really the owner's (signature, size and SHA-256), makes a backup copy of your saved data, swaps the exe in and restarts. The page reloads by itself and shows **Updated to 2.7.0** with the release notes, once.
+
+If something goes wrong (no internet, GitHub unreachable, no release yet, "This update isn't from the owner; not installed", a read-only folder) the message says so and **your current version keeps running with your data untouched**. If the folder can't be written to, the message links to the release page so you can download it by hand. If you run the program from source with `go run`, the check works but **Download and restart** is off ("Updates only apply to the built exe").
+
+**Going back:** the old exe stays next to the new one as `SquadTaskMap.previous.exe`; close the app, rename the two files and start it. Your data before each update is kept as `squad-task-map-data.before-<version>.json` (the newest three).
 
 ## AI Categorize (OpenAI)
 The **🤖 AI Categorize** box in the panel sorts parts by your instructions, e.g. "Make a Key runs category for parts that need a key on this map". It checks each task's objectives and its wiki page, proposes moves with reasons, and you pick which to apply. **Undo** reverts an applied batch.
@@ -96,6 +107,7 @@ The **🤖 AI Categorize** box in the panel sorts parts by your instructions, e.
   - Game data downloads from **json.tarkov.dev**.
   - Wiki pages from **escapefromtarkov.fandom.com** (AI Categorize).
   - Item icons from **assets.tarkov.dev**.
+  - **github.com**, only when you click **Check for updates** (or Download and restart). The app contacts GitHub only when you click Check for updates.
   - Requests to **api.openai.com**: each scanned screenshot (shrunk to 2048 px), and for AI Categorize, task data plus wiki excerpts.
 - OpenAI is billed to your key's account. A scan costs roughly 1–2k input tokens per screenshot; an AI Categorize request roughly 5–30k.
 - The OpenAI key is stored in plain text in `squad-task-map-settings.json` next to the exe, and only sent to api.openai.com.
@@ -113,6 +125,8 @@ While idle the program uses practically no CPU (measured 0.00% of one core over 
 | `squad-task-map-pending.json` | Game events waiting for the page (usually empty) |
 | `squad-task-map-wikicache.json` | Wiki pages, kept 7 days |
 | `squad-task-map-data.v1-backup.json` | Your v1 file, from the upgrade |
+| `squad-task-map-data.before-<version>.json` | Your saved data as it was just before updating to that version (newest 3 kept) |
+| `SquadTaskMap.previous.exe` | The version you had before the last update, as a way back |
 
 To back up or move to another PC, copy `squad-task-map-data.json` (and the settings file if you want the key).
 

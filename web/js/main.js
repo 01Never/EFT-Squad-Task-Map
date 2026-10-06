@@ -12,6 +12,7 @@ import { showPageForAddress, rerenderPage } from "./app/routing.js";
 import { connectToLiveEvents } from "./app/live-events.js";
 import { renderNav } from "./features/raid/nav.js";
 import { openSettings } from "./features/settings/panel.js";
+import { renderUpdateDot, showUpdatedNotice } from "./features/updates/panel.js";
 
 saveUnsavedChangesOnClose();
 addEventListener("hashchange", showPageForAddress);
@@ -47,8 +48,10 @@ async function start() {
     findElement("#saved").textContent = savedData ? "Saved ✓" : "";
     findElement("#settings").onclick = openSettings;
     renderNav();
+    renderUpdateDot();
     connectToLiveEvents();
     showPageForAddress();
+    showUpdatedNotice();
   } catch (error) {
     showStartUpError(error);
   }

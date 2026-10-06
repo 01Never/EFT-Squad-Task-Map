@@ -316,6 +316,23 @@ export {};
  * @property {Position | null} gps
  * @property {TrailPoint[] | null} trail
  * @property {AiStatus} ai
+ * @property {UpdatesStatus} [updates] Check for updates (features/updates)
+ */
+
+/** @typedef {{ bytesDone: number, bytesTotal: number }} UpdateDownload */
+
+/**
+ * @typedef {object} UpdatesStatus The server's "Check for updates" state (internal/features/updates).
+ * @property {string} currentVersion
+ * @property {boolean} canApply false under `go run`
+ * @property {string} cannotApplyMessage
+ * @property {"idle" | "checking" | "downloading" | "ready" | "applying"} phase
+ * @property {string | null} lastChecked RFC 3339; null until a manual check has finished
+ * @property {"" | "up-to-date" | "available"} result
+ * @property {{ version: string, released: string, notes: string, sizeBytes: number, releaseUrl: string } | null} available
+ * @property {UpdateDownload | null} download
+ * @property {{ code: string, message: string, releaseUrl?: string } | null} error
+ * @property {{ from: string, to: string, released: string, notes: string } | null} justUpdated
  */
 
 // ---------------------------------------------------------------- live events (app/live-events.js)
@@ -336,8 +353,9 @@ export {};
 /** @typedef {{ type: "mode", mode: string, dataMode: string }} ModeEvent */
 /** @typedef {{ type: "keybind", ok: boolean, warning: string }} KeybindEvent */
 /** @typedef {{ type: "data", status: GameDataStatus }} DataEvent */
+/** @typedef {{ type: "updates", status: UpdatesStatus }} UpdatesEvent */
 
 /**
  * @typedef {TaskEvent | RaidEndEvent | GpsEvent | CaptureEvent | RaidStartEvent | RaidMapEvent
- *   | ModeEvent | KeybindEvent | DataEvent} LiveEvent
+ *   | ModeEvent | KeybindEvent | DataEvent | UpdatesEvent} LiveEvent
  */

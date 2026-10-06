@@ -26,7 +26,7 @@ import (
 )
 
 // Version is the app's version, shown in Settings and used by "Check for updates".
-const Version = "2.5.0"
+const Version = "2.6.0"
 
 // The page is served on the first free port from 7777 (PORT overrides the start) up to 7800.
 const (
