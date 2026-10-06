@@ -80,6 +80,12 @@ export function catForPart(S, task, part) {
   const b = S.cats.find((x) => x.builtin === part.action);
   return b || S.cats.find((x) => x.builtin === "unsorted") || S.cats[0];
 }
+/** Drop a task as if it was never added: its entry (categories, pin, Don't split), ticks, used counts and sub-tasks. */
+export function forgetTask(S, id, task) {
+  delete S.tasks[id];
+  if (task) for (const o of task.objs) { delete S.ticks[o.id]; if (S.used) delete S.used[o.id]; }
+  S.subs = S.subs.filter((s) => s.task !== id);
+}
 export const isManual = (S, task, part) => { const e = S.tasks[task.id]; return !!(e && e.partCats && (e.partCats[part.key] || e.partCats["*"])?.manual); };
 
 /** Re-create any missing default categories. Returns how many were added. */

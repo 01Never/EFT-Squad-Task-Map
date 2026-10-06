@@ -64,7 +64,7 @@ Non-goals: multiplayer, the hosted VPS version, and Labs/Terminal maps (no align
 
 | Topic | Decision |
 |---|---|
-| Task source | No TarkovTracker. Scans add tasks (**add only, never remove**). Logs add accepted tasks and **quietly** remove finished or failed ones. |
+| Task source | No TarkovTracker. Scans **replace** the list: tasks not in the scan are forgotten entirely (changed after 2.0.1 by the owner; was add-only). Logs add accepted tasks and **quietly** remove finished or failed ones. |
 | Catch-up | None. Logs are read live only, from the end of the file at startup. A new scan covers anything missed. |
 | Objective progress | Ticked by hand in the app. The game logs don't record objective completion. |
 | Finished parts | A part whose objectives are all ticked **drops off the map**. |
@@ -252,7 +252,7 @@ For the boss list, use the boss names in json.tarkov.dev's map `bosses` data, or
      - Already active (unchanged)
      - Not matched, each with a search box to fix by hand
      - Off-map tasks (no map objectives) listed separately. They're still added: they never appear on a map, but their found-in-raid items show in the bring list (§7.2).
-  6. **Confirm:** add new tasks (add only), auto-sort the new parts (§6.3), and **delete the scanned screenshot files**. **Cancel** deletes nothing.
+  6. **Confirm:** add new tasks, auto-sort the new parts (§6.3), and **delete the scanned screenshot files**. Every active task not in the scan (matched, or fixed by hand in the review) is removed as if never added: its entry, ticks, used counts and sub-tasks are deleted, with no list shown first. Removal is skipped when any screenshot failed to read or no task was recognised. **Cancel** deletes nothing.
 - **Tabs:** the in-game list has STORY / SIDE / OPERATIONAL. Story chapters likely don't exist in tarkov.dev's task data; they'll fall into "Not matched", which is fine.
 - **Cost:** about 1–2k input tokens per image. Show an estimate before sending if the model is unknown.
 
@@ -388,7 +388,7 @@ TarkovMonitor (github.com/tarkovtracker-org/TarkovMonitor) is the reference.
 ✅ CPU stays near 0% in Task Manager while idle.
 
 **M6 · Screenshot scan**
-✅ Owner test: capture 3+ in-game task pages. The review lists the tasks correctly. Confirm adds only new ones and deletes those screenshot files. Cancel deletes nothing.
+✅ Owner test: capture 3+ in-game task pages. The review lists the tasks correctly. Confirm adds new ones, removes tasks not in the scan, and deletes those screenshot files. Cancel deletes nothing.
 
 **M7 · GPS + raid end**
 ✅ Owner test: in a raid, press the screenshot key. The app switches to the right map, and the arrow is where they are, facing the right way.

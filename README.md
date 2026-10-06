@@ -28,7 +28,7 @@ A banner suggests running **Scan tasks** once, so the list matches exactly what 
    2. In Tarkov, open **Tasks** and press your screenshot key on each page, scrolling between shots. STORY, SIDE and OPERATIONAL all work.
    3. Back in the app, the captured shots show as thumbnails (× drops one). Click **Done**.
    4. The model reads the task names; the app matches them to the game data and shows a review: new tasks (with how many land on each map), hand-in-only tasks, tasks already on your list, and names it couldn't match (type the right name, or leave blank to skip).
-   5. **Add tasks & delete screenshots** adds the new ones (it never removes anything) and deletes those screenshot files. **Cancel** deletes nothing.
+   5. **Update list & delete screenshots** makes your list match the scan: new tasks are added, and any task on your list that isn't in the screenshots is removed completely (its categories, pin, ticks and sub-tasks go too). Then it deletes those screenshot files. **Capture every page**, or tasks on a missed page are dropped. If a screenshot couldn't be read, or no task names were recognised, nothing is removed and the button says **Add tasks** instead. **Cancel** changes nothing and deletes nothing.
 2. **The game's logs.** While the app runs, a task you accept in-game is added within about 5 seconds. A task you finish or fail is removed quietly. Only events from the game mode you picked in Settings count. Events that happen while the app is closed are not caught up; scan again to catch up.
 3. **Add a task by name** (search box in the panel).
 

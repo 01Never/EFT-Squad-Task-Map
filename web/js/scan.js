@@ -1,7 +1,8 @@
-// Task-list scan: capture in-game screenshots, read them with the AI, review, add (add-only), delete the shots.
+// Task-list scan: capture in-game screenshots, read them with the AI, review, replace the task list, delete the shots.
 import { app, save, activate, mapName } from "./store.js";
 import { $, esc, toast, modal, api } from "./util.js";
 import { mapsOf, isOffmapTask } from "./logic/parts.js";
+import { forgetTask } from "./logic/state.js";
 import { openAIModal, openSettings } from "./settings.js";
 import { rerender } from "./live.js";
 
@@ -89,29 +90,36 @@ function review(names, rows, errors) {
   const perMap = {};
   for (const x of fresh) if (!isOffmapTask(x.task)) for (const m of mapsOf(x.task).map(mapName)) perMap[m] = (perMap[m] || 0) + 1;
   const onMap = fresh.filter((x) => !isOffmapTask(x.task)), offMap = fresh.filter((x) => isOffmapTask(x.task));
+  // The scan replaces the list, but only when every screenshot was read and something was recognised.
+  const replace = !errors.length && found.size > 0;
+  const note = replace ? "New tasks are added. Tasks on your list that aren't in these screenshots are removed."
+    : errors.length ? "Some screenshots couldn't be read, so nothing is removed from your list; new tasks are still added."
+    : "No tasks were recognised, so nothing is removed from your list.";
   const row = (x) => `<li><label><input type="checkbox" data-add="${esc(x.task.id)}" checked> ${esc(x.task.name)} <span class="tag">${esc(x.task.trader)}</span>${x.progress != null ? ` <span class="tag">${x.progress}%</span>` : ""}${x.fixed ? ` <span class="tag warnt" title="Read as “${esc(x.fixed)}”">spelling fixed</span>` : ""}</label></li>`;
   const dl = `<datalist id="fixlist">${app.DATA.tasks.map((t) => `<option value="${esc(t.name)}">`).join("")}</datalist>`;
   const { el, close } = modal(`<h3>Scan results</h3>
-    <p class="mnote">Read ${rows.length} rows from ${names.length} screenshot${names.length > 1 ? "s" : ""}. New tasks are added; nothing is removed.</p>
+    <p class="mnote">Read ${rows.length} rows from ${names.length} screenshot${names.length > 1 ? "s" : ""}. ${note}</p>
     ${errors.length ? `<div class="err">${errors.map(esc).join("<br>")}</div>` : ""}
     <h4>New tasks (${onMap.length})</h4>${Object.keys(perMap).length ? `<p class="mnote">${Object.entries(perMap).map(([m, n]) => `${esc(m)} ${n}`).join(" · ")}</p>` : ""}
     <ul class="rlist">${onMap.map(row).join("") || '<li class="none">None</li>'}</ul>
     ${offMap.length ? `<h4>New hand-in-only tasks (${offMap.length})</h4><p class="mnote">No map objectives, so they won't show on a map. Their found-in-raid items appear in the Bring list.</p><ul class="rlist">${offMap.map(row).join("")}</ul>` : ""}
     ${already.length ? `<h4>Already on your list (${already.length})</h4><p class="mnote">${already.map((x) => esc(x.task.name)).join(", ")}</p>` : ""}
     ${unknown.length ? `<h4>Not recognised (${unknown.length})</h4><p class="mnote">Type the right name to include one, or leave it blank to skip.</p><ul class="rlist">${unknown.map((n, i) => `<li>“${esc(n)}” → <input type="search" list="fixlist" data-fix="${i}" placeholder="Task name…"></li>`).join("")}</ul>${dl}` : ""}
-    <div class="row" style="margin-top:14px;justify-content:space-between"><button class="btn line" id="rvcancel">Cancel (keep screenshots)</button><button class="btn" id="rvok">Add tasks & delete ${names.length} screenshot${names.length > 1 ? "s" : ""}</button></div>`, { wide: true });
+    <div class="row" style="margin-top:14px;justify-content:space-between"><button class="btn line" id="rvcancel">Cancel (keep screenshots)</button><button class="btn" id="rvok">${replace ? "Update list" : "Add tasks"} & delete ${names.length} screenshot${names.length > 1 ? "s" : ""}</button></div>`, { wide: true });
   el.querySelector("#rvcancel").onclick = () => { close(); cancel(); };
   el.querySelector("#rvok").onclick = async () => {
-    let added = 0;
-    for (const cb of el.querySelectorAll("[data-add]")) if (cb.checked) { const x = found.get(cb.dataset.add); if (activate(x.task.id, "scan", { gamePct: x.progress, scannedAt: Date.now() })) added++; }
-    for (const inp of el.querySelectorAll("[data-fix]")) { const m = inp.value.trim() && app.matcher.match(inp.value.trim()); if (m && activate(m.task.id, "scan", { scannedAt: Date.now() })) added++; }
+    let added = 0, removed = 0;
+    const seen = new Set(already.map((x) => x.task.id));
+    for (const cb of el.querySelectorAll("[data-add]")) if (cb.checked) { const x = found.get(cb.dataset.add); seen.add(x.task.id); if (activate(x.task.id, "scan", { gamePct: x.progress, scannedAt: Date.now() })) added++; }
+    for (const inp of el.querySelectorAll("[data-fix]")) { const m = inp.value.trim() && app.matcher.match(inp.value.trim()); if (m) { seen.add(m.task.id); if (activate(m.task.id, "scan", { scannedAt: Date.now() })) added++; } }
     for (const x of already) Object.assign(S.tasks[x.task.id], { gamePct: x.progress ?? S.tasks[x.task.id].gamePct, scannedAt: Date.now() });
+    if (replace) for (const id of Object.keys(S.tasks)) if (S.tasks[id].active && !seen.has(id)) { forgetTask(S, id, app.BYID[id]); removed++; }
     S.showScanBanner = false;
     save();
     let deleted = 0;
     try { deleted = (await api("/api/scan/confirm", { method: "POST", body: { names } })).deleted; } catch {}
     app.capture = null; renderBar(); close();
-    toast(`Added ${added} task${added === 1 ? "" : "s"} · deleted ${deleted} screenshot${deleted === 1 ? "" : "s"}`);
+    toast(`Added ${added} task${added === 1 ? "" : "s"}${removed ? ` · removed ${removed}` : ""} · deleted ${deleted} screenshot${deleted === 1 ? "" : "s"}`);
     rerender();
   };
 }

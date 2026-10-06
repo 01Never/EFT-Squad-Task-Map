@@ -7,7 +7,7 @@ import { simplify } from "../web/js/logic/simplify.js";
 import { makeMatcher } from "../web/js/logic/match.js";
 import { partsOf, objAction, partDone, partProgress, clearPartsCache, isOneRaid } from "../web/js/logic/parts.js";
 import { requirementsOf, objReady, bringList, reqKey, consumes } from "../web/js/logic/ready.js";
-import { migrate, catForPart, freshState, ensureDefaults } from "../web/js/logic/state.js";
+import { migrate, catForPart, freshState, ensureDefaults, forgetTask } from "../web/js/logic/state.js";
 import { parseGpsName, yawFromQuaternion } from "../server/gpsname.ts";
 import { ROOT, loadSnapshot, snapshotToRaw } from "./helpers.ts";
 
@@ -169,6 +169,22 @@ describe("saved data", () => {
     expect(catForPart(S, t, a).builtin).toBe("unsorted");
     expect(ensureDefaults(S)).toBe(1);
     expect(catForPart(S, t, a).builtin).toBe(a.action);
+  });
+  test("a forgotten task leaves nothing behind; other tasks are untouched", () => {
+    const S = freshState();
+    const t = byName("Dandies"), u = byName("Booze");
+    S.tasks[t.id] = { active: true, pinned: true, partCats: { "*": { cat: "unsorted", manual: true } } };
+    S.tasks[u.id] = { active: true };
+    S.ticks[t.objs[0].id] = true; S.ticks[u.objs[0].id] = true;
+    S.used = { [t.objs[0].id]: 1 };
+    S.subs = [{ id: "s1", task: t.id }, { id: "s2", task: u.id }];
+    forgetTask(S, t.id, t);
+    expect(S.tasks[t.id]).toBeUndefined();
+    expect(S.ticks[t.objs[0].id]).toBeUndefined();
+    expect(S.used[t.objs[0].id]).toBeUndefined();
+    expect(S.subs.map((s: any) => s.id)).toEqual(["s2"]);
+    expect(S.tasks[u.id].active).toBe(true);
+    expect(S.ticks[u.objs[0].id]).toBe(true);
   });
 });
 
