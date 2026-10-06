@@ -53,14 +53,29 @@ func (static *staticFiles) serveIndex(writer http.ResponseWriter, request *http.
 	static.serveFile(writer, request, "web/index.html", "")
 }
 
-// serveScript serves the page's JavaScript modules (/js/… → web/js/…), and nothing else from there.
-func (static *staticFiles) serveScript(writer http.ResponseWriter, request *http.Request) {
+// servePageCode serves the page's code folder (/js/… → web/js/…): its JavaScript modules and the
+// stylesheets that sit next to them in the map, panel and feature folders. Nothing else from there:
+// no tests, no READMEs.
+func (static *staticFiles) servePageCode(writer http.ResponseWriter, request *http.Request) {
 	relative := strings.TrimPrefix(request.URL.Path, "/js/")
-	if !strings.HasSuffix(relative, ".js") || strings.HasSuffix(relative, ".test.js") || !fs.ValidPath(relative) {
+	isModule := strings.HasSuffix(relative, ".js") && !strings.HasSuffix(relative, ".test.js")
+	isStylesheet := strings.HasSuffix(relative, ".css")
+	if !(isModule || isStylesheet) || !fs.ValidPath(relative) {
 		http.Error(writer, "Not found", http.StatusNotFound)
 		return
 	}
 	static.serveFile(writer, request, path.Join("web/js", relative), "")
+}
+
+// serveStylesheet serves the shared stylesheets (/css/… → web/css/…), and nothing else from there.
+// fs.ValidPath refuses "..", so a request can't reach a file outside web/css.
+func (static *staticFiles) serveStylesheet(writer http.ResponseWriter, request *http.Request) {
+	relative := strings.TrimPrefix(request.URL.Path, "/css/")
+	if !strings.HasSuffix(relative, ".css") || !fs.ValidPath(relative) {
+		http.Error(writer, "Not found", http.StatusNotFound)
+		return
+	}
+	static.serveFile(writer, request, path.Join("web/css", relative), "")
 }
 
 func (static *staticFiles) serveMapArt(writer http.ResponseWriter, request *http.Request) {
