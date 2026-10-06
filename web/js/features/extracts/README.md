@@ -1,6 +1,12 @@
-# Extracts (closest extract)
+# Extracts (and the closest extract)
 
-**What it does (player's view):** after each GPS screenshot, the closest of *your* extracts is
+**What it does (player's view):** the map shows the extracts and transits whose kind is on in
+"Extracts & labels" (PMC, Scav, Shared, Transits, each with its count; PMC, Shared and Transits
+are on by default). Click an extract to mark it as one you have: it turns solid, with a white
+frame; the others stay see-through (SPEC §7.3). "Clear n marked" unmarks them all. The same
+section turns place names on and off.
+
+After each GPS screenshot, the closest of *your* extracts is
 highlighted: a ring in the player colour on the extract, a dashed line from you to it with the
 distance ("~180 m"), and "Closest: Crash Site · ~180 m" in the position bar. Clicking that name
 centres the map on the extract without changing the zoom.
@@ -23,26 +29,35 @@ are shown from `prefs[map].ext` (the PMC / Scav / Shared / Transit chips); your 
   Game units are metres. There's no walking-path data, so it's "as the crow flies", shown with a
   "~" (`approximateDistanceText()`: 5 m steps under 100 m, 10 m steps above, km from 1000 m).
 - No runner-ups (owner's decision): only the closest one is shown.
+- Kinds (`extractKind()`): the game data's faction "scav" or "pmc", anything else is Shared;
+  transits are their own kind. Colours (`EXTRACT_KIND_COLORS`) are tarkov.dev's green, blue,
+  orange and purple.
+- A click marks or unmarks (`toggleExtractMark()`); marks are per map.
 - A mark's stored value is any truthy value (`true` today), so ticket 06 can store
   `{ auto: true, note }` without breaking old data.
 
 **Flow:**
-- New position: `event "gps" → live.js → renderPlayer() → renderClosestExtract()`
-- Mark / unmark (click on the map), chip change, Clear marked: `map.js renderExtracts() →
+- New position: `event "gps" → app/live-events.js onPositionReceived() → renderPlayer() → renderClosestExtract()`
+- Mark / unmark (click on the map), chip change, Clear marked: `map-layer.js renderExtracts() →
   renderClosestExtract()`
-- Raid end: `event "raidEnd" → live.js clears the position and the marks → renderAll() →
+- A kind chip → `panel.js onKindChipClicked()` → save → `renderPanel()`, `renderExtracts()`.
+- Raid end: `event "raidEnd" → app/live-events.js onRaidEnded() clears the position and the marks →
+  renderMapPage() →
   renderExtracts() → renderClosestExtract()` (nothing to show).
 
 **Light while Tarkov runs:** the ring, line and label are plain SVG in their own layer
-(`M.gClosest`, between extracts and task markers), drawn once per update. Nothing animates. The
+(`closestExtract` in `map/layers.js`, between extracts and task markers), drawn once per update. Nothing animates. The
 line uses a non-scaling stroke, so it keeps its width while you zoom.
 
-**Saved data / settings:** reads `prefs[map].extMarked` and `prefs[map].ext`; owns nothing new.
+**Saved data / settings:** `prefs[map].extMarked` (marks) and `prefs[map].ext` (which kinds show),
+and `prefs[map].labels` (place names, drawn by `map/place-names.js`).
 
 **Files:**
-- `rules.js`: which extracts count, which is closest, the distance text.
-- `map-layer.js`: the ring, the dashed line and its label, and the "Closest: …" part of the
-  position bar.
+- `rules.js`: kinds and colours, marking, which extracts count, which is closest, the distance text.
+- `map-layer.js`: the extracts layer and marking with a click; the closest extract's ring, dashed
+  line and label, and the "Closest: …" part of the position bar.
+- `panel.js`: the "Extracts & labels" section and its handlers.
+- `extracts.css`: the diamond in the kind chips.
 - `rules.test.js`: tests for `rules.js`.
 
 **Tests:** `rules.test.js` covers marked vs shown, transits only when marked, old-format marks, the

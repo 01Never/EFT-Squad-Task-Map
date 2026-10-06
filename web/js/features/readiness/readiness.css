@@ -1,0 +1,14 @@
+/* Readiness: the Bring list tab (what to carry, with your bag counts). */
+.bring{padding:10px 16px}
+.bhead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
+.bnote{font-size:13px;color:var(--muted);margin:4px 0 10px}
+.bsec h4{margin:14px 0 6px;font-size:13px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+.bsec h4 small{color:var(--gold-one)}
+.bl{display:flex;align-items:center;gap:9px;padding:6px 6px;border-bottom:1px solid #333}
+.bl.short{background:rgb(255 212 59 / .07);box-shadow:inset 3px 0 var(--not-ready)}
+.bl img,.bl .noimg{width:36px;height:36px;object-fit:contain;flex:none;background:#151517;border:1px solid #333;display:grid;place-items:center;font-size:18px}
+.bn{flex:1;min-width:0} .bn b{display:block;font-size:15px;color:#fff;font-weight:700}
+.bt{display:block;font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.need{font-size:13px;color:var(--muted);white-space:nowrap}
+.have{display:inline-flex;align-items:center;gap:2px}
+.have input{width:46px;padding:2px 4px;text-align:center;border-width:1px}

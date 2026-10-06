@@ -1,4 +1,4 @@
-// Tests for the find-me rules. Runs under `bun test` now and `node --test` after ticket 04b.
+// Tests for the find-me rules (rules.js).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {

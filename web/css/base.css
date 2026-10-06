@@ -1,0 +1,90 @@
+/* Shared by the whole page: fonts, colours (as named variables), buttons and form fields, the top
+   bar, dialogs, toasts and tags. Each feature's own styles sit next to its code
+   (web/js/<folder>/<name>.css); index.html links them all, in a fixed order, after this file. */
+@font-face{font-family:bender;font-style:normal;font-weight:400;font-display:block;src:url(/fonts/bender.woff2) format("woff2")}
+@font-face{font-family:bender;font-style:normal;font-weight:700;font-display:block;src:url(/fonts/bender-bold.woff2) format("woff2")}
+/* Palette and type follow tarkov.dev (MIT, the-hideout/tarkov-dev src/App.css) */
+:root{
+  --black:#000; --black-light:#1b1919; --gunmetal:#383945; --gunmetal-dark:#2d2d2f;
+  --gold-one:#c7c5b3; --gold-two:#9a8866; --accent:#d2af78; --accent-hover:#e6c58c;
+  --blue:#0292c0; --green:#00a700; --orange:#ca8a00; --red:#cd1e2f; --purple:#8c6edf; --yellow:#ffe084;
+  --muted:#8f8d80; --glass:rgb(18 18 18 / .88); --glass-border:rgb(210 175 120 / .18); --panel:rgb(0 0 0 / .55);
+  /* Your position on the map (features/find-me). A colour no category, extract kind or selection ring uses. */
+  --player:#ff3fd2;
+  /* The ring around the selected task: its row's outline and the flashing rings on its markers. */
+  --selection-ring:#fff;
+  /* "You're missing something": the "!" badges, missing-item tags and short Bring list lines. */
+  --not-ready:#ffd43b;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--gunmetal-dark);color:var(--gold-one);font:400 16px/1.4 bender,-apple-system,system-ui,"Segoe UI",Roboto,Arial,sans-serif;word-spacing:1px;-webkit-font-smoothing:antialiased}
+a{color:var(--gold-two);text-decoration:none} a:hover{color:var(--accent)}
+button,input,select,textarea{font:inherit;color:inherit;border-radius:0}
+.btn{background:var(--gold-two);color:#000;border:0;height:36px;padding:0 14px;cursor:pointer;font-weight:700;letter-spacing:.3px;white-space:nowrap}
+.btn:hover{background:var(--accent)} .btn:disabled{opacity:.45;cursor:default}
+.btn.sm{height:28px;padding:0 9px;font-size:14px}
+.btn.line{background:transparent;color:var(--gold-one);border:2px solid var(--gold-two)} .btn.line:hover{border-color:var(--accent);color:var(--accent)}
+.btn.danger{background:transparent;color:#e0777f;border:2px solid #6b2a2f} .btn.danger:hover{border-color:var(--red)}
+input[type=text],input[type=number],input[type=search],textarea,select{background:var(--gunmetal-dark);border:2px solid var(--gold-two);color:var(--gold-one);padding:6px 9px}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold-one)}
+input[type=checkbox]{appearance:none;width:18px;height:18px;border:2px solid var(--gold-two);background:var(--gunmetal-dark);display:inline-grid;place-content:center;cursor:pointer;flex:none;margin:0}
+input[type=checkbox]::before{content:"";width:10px;height:10px;transform:scale(0);box-shadow:inset 1em 1em var(--gold-one)} input[type=checkbox]:checked::before{transform:scale(1)}
+
+/* the top bar */
+.nav{position:sticky;top:0;z-index:50;height:56px;background:var(--glass);backdrop-filter:blur(12px);border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:18px;padding:0 18px}
+.brand{font-weight:700;font-size:21px;letter-spacing:1.5px;color:var(--accent);text-transform:uppercase;white-space:nowrap}
+.brand span{color:var(--gold-one)}
+.crumbs{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.crumbs a{color:var(--gold-one)} .crumbs b{color:var(--gold-one);font-weight:700}
+.navr{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--muted);white-space:nowrap}
+.saved{min-width:70px;text-align:right} .saved.err{color:#ff7a85}
+#navinfo{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.navr .raid{color:#ff6b6b;font-weight:700} .navr .modewarn{color:var(--yellow)}
+#conn{position:fixed;right:12px;bottom:12px;background:#4a1f22;border:1px solid var(--red);color:#fff;padding:6px 10px;font-size:13px;z-index:90}
+
+/* the page area under the top bar (the picker or a map) */
+main{height:calc(100% - 56px)}
+
+/* text colours, small buttons, links that look like text, tick boxes with a label */
+.ok{color:#7fd67f} .warn{color:var(--yellow)} .bad{color:#ff8a93}
+.warnc{color:var(--not-ready)}
+.ib{all:unset;cursor:pointer;width:30px;height:30px;display:grid;place-items:center;color:var(--muted);font-size:16px}
+.ib:hover{color:var(--accent);background:rgb(255 255 255 / .05)}
+.ib.sm{width:20px;height:20px;font-size:14px}
+.lnk{all:unset;cursor:pointer;color:var(--accent);font-weight:700;font-size:inherit}
+.lnk:hover{text-decoration:underline}
+.lnk small{display:block;font-weight:400;color:var(--muted);font-size:12.5px;margin-top:2px}
+.chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+
+/* tags after a task's or objective's name */
+.tag{display:inline-block;font-size:12.5px;border:1px solid #555;padding:0 5px;margin-left:4px;color:var(--muted);vertical-align:1px;line-height:1.5}
+.tag.fir{border-color:var(--orange);color:#e8b64a} .tag.key{border-color:#3d7fa8;color:#8cc7f0} .tag.t{margin:0 4px 0 0;border-color:var(--gold-two);color:var(--gold-one)}
+.tag.place{border-color:#7a6a2e;color:#e8d18a} .tag.gear{border-color:#5a5a7a;color:#c9c9f0}
+.tag.miss{border-color:#a67c00;background:rgb(255 212 59 / .12);color:var(--not-ready)}
+.tag.warnt{border-color:#a67c00;color:var(--not-ready)}
+
+/* dialogs (app/dom.js openModal), banners, the busy spinner and the toast */
+.modal{position:fixed;inset:0;background:rgb(0 0 0 / .7);z-index:80;display:grid;place-items:center;padding:16px}
+.modal .box{background:#1f1f21;border:1px solid var(--gold-two);width:min(520px,100%);padding:18px 20px;max-height:90vh;overflow:auto}
+.modal h3{margin:0 0 8px;color:#fff;font-size:24px} .modal ol{padding-left:20px;margin:6px 0 12px;font-size:15px} .modal li{margin:3px 0}
+.modal .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center} .modal input{flex:1;min-width:0}
+.modal .err{color:#ff8a93;margin-top:8px;font-size:14.5px} .modal .info{margin-top:10px;border:1px solid #444;padding:8px 10px;font-size:14.5px}
+.modal .box.wide{width:min(720px,100%)}
+.modal h4{margin:14px 0 4px;color:#fff;font-size:16px}
+.mnote{font-size:13.5px;color:var(--muted);margin:2px 0 8px}
+.banner{border:1px solid var(--gold-two);background:rgb(154 136 102 / .12);padding:12px 14px;margin:0 0 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--gold-two);border-top-color:transparent;border-radius:50%;animation:sp 0.8s linear infinite;vertical-align:-1px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.toast{position:fixed;left:50%;top:66px;transform:translateX(-50%);background:rgb(0 0 0 / .9);border:1px solid var(--accent);color:var(--gold-one);padding:8px 16px;z-index:99;display:none;font-weight:700}
+
+@media (max-width:860px){
+  main{height:auto}
+  .navr .dd{display:none}
+}
+@media (max-width:600px){
+  .nav{gap:10px;padding:0 12px} .brand{font-size:16px;letter-spacing:1px}
+  .crumbs,.navr .saved,.lbl,.hm{display:none}
+  .navr{gap:8px;font-size:13px;margin-left:auto}
+}

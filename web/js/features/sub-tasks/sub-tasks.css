@@ -1,0 +1,7 @@
+/* Sub-tasks: the "Sub-tasks" box in an open task row. */
+.subs{margin-top:9px;border-top:1px dashed #444;padding-top:7px}
+.subs h5{margin:0 0 4px;font-size:13px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+.sub{display:flex;align-items:center;gap:6px;padding:3px 0}
+.sub .t{flex:1;min-width:0} .sub.done .t{text-decoration:line-through;color:var(--muted)}
+.sub select{padding:1px 3px;border-width:1px;font-size:13px}
+.addsub{display:flex;gap:6px;margin-top:5px} .addsub input{flex:1;min-width:0}

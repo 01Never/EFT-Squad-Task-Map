@@ -1,34 +1,60 @@
-// Boot + routing.
-import { app, flush } from "./store.js";
-import { $, esc } from "./util.js";
-import { migrate } from "./logic/state.js";
-import { openMap } from "./map.js";
-import { showPicker } from "./picker.js";
-import { connectLive, indexData, renderNav, rerender } from "./live.js";
-import { openSettings } from "./settings.js";
+// @ts-check
+// Start-up only: load the map settings, game data, status and saved data from the program, migrate
+// old saved data, then show the page the address asks for and listen for live events.
+// Everything else lives in app/, map/, panel/ and features/.
+import { app } from "./app/state.js";
+import { findElement, escapeHtml } from "./app/dom.js";
+import { fetchJson } from "./app/api.js";
+import { migrateSavedData, SAVED_DATA_VERSION } from "./app/saved-data.js";
+import { flush, saveMigratedData, saveUnsavedChangesOnClose } from "./app/saving.js";
+import { indexGameData } from "./app/game-data.js";
+import { showPageForAddress, rerenderPage } from "./app/routing.js";
+import { connectToLiveEvents } from "./app/live-events.js";
+import { renderNav } from "./features/raid/nav.js";
+import { openSettings } from "./features/settings/panel.js";
 
-function route() {
-  const m = location.hash.match(/^#\/map\/([\w-]+)/);
-  if (m && app.CFG.some((c) => c.key === m[1])) openMap(m[1]);
-  else showPicker();
-}
-addEventListener("hashchange", route);
-// keep the "x min ago" GPS label honest without a timer: refresh when you come back to the tab
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && app.S) rerender(); else flush(); });
+saveUnsavedChangesOnClose();
+addEventListener("hashchange", showPageForAddress);
+document.addEventListener("visibilitychange", onVisibilityChanged);
+start();
 
-(async () => {
-  try {
-    const [cfg, data, status, state] = await Promise.all(["/api/config", "/api/data", "/api/status", "/api/state"].map((u) => fetch(u).then((r) => r.json())));
-    app.CFG = cfg; app.DATA = data; app.STATUS = status;
-    app.gps = status.gps; app.trail = status.trail || [];
-    const wasV1 = state && state.version !== 2;
-    app.S = migrate(state);
-    indexData();
-    if (wasV1) { await fetch("/api/state", { method: "PUT", body: JSON.stringify(app.S) }); }
-    $("#saved").textContent = state ? "Saved ✓" : "";
-    $("#settings").onclick = openSettings;
-    renderNav(); connectLive(); route();
-  } catch (e) {
-    $("#view").innerHTML = `<div class="picker"><h1>Couldn't start</h1><p>${esc(e.message || e)}</p><p>Is the Squad Task Map program still running?</p></div>`;
+/**
+ * Coming back to the tab redraws the page, which keeps the "x min ago" of your position honest
+ * without a timer. Leaving it saves anything unsaved straight away.
+ */
+function onVisibilityChanged() {
+  if (document.visibilityState === "visible" && app.saved) {
+    rerenderPage();
+  } else {
+    flush();
   }
-})();
+}
+
+async function start() {
+  try {
+    const [mapConfigs, gameData, status, savedData] = await Promise.all(
+      ["/api/config", "/api/data", "/api/status", "/api/state"].map(fetchJson),
+    );
+    app.mapConfigs = mapConfigs;
+    app.gameData = gameData;
+    app.status = status;
+    app.gps = status.gps;
+    app.trail = status.trail || [];
+    const isOlderData = savedData && savedData.version !== SAVED_DATA_VERSION;
+    app.saved = migrateSavedData(savedData);
+    indexGameData();
+    if (isOlderData) await saveMigratedData();
+    findElement("#saved").textContent = savedData ? "Saved ✓" : "";
+    findElement("#settings").onclick = openSettings;
+    renderNav();
+    connectToLiveEvents();
+    showPageForAddress();
+  } catch (error) {
+    showStartUpError(error);
+  }
+}
+
+/** The program didn't answer (or answered nonsense): say so instead of a blank page. */
+function showStartUpError(error) {
+  findElement("#view").innerHTML = `<div class="picker"><h1>Couldn't start</h1><p>${escapeHtml(error.message || error)}</p><p>Is the Squad Task Map program still running?</p></div>`;
+}

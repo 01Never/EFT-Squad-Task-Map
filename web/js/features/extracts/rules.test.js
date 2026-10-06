@@ -1,4 +1,4 @@
-// Tests for the extract rules. Runs under `bun test` now and `node --test` after ticket 04b.
+// Tests for the extract rules (rules.js).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { extractsThatCount, closestExtract, approximateDistanceText } from "./rules.js";

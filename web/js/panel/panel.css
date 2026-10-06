@@ -1,0 +1,35 @@
+/* The right-hand panel's frame: its header (map name, Scan, Add a task, the tabs), sections and
+   chips, the footer, and hiding / showing the whole list. Features style their own sections. */
+aside{background:rgb(0 0 0 / .45);border-left:1px solid var(--glass-border);overflow-y:auto;overscroll-behavior:contain}
+.phead{padding:14px 16px 12px;border-bottom:1px solid #3a3a3d}
+.phead h2{margin:0 0 10px;font-size:28px;color:#fff;font-weight:700;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.phead h2 small{font-size:14px;color:var(--muted);font-weight:400}
+.sec{padding:10px 16px;border-bottom:1px solid #3a3a3d}
+.sec h4{margin:0 0 7px;font-size:13px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-weight:700}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:transparent;border:1px solid var(--gold-two);color:var(--muted);height:30px;padding:0 10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:14.5px}
+.chip[aria-pressed="true"]{background:var(--gold-two);color:#000}
+.chip .n{font-weight:400;opacity:.75}
+footer.pf{padding:14px 16px 24px;color:var(--muted);font-size:13px;line-height:1.5}
+footer.pf code{font-family:Consolas,Menlo,monospace;font-size:12px;word-break:break-all;color:var(--gold-one)}
+
+/* hide / show the task list */
+.phead h2 .hr{display:flex;align-items:baseline;gap:10px}
+.app.nopanel{grid-template-columns:1fr} .app.nopanel aside{display:none}
+.showpanel{display:none;position:absolute;top:10px;right:10px;z-index:3;background:rgb(0 0 0 / .8);border:1px solid var(--glass-border);color:var(--gold-one);font:inherit;font-weight:700;font-size:15px;height:38px;padding:0 14px;cursor:pointer}
+.showpanel:hover{color:var(--accent)} .app.nopanel .showpanel{display:block}
+
+.banner.sm{margin:10px 0 0;padding:8px 10px;font-size:14px;display:block}
+.phead .row{display:flex;gap:8px;align-items:center} .phead .row input{flex:1;min-width:0}
+.tabs{display:flex;gap:0;margin-top:12px;border-bottom:2px solid var(--gold-two)}
+.tabs button{all:unset;cursor:pointer;padding:7px 14px;font-weight:700;color:var(--muted)}
+.tabs button[aria-pressed="true"]{background:var(--gold-two);color:#000}
+.bang{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--not-ready);color:#000;font-weight:700;font-size:12px}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+details.menu{position:relative} details.menu summary{list-style:none} details.menu summary::-webkit-details-marker{display:none}
+.menubox{position:absolute;right:0;top:34px;z-index:5;background:#1f1f21;border:1px solid var(--gold-two);padding:8px 10px;display:grid;gap:10px;width:270px}
+
+@media (max-width:860px){
+  aside{border-left:0;overflow:visible}
+  .app.nopanel aside{display:block} .app.nopanel .showpanel,.hidep{display:none}
+}

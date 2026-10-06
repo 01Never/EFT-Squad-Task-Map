@@ -1,0 +1,16 @@
+/* Scan tasks: the capture bar at the top while you take screenshots, and the review dialog's lists. */
+#capbar{position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:70;width:min(920px,calc(100% - 24px));background:rgb(18 18 18 / .96);border:1px solid var(--accent);box-shadow:0 8px 30px #000}
+.capin{display:flex;gap:14px;align-items:center;padding:10px 12px;flex-wrap:wrap}
+.captext{flex:1 1 260px;min-width:0;font-size:14px} .captext b{display:block;font-size:16px;color:#fff;margin-bottom:2px}
+.captext .est{display:block;margin-top:3px;color:var(--muted);font-size:12.5px}
+.thumbs{display:flex;gap:6px;overflow-x:auto;max-width:100%;flex:1 1 200px}
+.thumbs .none{color:var(--muted);font-size:14px;align-self:center}
+.th{position:relative;flex:none} .th img{height:52px;width:auto;display:block;border:1px solid #444}
+.th .x{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:#000;color:#fff;cursor:pointer;line-height:18px;padding:0}
+.capbtns{display:flex;gap:8px}
+.rlist{list-style:none;margin:4px 0;padding:0;max-height:260px;overflow:auto} .rlist li{padding:3px 0;border-bottom:1px solid #2c2c2e} .rlist .none{color:var(--muted)}
+.rlist input[type=search]{padding:2px 6px;border-width:1px;width:260px}
+
+@media (max-width:860px){
+  #capbar{top:58px}
+}

@@ -26,6 +26,10 @@ func builtInFiles() fstest.MapFS {
 		"web/js/logic/rules.js":       {Data: []byte("export const rules = 1;")},
 		"web/js/logic/rules.test.js":  {Data: []byte("test('x')")},
 		"web/js/app/event-names.json": {Data: []byte("{}")},
+		"web/js/features/x/README.md": {Data: []byte("# x")},
+		"web/js/features/x/x.css":     {Data: []byte(".x{color:red}")},
+		"web/css/base.css":            {Data: []byte(":root{--player:#ff3fd2}")},
+		"web/css/notes.txt":           {Data: []byte("notes")},
 		"assets/Customs.svg":          {Data: []byte("<svg/>")},
 		"assets/Customs.png":          {Data: []byte("png")},
 		"assets/maps-config.json":     {Data: []byte(`[{"key":"customs"}]`)},
@@ -65,6 +69,8 @@ func TestThePageAndItsFilesAreServedWithExplicitContentTypes(t *testing.T) {
 		{"the page by name", "/index.html", "text/html; charset=utf-8", "<!doctype html><title>Squad Task Map</title>", "no-cache"},
 		{"a script", "/js/app.js", "text/javascript; charset=utf-8", "export const app = 1;", "no-cache"},
 		{"a script in a subfolder", "/js/logic/rules.js", "text/javascript; charset=utf-8", "export const rules = 1;", "no-cache"},
+		{"a feature's stylesheet next to its scripts", "/js/features/x/x.css", "text/css; charset=utf-8", ".x{color:red}", "no-cache"},
+		{"a shared stylesheet", "/css/base.css", "text/css; charset=utf-8", ":root{--player:#ff3fd2}", "no-cache"},
 		{"map art (cached for an hour)", "/maps/Customs.svg", "image/svg+xml", "<svg/>", "max-age=3600"},
 		{"the maps config", "/api/config", "application/json", `[{"key":"customs"}]`, "no-cache"},
 		{"a font from fonts.json (cached for a day)", "/fonts/Bender.woff2", "font/woff2", string(fontBytes), "max-age=86400"},
@@ -94,6 +100,10 @@ func TestOnlyTheRoutedFilesAreServed(t *testing.T) {
 		{"a test file under /js/", http.MethodGet, "/js/logic/rules.test.js"},
 		{"a non-script under /js/", http.MethodGet, "/js/app/event-names.json"},
 		{"a script that doesn't exist", http.MethodGet, "/js/missing.js"},
+		{"a README under /js/", http.MethodGet, "/js/features/x/README.md"},
+		{"a stylesheet that doesn't exist", http.MethodGet, "/css/missing.css"},
+		{"a non-stylesheet under /css/", http.MethodGet, "/css/notes.txt"},
+		{"a script under /css/", http.MethodGet, "/css/app.js"},
 		{"map art that isn't an svg", http.MethodGet, "/maps/Customs.png"},
 		{"map art that doesn't exist", http.MethodGet, "/maps/Atlantis.svg"},
 		{"a font that isn't in fonts.json", http.MethodGet, "/fonts/Missing.woff2"},
@@ -110,6 +120,36 @@ func TestOnlyTheRoutedFilesAreServed(t *testing.T) {
 			server.ServeHTTP(recorder, httptest.NewRequest(testCase.method, testCase.path, nil))
 			if recorder.Code != http.StatusNotFound || strings.TrimSpace(recorder.Body.String()) != "Not found" {
 				t.Errorf("got %d %q, want 404 Not found", recorder.Code, recorder.Body.String())
+			}
+		})
+	}
+}
+
+// The route table cleans "/css/../x" before it reaches a handler, so these call the handlers
+// directly: their own path check must still refuse anything outside their folder.
+func TestTheFileHandlersRefusePathsOutsideTheirFolder(t *testing.T) {
+	static, err := NewStatic(builtInFiles(), "2.4.0", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name    string
+		handler http.HandlerFunc
+		path    string
+	}{
+		{"a stylesheet path that climbs out of web/css", static.serveStylesheet, "/css/../js/features/x/x.css"},
+		{"a stylesheet path that climbs out to the page", static.serveStylesheet, "/css/../../web/css/base.css"},
+		{"a script path that climbs out of web/js", static.servePageCode, "/js/../css/base.css"},
+		{"an absolute stylesheet path", static.serveStylesheet, "/css//web/css/base.css"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, "/", nil)
+			request.URL.Path = testCase.path
+			recorder := httptest.NewRecorder()
+			testCase.handler(recorder, request)
+			if recorder.Code != http.StatusNotFound {
+				t.Errorf("got %d %q, want 404", recorder.Code, recorder.Body.String())
 			}
 		})
 	}

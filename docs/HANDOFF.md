@@ -31,7 +31,7 @@ Current version: see `Version` in `internal/app/run.go` (also `version` in `pack
   2. GPS screenshots created during the raid that just ended (`raid.Tracker.End`, only files it saw being created).
   Both go through `screenshots.Watcher.DeleteFile`, which refuses anything but a plain file name in the folder.
 - **API keys** stay server-side, stored in plain text in `squad-task-map-settings.json`, and are only sent to `api.openai.com`. The page never sees the full key (`storage.MaskKey`).
-- **Projection (`web/js/logic/projection.js` `makeProj`) is exact** and verified against tarkov.dev test vectors. Keep its tests passing.
+- **Projection (`web/js/map/projection.js` `makeProj`) is exact** and verified against tarkov.dev test vectors. Keep its tests passing.
 - **Saved-state changes need a migration path** (see §6.2).
 - Use a scratch `STM_DATA_DIR` while developing so the owner's real `squad-task-map-data.json` isn't touched.
 
@@ -47,7 +47,9 @@ Go dependencies: `github.com/fsnotify/fsnotify` (screenshots folder notification
 |---|---|
 | Dev run | `go run .` (page files are served from disk, so edits show on reload) |
 | Server tests | `go test ./...` |
-| Page tests | `npm test` (= `node --test "tests/*.test.js" "web/js/**/*.test.js"`) |
+| Page tests | `npm test` (= `node --test "web/js/**/*.test.js"`) |
+| Page type check | `npm run typecheck` (= `npx -y -p typescript tsc -p jsconfig.json --noEmit`; downloads TypeScript on first use, nothing installed in the project). VS Code checks the same files as you type (`jsconfig.json`, `// @ts-check`). |
+| Browser suite | `npm run test:browser` (see §9 and `tests/browser/README.md`) |
 | Windows exe | `go build -trimpath -ldflags "-s -w" -o dist/SquadTaskMap.exe .` (~12 MB) |
 | Icon / version info | edit `winres/winres.json`, then `go-winres make --arch amd64 --out rsrc` (writes `rsrc_windows_amd64.syso`, picked up by `go build`) |
 
@@ -131,7 +133,7 @@ OpenAI ◄──(scan, categorize)───── taskscan / aicategorize ┘   
 - **Server → page events use Server-Sent Events** (`/api/events`). There are two kinds (`server/events.ts`):
   - `deliver(ev)`: events that change saved data (`task` started/finished/failed, `raidEnd`). They're queued in `squad-task-map-pending.json` and resent until the page acks (`POST /api/events/ack`). That way a task accepted while the browser was closed still lands.
   - `broadcast(ev)`: transient events (`gps`, `capture`, `raidStart`, `raidMap`, `mode`, `keybind`, `data`). They're dropped if no page is open.
-- The page handles events in `web/js/live.js` `handle()`.
+- The page handles events in `web/js/app/live-events.js`: one named handler per event name (`app/event-names.js`, checked against `internal/events/names.go` by `names_test.go`).
 - **The page never polls,** with one exception: it polls `/api/ai/job/:id` while an AI Categorize request runs.
 
 ### Server (Go; start with `internal/app/app.go`)
@@ -140,7 +142,7 @@ OpenAI ◄──(scan, categorize)───── taskscan / aicategorize ┘   
 | `main.go`, `embed.go` | Entry point; `//go:embed` of `web/` and `assets/` (the page is served as-is, no bundler). |
 | `internal/app` | Creates every part and wires them (`app.go`: log event → raid/gps/events; screenshot → gps or scan), the backend behind every route (`backend.go`), start-up (`run.go`: data folder, single copy, port 7777→7800, banner, browser). |
 | `internal/httpapi` | Route table and thin handlers (`routes.go`), static files with explicit content types and an ETag = version (`static.go`), the `Backend` interface listing everything the page can ask for. |
-| `internal/events` | Event names (`names.go`, spelled as `web/js/live.js` expects) and the SSE hub: `Deliver` (queued in `squad-task-map-pending.json` until acked) and `Broadcast` (live only). |
+| `internal/events` | Event names (`names.go`, spelled identically in `web/js/app/event-names.js`; `names_test.go` fails if the lists differ) and the SSE hub: `Deliver` (queued in `squad-task-map-pending.json` until acked) and `Broadcast` (live only). |
 | `internal/storage` | Files next to the exe: settings (unknown fields kept, `tt*` dropped), the page's saved data as opaque text (atomic write + `.bak`), v1 backup. |
 | `internal/gamedata` | Saved copy or built-in snapshot; refresh when over 24 h old (checked hourly); validation (≥ max(200, 50% of previous) tasks, ≥ 5 maps); `convert.go`/`snapshot.go` = 1:1 port of v2's converter, JSON-equal to the v2 goldens. |
 | `internal/gamefolders` | Logs folder via the launcher's registry entry or Steam libraries; Documents via `FOLDERID_Documents` (OneDrive-safe). |
@@ -156,22 +158,39 @@ OpenAI ◄──(scan, categorize)───── taskscan / aicategorize ┘   
 | `cmd/release` | The owner's release tool: version check, tests, Windows build, signed `latest.json`. See "Publishing an update". |
 
 ### Page (`web/`)
-- `index.html`: all CSS (tarkov.dev palette, Bender font) and the shell. Mobile breakpoints at 860 px and 600 px. Feature CSS added by roadmap tickets sits in its own clearly labelled block until ticket 04b moves CSS into files.
-- `web/js/logic/` (DOM-free, unit tested):
-  - `projection.js`: game ↔ SVG coordinates, floor badges, arrow rotation.
-  - `parts.js`: objective actions, splitting, progress.
-  - `ready.js`: requirements, readiness, bring list.
-  - `state.js`: defaults, `fill`, `migrate`, `catForPart`, `forgetTask`.
-  - `match.js`: fuzzy task-name matching.
-  - `simplify.js`: drawing strokes.
-- `web/js/features/<name>/`: code added by roadmap tickets, written to `docs/CODE-STYLE.md` (README, `rules.js` + `rules.test.js`, `map-layer.js`/`panel.js`). See `docs/FEATURES.md`.
-- UI modules:
-  - `main.js`: boot and routing (`#/` picker, `#/map/<key>`).
-  - `store.js`: `app` singleton, `save`, `activate`, `finish`, `setTick`.
-  - `map.js`: SVG map, pan/zoom, layers, markers, popup, selection flash, panel hide.
-  - `panel.js`: right panel and Bring list; all clicks delegated through `data-act`.
-  - `ai.js`, `scan.js`, `settings.js`, `live.js`, `picker.js`, `util.js`.
-- **Rendering model:** `renderAll()` rebuilds the panel's innerHTML (keeping its scroll position) and redraws the SVG layers. Map overlays are `<g class="sc" data-x data-y>`, counter-scaled in `apply()` so they keep their screen size at any zoom.
+Plain JavaScript modules served as-is (no bundler), organised by feature (`docs/CODE-STYLE.md` §1).
+Every file starts with `// @ts-check`; types are JSDoc (`web/js/app/types.js`), checked by VS Code
+and `npm run typecheck`. Each feature folder has a README.
+- `index.html`: the shell (top bar, `#view`, capture bar, toast) and the stylesheets, linked in a
+  fixed order: `web/css/base.css` (colours as variables such as `--player`, `--selection-ring`,
+  `--not-ready`; fonts, buttons, fields, dialogs, tags; the 860 px and 600 px breakpoints), then
+  `map/map.css`, `panel/panel.css`, then one file per feature. A later file wins a tie.
+- `web/js/main.js`: start-up only (load config, data, status, saved data; migrate; route; connect).
+- `web/js/app/`: the shared parts.
+  - `state.js`: `app`, the one shared changing state (saved data, game data, status, the open map).
+  - `types.js`: JSDoc types (Task, Objective, Part, SavedState, Category, Settings, events…).
+  - `saved-data.js`: `freshState()`, `fillMissingFields()`, `migrateSavedData()` (v1 → v2).
+  - `saving.js`: `save()` (500 ms debounce), `flush()`, save on close.
+  - `game-data.js`: lookups (tasks by id, objectives by id, name matcher, map names), reload.
+  - `live-events.js`: the live-event router; `event-names.js`: the names.
+  - `routing.js`: `#/` picker or `#/map/<key>`, and `rerenderPage()`.
+  - `api.js`, `dom.js` (find, escape, SVG elements, toast, modal), `map-prefs.js`, `game-modes.js`.
+- `web/js/map/`: the map view, no feature rules.
+  - `map-page.js`: open/close a map, `renderMapPage()` (panel, then each layer, then the popup),
+    floors, modes (pan / draw / place).
+  - `layers.js`: the map's layers, bottom to top. `view.js`: pan, zoom, fit, `applyView()`.
+    `input.js`: mouse, touch, wheel, keys. `projection.js` (exact, tested). `markers.js` and
+    `marker-shapes.js`: drawing a marker. `place-names.js`. `selection-flash.js` (`#fx`).
+    `map-art.js`: the SVG files.
+- `web/js/panel/panel.js`: the panel's header, the Tasks tab's sections in order, the footer,
+  hide/show, and the one router for its clicks and changes (each feature lists its handlers).
+- `web/js/features/<name>/`: `tasks`, `readiness`, `sub-tasks`, `drawing`, `extracts`, `find-me`,
+  `picker`, `raid`, `scan`, `ai-categorize`, `settings`. Each has `README.md`, `rules.js` (no DOM,
+  tested in `rules.test.js`), `panel.js` and/or `map-layer.js`, and its `<name>.css`. See
+  `docs/FEATURES.md`.
+- **Rendering model:** `renderMapPage()` rebuilds the panel's innerHTML (keeping its scroll position)
+  and redraws the SVG layers. Map overlays are `<g class="sc" data-x data-y>`, counter-scaled in
+  `applyView()` so they keep their screen size at any zoom.
 
 ---
 
@@ -260,21 +279,22 @@ Measured idle cost with the page open (2 min, 2026-10-05): **Go 2.4.0: 0.000% of
   - **The selection flash** is HTML rings in `#fx` over the map, animated only with CSS `transform`/`opacity`. That runs on the compositor with zero main-thread paint. A trace showed 0 Paint/Layout per second, versus ~120 paints per second for the old SVG `r` animation.
   - **The find-me pulse** (ticket 01) uses the same technique, and only for ~20 s after a new position or a Find me click.
   - **Never animate SVG attributes** or anything inside the map SVG: the map is a huge SVG, and each repaint is expensive.
-  - `renderFx()` rebuilds the rings only when the selection signature changes, so re-renders don't restart the animation; `placeFx()` repositions them in `apply()` using `svg.getScreenCTM()`.
-- Pan/zoom uses `requestAnimationFrame` (`applySoon`).
+  - `renderSelectionFlash()` (`map/selection-flash.js`) rebuilds the rings only when the selection signature changes, so re-renders don't restart the animation; `placeSelectionFlash()` repositions them in `applyView()` using `svg.getScreenCTM()`.
+- Pan/zoom uses `requestAnimationFrame` (`applyViewSoon()` in `map/view.js`).
 
 ---
 
 ## 8. Recipes
 
 - **New API route:** add a method to `httpapi.Backend`, a line in the route table in `internal/httpapi/routes.go` and a thin handler; implement the method in `internal/app/backend.go`. Keep it on 127.0.0.1.
-- **New live event:** add its name to `internal/events/names.go`; `hub.Deliver()` if it must reach saved data, else `hub.Broadcast()` (from `internal/app`); handle it in `live.js` `handle()`.
+- **New live event:** add its name to `internal/events/names.go`; `hub.Deliver()` if it must reach saved data, else `hub.Broadcast()` (from `internal/app`); add the same name to `web/js/app/event-names.js` (a Go test checks the two lists) and a named handler to `HANDLER_BY_EVENT_NAME` in `web/js/app/live-events.js`, calling into the feature that owns it.
 - **New server feature:** a package in `internal/features/<name>/` with `rules.go` (pure), its I/O in another file, `*_test.go` and a README; connect it in `internal/app/app.go` only.
-- **New panel button:** markup with `data-act="x"` in `panel.js`; add `case "x":` in `bindPanel`'s switch; `save()` then `renderAll()`/`renderPanel()`.
-- **Toast with Undo:** `toast(msg, { label: "Undo", run: () => … })`. Snapshot with `snapshotCats()`/`restoreCats()` for category changes.
+- **New panel button:** markup with `data-act="x"` in the feature's `panel.js`, and `x: onXClicked` in that feature's actions table (e.g. `TASK_ROW_ACTIONS`); `panel/panel.js` routes clicks to it. The handler changes the saved data, then `save()` and `renderMapPage()` / `renderPanel()`.
+- **New panel section:** a render function in the feature's `panel.js`, added to `TASKS_TAB_SECTIONS` in `panel/panel.js` in its place. **New map layer:** a name in `map/layers.js` (bottom to top), a render function in the feature's `map-layer.js`, called from `renderMapPage()`.
+- **Toast with Undo:** `showToast(message, { label: "Undo", run: () => … })`. Snapshot with `snapshotCategories()`/`restoreCategories()` for category changes.
 - **New map:** add the SVG to `assets/` and `embed.go` already embeds `assets/*.svg`. Add an entry to `assets/maps-config.json` (key, name, svg, transform, rotation, bounds, svgBounds, baseLayer, heightRange, layers, labels). These values come from tarkov.dev's maps data (the-hideout/tarkov-dev). Check that `SceneToMap`/`NameIDToMap` in `internal/gamedata/snapshot.go` map to the key.
-- **Change splitting/categories:** edit `parts.js`/`state.js` and add a case to `tests/logic.test.js` (tasks are looked up by name in `testdata/golden/data-snapshot.json.gz`).
-- **New roadmap feature:** a folder in `web/js/features/<name>/` with `README.md`, `rules.js`, `rules.test.js` and `map-layer.js`/`panel.js`; add a row to `docs/FEATURES.md`.
+- **Change splitting/categories:** edit `features/tasks/rules.js` / `categories.js` and add a case to `rules.test.js` / `categories.test.js` next to them (tasks are looked up by name in `testdata/golden/data-snapshot.json.gz`, via `tests/support/game-data.js`).
+- **New roadmap feature:** a folder in `web/js/features/<name>/` with `README.md`, `rules.js`, `rules.test.js`, `map-layer.js`/`panel.js` and `<name>.css` (linked in `index.html`, in order); add a row to `docs/FEATURES.md`.
 
 ---
 
@@ -287,7 +307,7 @@ Measured idle cost with the page open (2 min, 2026-10-05): **Go 2.4.0: 0.000% of
 - `internal/features/raid/raid_test.go`: mode matching, raid start/end, only that raid's GPS shots are deleted.
 - `cmd/mock`: its own tests.
 
-**Page:** `npm test` (`node --test`): `tests/logic.test.js` (projection vectors, parts, readiness/bring list, migration, matching, simplify) and `web/js/features/**/rules.test.js`.
+**Page:** `npm test` (`node --test`): every `*.test.js` next to the rules it tests: `map/projection.test.js` (tarkov.dev vectors), `app/saved-data.test.js` (v1 → v2, missing fields), and `features/<name>/rules.test.js` (parts, categories, readiness and the Bring list, name matching, drawing, extracts, find-me, raid, picker, settings, AI Categorize, sub-tasks). Shared test data loading is in `tests/support/game-data.js`. `npm run typecheck` type-checks the page.
 
 **Golden files** (`testdata/golden/`) were captured from the v2 TypeScript code before it was removed: converter outputs, the mock's raw documents, log events, GPS names. If a rule changes on purpose, regenerate the affected golden and say so in the commit.
 
@@ -360,6 +380,7 @@ Verified on the owner's PC since 2.3.0: folder detection (registry → `E:\Games
 - **2.2.0 (ticket 02, auto-center):** setting `autoCenter` (off by default) + ◎ Follow toolbar toggle: each new position centres the map at your zoom. With it off, only off-screen positions are brought into view (if Follow my position is on). The zoom-changing `centerOn()` is gone: nothing changes zoom automatically any more. A position that arrives mid-drag waits for the release (`afterUserLetsGo`).
 - **2.3.0 (ticket 03, closest extract):** after each position, the closest marked extract (or, with none marked, the closest one the chips show; transits only when marked) gets a ring, a dashed line with "~N m" and a "Closest: …" link in the position bar. No runner-ups (owner). Code in `web/js/features/extracts/`. Also: the Follow toggle icon is ◎ (⌖ didn't render). Last Bun-only release before the Go port.
 - **2.4.0 (ticket 04, Go backend):** the server is Go (`internal/`), one 12 MB exe (was ~89 MB), idle 0.000% CPU / 34 MB. Same routes, JSON, SSE events and data files (34-check parity run against the Bun server, JSON-equal converter on real data). The page is served unbundled (`/js/main.js`). New: one copy at a time per data folder; exe icon and version info; `cmd/mock` in Go; page tests on `node --test`. Found and fixed against the owner's real files first: a false "SysReq" screenshot-key warning (one working slot is enough) and a stale game-mode prompt (the game logs "Pve" then "PvpSeason" at start-up). Kill targets: "The Wedge" counts as a Scav kill (not in the boss list); left as is, raised with the owner. Bun uninstalled.
+- **2.5.0 (ticket 04b, page reorganised by feature):** no behaviour change. The page's code moved from `web/js/*.js` and `web/js/logic/` into `app/`, `map/`, `panel/` and `features/<name>/` (README, `rules.js` + tests, `panel.js`, `map-layer.js`, `<name>.css`), with full names, small render functions, named handlers per feature instead of one big switch, named constants, `// @ts-check` with JSDoc types, one live-event router and event names checked against Go. CSS moved out of `index.html` into `web/css/base.css` and one file per feature. Checked with the browser suite: the same API requests in the same order, 0 changed pixels, the same saved data.
 - **Roadmap (`docs/ROADMAP.md`):** tickets 01 → 10, one branch each. Progress is tracked in `docs/FEATURES.md` and below.
 
 **References:**

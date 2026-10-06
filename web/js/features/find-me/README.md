@@ -33,11 +33,11 @@ name. The server parses it (`internal/features/gps`), works out the map from the
   Follow is on and you're not well in view; "well in view" ignores the outer
   `BRING_INTO_VIEW_EDGE_FRACTION` = 10% of the view (`isWellInsideArea()`). Otherwise "leave".
 - The centring waits while a finger or mouse button is down on the map (`afterUserLetsGo()` in
-  `map.js`), then runs once you let go.
+  `map/view.js`), then runs once you let go.
 
 **Flow:**
-`screenshot file → internal/screenshots → app.onScreenshot → gps.ParseFileName → gps.Tracker.Update → event "gps" → live.js →
-onNewPosition() (starts the pulse) → renderPlayer() → moveViewForNewPosition() → map.js apply() →
+`screenshot file → internal/screenshots → app.onScreenshot → gps.ParseFileName → gps.Tracker.Update → event "gps" → app/live-events.js onPositionReceived() →
+onNewPosition() (starts the pulse) → renderPlayer() → moveViewForNewPosition() → map/view.js applyView() →
 placeFindMeOverlays()`
 
 **Light while Tarkov runs:** the marker, label and trail are plain SVG, drawn once per update.
@@ -50,14 +50,14 @@ With "reduce motion" turned on in Windows, the pulse is one still ring for the s
 **Saved data / settings:** `autoCenter` (off by default) and `followPosition` in
 `squad-task-map-settings.json`, read from `/api/status` and changed with `PUT /api/settings`
 (the ◎ Follow toggle and Settings both use it). The pulse start time lives in `app.findMePulseStartedAt`
-(memory only). The player colour is the CSS variable `--player` in `web/index.html`.
+(memory only). The player colour is the CSS variable `--player` in `web/css/base.css`.
 
 **Files:**
 - `rules.js`: pulse timing, on-screen test, chip placement, distance, what a new position does to the view.
 - `map-layer.js`: draws the marker, label, floor badge, trail and position bar; the pulse rings;
   the off-screen chip; the Find me button and the ◎ Follow toggle; moving the view for a new position.
 - `rules.test.js`: tests for `rules.js`.
-- Styles: the `features/find-me` block in `web/index.html` (moves to `find-me.css` in ticket 04b).
+- `find-me.css`: the position bar, the pulse rings and the chip.
 
 **Tests:** `rules.test.js` covers the pulse timing (fresh, re-drawn halfway, finished), the
 on-screen margin, chip placement on each edge, distance and its rounding. Checked in a browser

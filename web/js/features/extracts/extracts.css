@@ -1,0 +1,3 @@
+/* Extracts: the diamond in each extract-kind chip ("Extracts & labels"). The extracts themselves
+   are SVG on the map, coloured in map-layer.js. */
+.dia{width:10px;height:10px;transform:rotate(45deg);display:inline-block;border:1px solid #000}

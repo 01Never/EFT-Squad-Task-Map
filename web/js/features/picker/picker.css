@@ -1,0 +1,14 @@
+/* The map picker: a card per map with its task count, and the tasks that aren't on a map. */
+.picker{max-width:1180px;margin:0 auto;padding:28px 20px 40px}
+.picker h1{font-size:34px;margin:0 0 4px;color:var(--gold-one);font-weight:700}
+.picker p.lede{margin:0 0 22px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.card{display:block;background:var(--panel);border:1px solid #444;padding:0;color:var(--gold-one);position:relative;overflow:hidden;transition:border-color .15s}
+.card:hover{border-color:var(--accent);color:var(--gold-one)}
+.card .thumb{height:140px;background:#1e1e20;display:grid;place-items:center;overflow:hidden}
+.card .thumb svg{width:100%;height:100%}
+.card .meta{padding:10px 12px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;border-top:1px solid #333}
+.card .meta b{font-size:19px} .card .meta span{font-size:14px;color:var(--muted)} .card .meta span.has{color:var(--accent)}
+.phd{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.phd .lede{margin:0!important}
+.offmap{margin-top:22px;border:1px solid #444;padding:10px 14px;background:var(--panel)} .offmap summary{cursor:pointer;font-weight:700}
