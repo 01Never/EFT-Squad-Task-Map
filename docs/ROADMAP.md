@@ -1,6 +1,6 @@
 # Roadmap: v2.1 → v3
 
-Twelve tickets, in the order to build them. Each ticket file has its goal, scope, acceptance checks, in-game checks for the owner, and open questions with a proposed default. Ask the owner about any open question before building that part.
+Fourteen tickets, in the order to build them. Each ticket file has its goal, scope, acceptance checks, in-game checks for the owner, and open questions with a proposed default. Ask the owner about any open question before building that part.
 
 | # | Ticket | Size | Touches | Depends on |
 |---|---|---|---|---|
@@ -10,6 +10,8 @@ Twelve tickets, in the order to build them. Each ticket file has its goal, scope
 | 04 | Go backend: port the server to Go, written readable from the start; serve the JS unbundled | L | server | 01–03 merged |
 | 04b | Reorganise the page for readability (no behaviour change) | M | page | 04 |
 | 04c | Check for updates from GitHub Releases (manual button) | M | server + page + release tool | 04, 04b |
+| 04d | Only answer the app's own page (Host/Origin checks on the local API) | S | server | 04c |
+| 04e | Page bug fixes found by the browser suite | S | page | 04b |
 | 05 | Squad multiplayer over Tailscale (tsnet) | L | server + page | 04, 04b |
 | 06 | Read my extracts from the first raid screenshot (AI) | M | server + page | 04, 04b (and 03 to be useful) |
 | 07 | Item icons as task markers | S–M | page + server icon cache | 04, 04b |
@@ -478,6 +480,53 @@ Also `go run ./cmd/release -init-keys` creates the key pair once and prints the 
 
 
 ---
+
+# 04d · Only answer the app's own page (local API hardening)
+
+**Size:** S · **Touches:** server (`internal/httpapi`, `internal/app`) · **Depends on:** 04c · *Owner decision (2026-10-06), after QA's review of 04c.*
+
+## Problem
+The server listens on 127.0.0.1 only, but any web page open in the user's browser can still send it requests:
+- **Cross-site "simple" POSTs** (e.g. `Content-Type: text/plain`) are accepted without a CORS preflight. A page can trigger `/api/updates/check` → `/download` → `/apply` (a forced restart, possibly mid-raid), `/api/ai/categorize` (spends OpenAI credit) or `/api/scan/confirm` (deletes screenshots). It can't read the answers, and it can only install a release signed by the owner.
+- **DNS rebinding:** a site whose name resolves to 127.0.0.1 is same-origin with itself, so its page can read `/api/state` and overwrite it with PUT. Today the server answers any `Host` header.
+
+## Scope
+1. **One middleware in front of every route** (static files, API, SSE):
+   - **Host check:** the `Host` header must be `127.0.0.1:<port>` or `localhost:<port>` (the port the server actually listens on). Anything else → `421 Misdirected Request` with a one-line plain-text body. This blocks DNS rebinding.
+   - **Origin check on state-changing requests** (every method except GET, HEAD, OPTIONS): when an `Origin` header is present it must be `http://127.0.0.1:<port>` or `http://localhost:<port>`, otherwise `403`. When `Origin` is absent, check `Sec-Fetch-Site` if present (`same-origin` or `none` pass), otherwise allow (non-browser clients such as tests and curl send neither).
+   - **JSON bodies:** API routes that read a JSON body require `Content-Type: application/json` (`415` otherwise), so a cross-site form or `text/plain` POST can't reach them even if a browser omits `Origin`.
+2. **The page keeps working unchanged.** Check that every `fetch` in `web/js/` sends `Content-Type: application/json` with a body (the page's own API helper should already). Only fix the page if one doesn't, and say so.
+3. **Tests** (table-driven, names that read like the rules): good host/origin pass; foreign Host, foreign Origin, `null` Origin, cross-site `Sec-Fetch-Site`, `text/plain` body each refused with the right status; GET of static files and `/api/events` still work with the right Host; the port in Host must match.
+4. **The single-instance check** (a second launch opens the running copy's page) and `cmd/mock` must keep working. `cmd/mock` is not the app and doesn't need the middleware.
+5. **Ticket 05 (tsnet) note:** squadmates will reach a *separate* tsnet listener. Write the middleware so the allowed hosts are a list built in `internal/app`, so 05 can add its own listener's rules instead of loosening these.
+
+## Acceptance checks
+- `curl -X POST -H 'Origin: http://evil.example' -H 'Content-Type: text/plain' -d '{}' http://127.0.0.1:7777/api/updates/check` → 403, and the mock's log shows no GitHub request.
+- `curl -H 'Host: attacker.example:7777' http://127.0.0.1:7777/api/state` → 421.
+- The full browser suite passes unchanged.
+- `docs/HANDOFF.md` (architecture) and the `httpapi` README describe the rule; the user guide's privacy section gets one line ("Only the app's own page can use it; other websites open in your browser can't").
+
+## Owner checks
+- None in-game; the app should behave exactly as before.
+
+---
+
+# 04e · Page bug fixes found by the browser suite
+
+**Size:** S · **Touches:** page · **Depends on:** 04b · *Owner decision (2026-10-06): fix the three bugs the 04b suite found.*
+
+1. **Settings checkboxes are squashed into thin slivers** ("Follow my position", "Center the map on me…"). They should look like normal checkboxes, left of their label, in the tarkov.dev style (`accent-color` from the palette), and stay clickable on the label too. Check desktop and phone width.
+2. **Deselecting leaves the task row open.** Pressing Esc or clicking an empty spot on the map clears the selection (flash stops) but the task's row in the list stays expanded, so the next click on that row closes it instead of selecting it. Fix: deselecting also collapses the row it had opened, so the next click on that row selects it again (zoom + flash), exactly like a fresh click. Closing the popup behaves the same.
+3. **"Switch data" reloads the game data twice.** Clicking "Switch data" in the "Game says PvE" prompt should change the mode and reload the game data once (one `/api/data` request, one redraw).
+
+## Acceptance checks
+- New browser-suite checks for each bug (fail before, pass after), and new logic tests where a rule changed.
+- The rest of the browser suite passes. Only the expectations these fixes change are re-recorded (`STM_E2E_UPDATE=1` on those tests only), named in the commit: likely the Settings screenshot and the "Switch data" request list.
+- No new timers, no polling, no animation of SVG attributes.
+
+## Owner checks
+- Open Settings: the two checkboxes look and click normally.
+- Select a task, press Esc, click the same row again: it selects and zooms.
 
 # 05 · Squad multiplayer over Tailscale (tsnet)
 
