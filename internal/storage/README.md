@@ -23,6 +23,8 @@ temporary build is recognised by `go-build` or `\temp\` in the exe's path.
 | `squad-task-map-wikicache.json` | wiki pages for AI Categorize | `aicategorize` |
 | `squad-task-map-gamedata-<mode>.json` | the game data cache | `gamedata` |
 | `squad-task-map-instance.json` | the port of the running copy (one copy at a time) | `internal/app/run.go` |
+| `squad-task-map-data.before-<version>.json` | copy of the saved data made before a new version's first start; the newest 3 are kept | `BackupStateBeforeUpdate` (called by `updates`) |
+| `squad-task-map-update-notice.json` | release notes handed to the copy an update starts | `updates` |
 
 **The rules:**
 - **Atomic writes** (`WriteFileAtomic`): write `<file>.tmp`, then rename it over the file, so a
@@ -47,5 +49,11 @@ temporary build is recognised by `go-build` or `\temp\` in the exe's path.
 **Files:** `files.go` (data folder, file names, atomic write), `settings.go` (settings, masking the
 key), `state.go` (saved data, `.bak`, v1 backup).
 
-**Tests:** `storage_test.go`: atomic writes leave no `.tmp`; non-JSON state is refused and the previous file kept as `.bak`; "null" when there's no data; the v1 backup is made once and never for version 2; unknown settings survive a save while `tt…` fields are dropped; defaults for Follow and auto-center; key masking; only a go-build path counts as `go run`. **Needs a Windows check:** the data files land next to the exe; the
+- **Pre-update backup** (`BackupStateBeforeUpdate(files, version)`): copies the saved data to
+  `squad-task-map-data.before-<version>.json`, then deletes all but the newest 3 such files (by
+  modification time). Nothing to do when there's no saved data; a version containing `/` or `\`
+  is refused. The saved data itself is never touched.
+
+**Tests:** `update_backup_test.go` (the copy, no data, only the newest 3 kept while other backups are
+left alone, unsafe versions refused); `storage_test.go`: atomic writes leave no `.tmp`; non-JSON state is refused and the previous file kept as `.bak`; "null" when there's no data; the v1 backup is made once and never for version 2; unknown settings survive a save while `tt…` fields are dropped; defaults for Follow and auto-center; key masking; only a go-build path counts as `go run`. **Needs a Windows check:** the data files land next to the exe; the
 owner's real v1 file gets its backup once.

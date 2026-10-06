@@ -19,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"squadtaskmap/internal/features/updates"
 	"squadtaskmap/internal/gamedata"
 	"squadtaskmap/internal/httpapi"
 	"squadtaskmap/internal/storage"
@@ -39,6 +40,13 @@ func Run(builtIn fs.FS) error {
 	files := storage.FilesIn(storage.DataDir())
 	assets, isDev := pageFiles(builtIn)
 
+	// An update started this copy: the old one is still closing its port. Wait for it first,
+	// or the check below would find the old copy and just open its page. (Ticket 04c.)
+	updatedFrom := updates.UpdatedFromArgument(os.Args[1:])
+	if updatedFrom != "" {
+		waitForOldCopy(files)
+	}
+
 	if url, running := runningCopy(files); running {
 		fmt.Println("\n  Squad Task Map is already running: " + url)
 		openBrowser(url)
@@ -46,7 +54,7 @@ func Run(builtIn fs.FS) error {
 	}
 
 	loadMapNames(assets)
-	app := newApp(Version, files, builtInGameData(builtIn))
+	app := newApp(Version, updatedFrom, files, builtInGameData(builtIn))
 	app.gameData.Start(app.currentSettings().GameModeOrDefault())
 
 	static, err := httpapi.NewStatic(assets, Version, isDev)
@@ -59,7 +67,7 @@ func Run(builtIn fs.FS) error {
 	}
 	url := fmt.Sprintf("http://127.0.0.1:%d/", port)
 	rememberRunningCopy(files, port)
-	defer os.Remove(files.Instance)
+	defer forgetRunningCopy(files)
 
 	server := &http.Server{Handler: httpapi.NewServer(app, static), ReadHeaderTimeout: 10 * time.Second}
 	// Goroutine: the web server; ends when server.Shutdown is called below.
@@ -71,9 +79,13 @@ func Run(builtIn fs.FS) error {
 
 	app.startWatchers()
 	printBanner(app, url, isDev)
-	openBrowser(url)
+	if updatedFrom == "" {
+		// After an update the page that clicked "Download and restart" is still open and
+		// reconnects by itself; a second tab would be noise.
+		openBrowser(url)
+	}
 
-	waitForClose()
+	waitForClose(app.exitRequested)
 	app.hub.Close() // end the live-event streams, so the server stops at once
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -185,6 +197,33 @@ func runningCopy(files storage.Files) (string, bool) {
 	return url, true
 }
 
+// forgetRunningCopy removes the instance file, but only if it is still ours: after an update the
+// new copy has already written its own while this one finishes shutting down.
+func forgetRunningCopy(files storage.Files) {
+	data, err := os.ReadFile(files.Instance)
+	if err != nil {
+		return
+	}
+	var info runningCopyInfo
+	if json.Unmarshal(data, &info) == nil && info.PID != os.Getpid() {
+		return
+	}
+	_ = os.Remove(files.Instance)
+}
+
+// waitForOldCopy gives the copy that started this one (after an update) time to close its port.
+func waitForOldCopy(files storage.Files) {
+	data, err := os.ReadFile(files.Instance)
+	if err != nil {
+		return
+	}
+	var info runningCopyInfo
+	if json.Unmarshal(data, &info) != nil || info.Port == 0 {
+		return
+	}
+	updates.WaitUntilPortIsFree(info.Port, updates.WaitForOldCopy)
+}
+
 func rememberRunningCopy(files storage.Files, port int) {
 	data, _ := json.Marshal(runningCopyInfo{Port: port, PID: os.Getpid()})
 	_ = storage.WriteFileAtomic(files.Instance, data)
@@ -236,9 +275,13 @@ func openBrowser(url string) {
 	_ = command.Start() // the URL is printed above if this fails
 }
 
-// waitForClose blocks until Ctrl+C or the console window is closed.
-func waitForClose() {
+// waitForClose blocks until Ctrl+C, the console window is closed, or an update asks the app to
+// exit (the exitRequested channel is closed once the new copy has been started).
+func waitForClose(exitRequested <-chan struct{}) {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
-	<-signals
+	select {
+	case <-signals:
+	case <-exitRequested:
+	}
 }

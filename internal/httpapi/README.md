@@ -30,7 +30,7 @@ connects them); log-in or CORS (the server only listens on 127.0.0.1, so only th
 |---|---|---|
 | `GET /`, `/index.html`, `/js/…`, `/fonts/{name}`, `/maps/{file}.svg`, `/api/config` | the page, its modules, the Bender font, map art, `assets/maps-config.json` | |
 | `GET /api/data` | the game data in the page's format | `gamedata` |
-| `GET /api/status` | everything the page shows about the program | version, data, settings, logs, screenshots, keybind, raid, gps, trail, capture, ai |
+| `GET /api/status` | everything the page shows about the program | version, data, settings, logs, screenshots, keybind, raid, gps, trail, capture, ai, updates |
 | `POST /api/data/refresh` | download the game data now | |
 | `GET /api/events` | live events (SSE) | `events` |
 | `POST /api/events/ack {upTo}` | drop queued events up to that id | |
@@ -47,8 +47,16 @@ connects them); log-in or CORS (the server only listens on 127.0.0.1, so only th
 | `GET /api/scan/image?name=` | one captured picture | listed files only; not cached |
 | `POST /api/scan/read {image}` | the AI reads one screenshot → `{ok, rows, usage}` | 400: no key or bad image; 502: OpenAI's error |
 | `POST /api/scan/confirm {names}` | delete the listed files → `{ok, deleted}` | broadcasts `capture` with `done: true` |
+| `POST /api/updates/check` | ask GitHub for the latest release → `{ok, status}` | answers when finished; a refusal is `{ok: false, error, code, status}` |
+| `POST /api/updates/download {version?}` | start the background download | answers at once; progress comes as `updates` events |
+| `POST /api/updates/cancel` | stop or discard the download | |
+| `POST /api/updates/apply` | install the verified download and restart | this copy closes right after the answer |
+| `POST /api/updates/seen` | dismiss "Updated to X" | |
 
-**Files:** `routes.go` (route table and handlers), `backend.go` (the `Backend` interface and
+The update routes' requests, answers, error codes and events are written out in
+`internal/features/updates/README.md`. Nothing contacts GitHub unless one of them is called.
+
+**Files:** `routes.go` (route table and handlers), `updates.go` (the update routes), `backend.go` (the `Backend` interface and
 `SettingsChange`), `helpers.go` (JSON in and out, JavaScript-style text and limits), `static.go`
 (page, modules, map art, fonts).
 

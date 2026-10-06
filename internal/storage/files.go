@@ -11,14 +11,15 @@ import (
 
 // Files lists every file the app keeps in its data folder.
 type Files struct {
-	Dir        string // the data folder (next to the exe, or STM_DATA_DIR)
-	State      string // squad-task-map-data.json: the page's saved data
-	V1Backup   string // squad-task-map-data.v1-backup.json: untouched copy before the v1 → v2 migration
-	Settings   string // squad-task-map-settings.json
-	Pending    string // squad-task-map-pending.json: game events waiting for the page to acknowledge them
-	WikiCache  string // squad-task-map-wikicache.json
-	Instance   string // squad-task-map-instance.json: which port the running copy listens on
-	gameDataFn func(mode string) string
+	Dir          string // the data folder (next to the exe, or STM_DATA_DIR)
+	State        string // squad-task-map-data.json: the page's saved data
+	V1Backup     string // squad-task-map-data.v1-backup.json: untouched copy before the v1 → v2 migration
+	Settings     string // squad-task-map-settings.json
+	Pending      string // squad-task-map-pending.json: game events waiting for the page to acknowledge them
+	WikiCache    string // squad-task-map-wikicache.json
+	Instance     string // squad-task-map-instance.json: which port the running copy listens on
+	UpdateNotice string // squad-task-map-update-notice.json: release notes handed to the copy an update starts
+	gameDataFn   func(mode string) string
 }
 
 // GameDataCache is the cached game data for one game mode.
@@ -28,14 +29,15 @@ func (f Files) GameDataCache(mode string) string { return f.gameDataFn(mode) }
 func FilesIn(dir string) Files {
 	join := func(name string) string { return filepath.Join(dir, name) }
 	return Files{
-		Dir:        dir,
-		State:      join("squad-task-map-data.json"),
-		V1Backup:   join("squad-task-map-data.v1-backup.json"),
-		Settings:   join("squad-task-map-settings.json"),
-		Pending:    join("squad-task-map-pending.json"),
-		WikiCache:  join("squad-task-map-wikicache.json"),
-		Instance:   join("squad-task-map-instance.json"),
-		gameDataFn: func(mode string) string { return join("squad-task-map-gamedata-" + mode + ".json") },
+		Dir:          dir,
+		State:        join("squad-task-map-data.json"),
+		V1Backup:     join("squad-task-map-data.v1-backup.json"),
+		Settings:     join("squad-task-map-settings.json"),
+		Pending:      join("squad-task-map-pending.json"),
+		WikiCache:    join("squad-task-map-wikicache.json"),
+		Instance:     join("squad-task-map-instance.json"),
+		UpdateNotice: join("squad-task-map-update-notice.json"),
+		gameDataFn:   func(mode string) string { return join("squad-task-map-gamedata-" + mode + ".json") },
 	}
 }
 

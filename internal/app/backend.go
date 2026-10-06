@@ -8,6 +8,7 @@ import (
 	"squadtaskmap/internal/events"
 	"squadtaskmap/internal/features/aicategorize"
 	"squadtaskmap/internal/features/taskscan"
+	"squadtaskmap/internal/features/updates"
 	"squadtaskmap/internal/gamedata"
 	"squadtaskmap/internal/httpapi"
 	"squadtaskmap/internal/openai"
@@ -56,6 +57,7 @@ func (app *App) Status() any {
 		"trail":       trail,
 		"capture":     map[string]any{"active": app.scan.IsActive(), "files": app.scan.List()},
 		"ai":          app.aiStatus(settings),
+		"updates":     app.updates.Status(),
 	}
 }
 
@@ -209,6 +211,9 @@ func (app *App) ReadScanImage(ctx context.Context, dataURL string) (taskscan.Rea
 func (app *App) ScanEnded(how string) {
 	app.hub.Broadcast(events.New(events.Capture, map[string]any{"files": []taskscan.CapturedFile{}, how: true}))
 }
+
+// Updates is "Check for updates" (check, download, cancel, install).
+func (app *App) Updates() *updates.Updater { return app.updates }
 
 type errType string
 

@@ -25,6 +25,7 @@
 | `mode` | broadcast | `mode`, `dataMode` | `Session mode: …` |
 | `keybind` | broadcast | `ok`, `warning` | the game's control settings were read |
 | `data` | broadcast | `status` | the game data changed (download, mode switch) |
+| `updates` | broadcast | `status` (the update state, see `internal/features/updates/README.md`) | a check, download, install or failure changed it (progress at most every 250 ms); only after a click |
 
 **What it deliberately doesn't do:** decide what to send (`internal/app` does); keep broadcast
 events for later; send heartbeats (the connection is local).

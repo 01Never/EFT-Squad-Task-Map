@@ -62,6 +62,13 @@ func NewServer(backend Backend, static *staticFiles) *Server {
 		{"GET /api/scan/image", server.scanImage},
 		{"POST /api/scan/read", server.readScanImage},
 		{"POST /api/scan/confirm", server.confirmScan},
+
+		// Check for updates (every one of these starts from a click; see updates.go).
+		{"POST /api/updates/check", server.checkForUpdates},
+		{"POST /api/updates/download", server.downloadUpdate},
+		{"POST /api/updates/cancel", server.cancelUpdateDownload},
+		{"POST /api/updates/apply", server.applyUpdate},
+		{"POST /api/updates/seen", server.updateNoticeSeen},
 	}
 	for _, route := range routes {
 		server.mux.HandleFunc(route.pattern, route.handler)

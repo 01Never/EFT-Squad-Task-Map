@@ -19,4 +19,5 @@ const (
 	Mode      = "mode"      // broadcast: the game reported which game mode it's in
 	Keybind   = "keybind"   // broadcast: whether a screenshot key is bound in the game
 	Data      = "data"      // broadcast: the game data changed (new download, mode switch)
+	Updates   = "updates"   // broadcast: the update state changed (check result, download progress, install)
 )
