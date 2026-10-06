@@ -1,6 +1,6 @@
 # Instructions for Claude Code
 
-Project: **Squad Task Map, local edition.** It's a Windows desktop helper for Escape from Tarkov: a Go server that serves a map web page on 127.0.0.1 and compiles to one `.exe`. v2 is described in `SPEC.md`; the work now follows `docs/ROADMAP.md` (tickets) and `docs/CODE-STYLE.md` (how code is written). Read `HANDOFF.md` first.
+Project: **Squad Task Map, local edition.** It's a Windows desktop helper for Escape from Tarkov: a Go server that serves a map web page on 127.0.0.1 and compiles to one `.exe`. v2 is described in `docs/SPEC.md`; the work now follows `docs/ROADMAP.md` (tickets) and `docs/CODE-STYLE.md` (how code is written). Read `docs/HANDOFF.md` first.
 
 ## How to work
 - Build **one ticket at a time**, in the order of `docs/ROADMAP.md`, one commit per ticket. Report after each one:
@@ -24,6 +24,7 @@ Project: **Squad Task Map, local edition.** It's a Windows desktop helper for Es
 - Offline stand-ins: `go run ./cmd/mock` (port 7820) fakes json.tarkov.dev, OpenAI and the wiki. Point the app at it with `STM_JSON_BASE`, `STM_OPENAI_API`, `STM_WIKI_API`; `STM_LOGS_DIR` and `STM_SCREENSHOTS_DIR` override the game folders.
 
 ## Layout
+- Root: only `README.md` (GitHub landing page), `CLAUDE.md`, the Go entry files and build files. Docs live in `docs/` (`USER-GUIDE.md` is the player manual).
 - `main.go`, `embed.go` (files built into the exe), `internal/app` (creates and connects every feature: read first).
 - `internal/features/<name>/` (gamelog, raid, gps, taskscan, aicategorize, …): one folder per feature, `rules.go` for the logic, a README each.
 - `internal/` infrastructure: `httpapi` (routes), `events` (SSE + pending queue), `storage` (files next to the exe), `gamedata` (download/cache/convert), `gamefolders`, `screenshots`, `openai`.
@@ -41,3 +42,9 @@ Project: **Squad Task Map, local edition.** It's a Windows desktop helper for Es
 - Pure logic in DOM-free modules with tests (`node --test` for JS, `go test` for Go). UI in `web/js/`.
 - Styling follows tarkov.dev (see existing CSS variables in `web/index.html`). Markers are fully opaque except the two cases in SPEC §7.3.
 - Saved-state changes need a migration (SPEC §5.3, §12).
+
+## Working with agents
+- The main session is the **product manager**: it turns a ticket into a brief, hands it to an agent in `.claude/agents/`, reviews the report and diff, and only then merges to `main`.
+- `backend-engineer` (Go: `internal/`, `cmd/`), `frontend-engineer` (`web/`), `qa-tester` (all test layers, `tests/browser/`, verdict before merge), `docs-writer` (README, user guide, handoff).
+- Well-scoped work (one feature, clear acceptance checks) goes to a fast model (Sonnet). Behaviour-preserving refactors and security-sensitive code (self-update, signing) stay on the default model.
+- Each agent works in its own git worktree on its own branch, commits early and keeps updating, so an interrupted agent loses nothing.

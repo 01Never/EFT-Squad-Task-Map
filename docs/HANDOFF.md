@@ -1,6 +1,6 @@
 # Handoff: Squad Task Map v2
 
-For Claude Code picking up this project. Read this file, then `CLAUDE.md` (rules), then `SPEC.md` (the v2 design, still the source of truth for intended behavior), then `docs/ROADMAP.md` (the tickets being built now) and `docs/CODE-STYLE.md` (how new code is written). `README.md` is the user-facing manual.
+For Claude Code picking up this project. Read this file, then `CLAUDE.md` (rules), then `docs/SPEC.md` (the v2 design, still the source of truth for intended behavior), then `docs/ROADMAP.md` (the tickets being built now) and `docs/CODE-STYLE.md` (how new code is written). `docs/USER-GUIDE.md` is the user-facing manual; `README.md` is the GitHub landing page (overview, download, building).
 
 Current version: see `Version` in `internal/app/run.go` (also `version` in `package.json` and the version info in `winres/winres.json`; keep all three equal).
 
@@ -18,7 +18,8 @@ Current version: see `Version` in `internal/app/run.go` (also `version` in `pack
 3. **The owner decides features.** They like to talk a feature through before anything is built. Don't change behavior that wasn't asked for. When a request is ambiguous, ask. Squadmates' feedback arrives through the owner; build what the owner asks for, which can differ from the raw feedback (e.g., the friend asked for red highlights and the owner said "not red").
 4. **Checked against real data on 2026-10-04/05 (ticket 04 step 0):** the live json.tarkov.dev files, the owner's real log files (one session, anonymised in `testdata/logs/real-session`) and real screenshot names (`testdata/screenshots/names.txt`), and Windows folder detection on the owner's PC. Still not seen in-game: the items in §10.
 5. **Deliverables the owner expects:** the Windows exe (zipped; also `.7z` if the zip is over 30 MB) **and** the source. See §3.
-6. **Git:** the project is a local git repo (no remote). `main` holds released work; each roadmap ticket gets its own branch (`ticket-NN-<name>`), merged into `main` when the owner accepts it.
+6. **Git:** the repo is on GitHub at `github.com/01Never/EFT-Squad-Task-Map` (public). `main` holds accepted work; each roadmap ticket gets its own branch, merged into `main` when the owner accepts it. Releases are published as GitHub Releases (ticket 04c).
+7. **Agents:** role briefs for Claude Code subagents live in `.claude/agents/` (backend, frontend, tester, docs). The main session acts as product manager: it writes the brief for each ticket, hands it to the right agent, and reviews the result before it reaches `main`.
 
 ---
 
@@ -68,9 +69,9 @@ Go dependencies: `github.com/fsnotify/fsnotify` (screenshots folder notification
 1. Bump `Version` in `internal/app/run.go`, `version` in `package.json` and the versions in `winres/winres.json` (then `go-winres make --arch amd64 --out rsrc`).
 2. `go test ./...`, `npm test`, then the manual checks in §9 that touch your change.
 3. `go build -trimpath -ldflags "-s -w" -o dist/SquadTaskMap.exe .`
-4. Zip `SquadTaskMap.exe` + `README.md` in a `SquadTaskMap-v2/` folder. The Go exe zips well under the chat's 30 MB limit; only if a zip is over 30 MB, also make a `.7z` with Windows' own tar: `tar --format 7zip --options "7zip:compression=lzma2,7zip:compression-level=9" -cf SquadTaskMap-<version>.7z SquadTaskMap-v2`.
+4. Zip `SquadTaskMap.exe` + `USER-GUIDE.md` (from `docs/`) in a `SquadTaskMap-v2/` folder. The Go exe zips well under the chat's 30 MB limit; only if a zip is over 30 MB, also make a `.7z` with Windows' own tar: `tar --format 7zip --options "7zip:compression=lzma2,7zip:compression-level=9" -cf SquadTaskMap-<version>.7z SquadTaskMap-v2`.
 5. Zip the source: `git archive --format=zip --prefix=squad-task-map-<version>-source/ -o <file>.zip HEAD`.
-6. Update `README.md` for user-visible changes, and this file.
+6. Update `docs/USER-GUIDE.md` for user-visible changes, and this file.
 
 ---
 
