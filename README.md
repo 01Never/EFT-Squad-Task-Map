@@ -63,7 +63,13 @@ The **Bring list** tab lists what the tasks currently shown on the map need: key
 - Extracts show faded. Click one on the map to mark it solid; click again to unmark. Marks clear after each raid (or **Clear marked**). The PMC / Scav / Shared / Transit chips choose which kinds show.
 
 ## Your position (GPS)
-During a raid, Tarkov puts your position and facing in each screenshot's **file name**. When a new one appears, the app switches to the raid's map (setting **Follow my position**, on by default), draws an arrow where you are with a short trail, and centers on it if it's off-screen. The app reads the file name only, never the picture.
+During a raid, Tarkov puts your position and facing in each screenshot's **file name**. When a new one appears, the app switches to the raid's map (setting **Follow my position**, on by default), draws your marker with a short trail, and centers on it if it's off-screen. The app reads the file name only, never the picture.
+
+- **Your marker** is a coloured disc with a heading arrow inside a ring, labelled **You**, drawn above everything else. No task or extract uses its colour or shape.
+- **Each new position pulses** with big expanding rings for about 20 seconds, so you spot the update. Then the marker sits still (no animation runs after that).
+- **📍 Find me** (map toolbar) centres the map on you without changing the zoom, and pulses again. The **Show** button in the position bar does the same. Find me is greyed out until there's a position on this map.
+- **When you're off-screen,** a chip on the edge of the map points toward you with the distance ("You · 240 m", straight line from the middle of the view). Click it to centre on you, keeping the zoom.
+- The trail of your last few positions is drawn small and faint, so it doesn't compete with the marker.
 
 When the raid ends, the app deletes that raid's GPS screenshots, resets your bring-list counts and clears extract marks.
 

@@ -14,6 +14,8 @@
   --gold-one:#c7c5b3; --gold-two:#9a8866; --accent:#d2af78; --accent-hover:#e6c58c;
   --blue:#0292c0; --green:#00a700; --orange:#ca8a00; --red:#cd1e2f; --purple:#8c6edf; --yellow:#ffe084;
   --muted:#8f8d80; --glass:rgb(18 18 18 / .88); --glass-border:rgb(210 175 120 / .18); --panel:rgb(0 0 0 / .55);
+  /* Your position on the map (features/find-me). A colour no category, extract kind or selection ring uses. */
+  --player:#ff3fd2;
   color-scheme:dark;
 }
 *,*::before,*::after{box-sizing:border-box}
@@ -211,8 +213,24 @@ details.menu{position:relative} details.menu summary{list-style:none} details.me
 .donelist{margin:6px 8px} .donelist summary{cursor:pointer;color:var(--muted);font-size:14px;padding:4px 0}
 .popacts{display:flex;gap:8px;align-items:center;margin-bottom:6px}
 .pop .objs{padding-left:18px}
-.gpsbar{position:absolute;left:10px;bottom:10px;z-index:3;background:rgb(0 0 0 / .8);border:1px solid #40c057;padding:5px 10px;font-size:14px;font-weight:700;color:#d3f9d8}
-.gpsbar .lnk{color:#8ce99a;margin-left:6px}
+.gpsbar{position:absolute;left:10px;bottom:10px;z-index:3;background:rgb(0 0 0 / .8);border:1px solid var(--player);padding:5px 10px;font-size:14px;font-weight:700;color:#fff}
+.gpsbar .lnk{color:var(--player);margin-left:6px}
+/* ---- features/find-me (ticket 01): the pulse after a new position, and the off-screen chip.
+   Both are HTML over the map, animated with transform/opacity only (compositor, no map repaint). */
+.mapui button:disabled{opacity:.4;cursor:default}
+.findme-fx{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:hidden}
+.findme-pulse{position:absolute;left:0;top:0;width:0;height:0}
+.findme-ring{position:absolute;left:-150px;top:-150px;width:300px;height:300px;border-radius:50%;box-sizing:border-box;
+  border:7px solid var(--player);box-shadow:0 0 0 3px #000,inset 0 0 0 3px #fff;background:color-mix(in srgb,var(--player) 14%,transparent);
+  opacity:0;animation-name:findme-ring;animation-duration:1.5s;animation-timing-function:ease-out;will-change:transform,opacity}
+@keyframes findme-ring{0%{transform:scale(.2);opacity:1}70%{opacity:.85}100%{transform:scale(1);opacity:0}}
+@keyframes findme-hold{0%,100%{transform:scale(.3);opacity:1}}
+@media (prefers-reduced-motion:reduce){.findme-ring{animation-name:findme-hold}.findme-ring+.findme-ring{display:none}}
+.findme-chip{position:absolute;left:0;top:0;z-index:3;display:flex;align-items:center;gap:6px;padding:4px 10px 4px 7px;
+  background:rgb(0 0 0 / .85);border:2px solid var(--player);color:#fff;font:700 14px bender,Arial,sans-serif;white-space:nowrap;cursor:pointer}
+.findme-chip[hidden]{display:none}
+.findme-chip:hover{background:#000}
+.findme-chip-arrow{display:inline-block;color:var(--player);font-size:16px;line-height:1}
 /* bring list */
 .bring{padding:10px 16px}
 .bhead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}

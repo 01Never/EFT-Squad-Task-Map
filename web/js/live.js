@@ -3,7 +3,8 @@
 import { app, save, activate, finish, prefs } from "./store.js";
 import { $, toast, esc, MODE_NAME, api } from "./util.js";
 import { onCapture } from "./scan.js";
-import { renderAll, renderGps, centerOn } from "./map.js";
+import { renderAll, centerOn } from "./map.js";
+import { renderPlayer, onNewPosition } from "./features/find-me/map-layer.js";
 import { clearPartsCache } from "./logic/parts.js";
 import { makeMatcher } from "./logic/match.js";
 import { showPicker } from "./picker.js";
@@ -73,8 +74,9 @@ function handle(ev) {
     case "raidMap": app.STATUS.raid = { ...app.STATUS.raid, map: ev.map }; renderNav(); break;
     case "gps": {
       app.gps = ev.gps; app.trail = ev.trail || [];
+      onNewPosition(); // ticket 01: a new position pulses for ~20 s
       if (follow(ev.gps.map)) break;
-      if (app.M && (!ev.gps.map || ev.gps.map === app.M.key)) { renderGps(); if (app.STATUS.settings.followPosition) centerOn(ev.gps, true); }
+      if (app.M && (!ev.gps.map || ev.gps.map === app.M.key)) { renderPlayer(); if (app.STATUS.settings.followPosition) centerOn(ev.gps, true); }
       break;
     }
     case "capture": onCapture(ev); break;

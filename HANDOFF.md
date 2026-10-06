@@ -290,6 +290,7 @@ Browser end-to-end checks are driven with `puppeteer-core` + the installed Micro
   - The task list can be hidden; the map keeps its zoom on resize.
   - Esc deselects.
 - **After 2.0.1, before ticket 01:** a confirmed scan replaces the task list instead of only adding (owner's request).
+- **2.1.0 (ticket 01, Find me):** player marker in its own colour and ring shape with a "You" label; a new position (or 📍 Find me) pulses for ~20 s, then nothing animates (owner replaced the ticket's continuous radar with this); off-screen chip with distance; Find me and the chip centre without changing zoom; fainter trail. Includes the scan-replaces-list change.
 - **Roadmap (`docs/ROADMAP.md`):** tickets 01 → 10, one branch each. Progress is tracked in `docs/FEATURES.md` and below.
 
 **References:**

@@ -1,11 +1,12 @@
 // The map page: SVG map art, pan/zoom/pinch, drawing, markers, zones, extracts, GPS arrow, popup.
 import { app, prefs, save, partsFor, catOf, tasksOn, setTick, mapName } from "./store.js";
 import { $, esc, mk, toast, shapeD, uid } from "./util.js";
-import { makeProj, floorBadge, arrowRotation } from "./logic/projection.js";
+import { makeProj, floorBadge } from "./logic/projection.js";
 import { simplify } from "./logic/simplify.js";
 import { objOnMap, partOnMap, partDone, objDone, partProgress, isCounter, tickValue, tickTarget, ACTION_LABEL } from "./logic/parts.js";
 import { objReady, missingFor, requirementsOf } from "./logic/ready.js";
 import { renderPanel, bindPanel } from "./panel.js";
+import { renderPlayer, placeFindMeOverlays, bindFindMe } from "./features/find-me/map-layer.js";
 
 const svgCache = {};
 export async function getSvg(file) {
@@ -38,8 +39,9 @@ export async function openMap(key) {
   teardownMap();
   const cfg = app.CFG.find((c) => c.key === key);
   $("#crumbs").innerHTML = `<a href="#/">Maps</a> / <b>${esc(cfg.name)}</b>`;
-  $("#view").innerHTML = `<div class="app${app.S.panelHidden ? " nopanel" : ""}"><div class="stage" id="stage"><div class="fx" id="fx"></div><div class="mapui">
-    <div class="grp"><button id="zin" title="Zoom in">+</button><button id="zout" title="Zoom out">−</button><button id="zfit" title="Reset view">⤢</button><button id="bdraw" aria-pressed="false" title="Draw on the map">✎<span class="lbl"> Draw</span></button><button id="bpin" title="Show only pinned tasks">📌<span class="lbl"> Pinned only</span></button><span id="floors" style="display:flex;align-items:center"></span></div>
+  $("#view").innerHTML = `<div class="app${app.S.panelHidden ? " nopanel" : ""}"><div class="stage" id="stage"><div class="fx" id="fx"></div>
+    <div class="findme-fx" id="findme-fx"><div class="findme-pulse" id="findme-pulse"></div></div><button class="findme-chip" id="findme-chip" hidden title="Centre on you"><span class="findme-chip-arrow">➜</span><span class="findme-chip-text"></span></button><div class="mapui">
+    <div class="grp"><button id="zin" title="Zoom in">+</button><button id="zout" title="Zoom out">−</button><button id="zfit" title="Reset view">⤢</button><button id="bfindme" disabled>📍<span class="lbl"> Find me</span></button><button id="bdraw" aria-pressed="false" title="Draw on the map">✎<span class="lbl"> Draw</span></button><button id="bpin" title="Show only pinned tasks">📌<span class="lbl"> Pinned only</span></button><span id="floors" style="display:flex;align-items:center"></span></div>
     <div class="grp" id="drawbar" hidden></div></div><div class="hint" id="hint"></div><div class="gpsbar" id="gpsbar" hidden></div><div class="pop" id="pop"></div><button class="showpanel" id="showpanel" title="Show the task list">◂ Tasks</button></div><aside id="panel"></aside></div>`;
   const txt = await getSvg(cfg.svg);
   if (location.hash !== "#/map/" + key) return; // navigated away while loading
@@ -52,7 +54,7 @@ export async function openMap(key) {
   const M = (app.M = { key, cfg, svg, home, vb: { ...home }, proj: makeProj(cfg, [vbx.x, vbx.y, vbx.width, vbx.height]), floor: "ground", mode: "pan", placing: null, sel: null, pop: null, expanded: null, menu: null, redo: [] });
   M.gZones = mk("g", {}, svg); M.gLabels = mk("g", {}, svg); M.gDraw = mk("g", {}, svg); M.gExt = mk("g", {}, svg); M.gMk = mk("g", {}, svg); M.gGps = mk("g", {}, svg);
   M.mapData = app.DATA.maps.find((m) => m.key === key) || { extracts: [], transits: [] };
-  bindMap(); bindPanel(); renderFloors(); renderAll(); fitTo(home, 0);
+  bindMap(); bindPanel(); bindFindMe(); renderFloors(); renderAll(); fitTo(home, 0);
   if (app.gps && app.gps.map === key) centerOn(app.gps, false);
 }
 
@@ -67,6 +69,12 @@ export function apply() {
   svg.querySelectorAll(".sc").forEach((g) => g.setAttribute("transform", `translate(${+g.dataset.x + (+g.dataset.ox || 0) * k},${+g.dataset.y + (+g.dataset.oy || 0) * k}) scale(${k * (+g.dataset.s || 1)})${g.dataset.r ? ` rotate(${g.dataset.r})` : ""}`));
   if (isFinite(k) && k > 0) app.M.k = k;
   placeFx();
+  placeFindMeOverlays();
+}
+/** Move the view so (x, y) in map coordinates is in the middle, keeping the zoom. */
+export function panTo(x, y) {
+  const M = app.M; if (!M) return;
+  M.vb = { ...M.vb, x: x - M.vb.w / 2, y: y - M.vb.h / 2 }; apply();
 }
 /** When the map area changes size (window resized, task list hidden/shown), keep the same centre and zoom. */
 function keepView() {
@@ -223,7 +231,7 @@ function renderDrawbar() {
 // ---------------------------------------------------------------- layers
 export function renderAll() {
   if (!app.M) return;
-  renderPanel(); renderLabels(); renderExtracts(); renderDraw(); renderMarkers(); renderGps(); renderPop();
+  renderPanel(); renderLabels(); renderExtracts(); renderDraw(); renderMarkers(); renderPlayer(); renderPop();
   $("#bpin").setAttribute("aria-pressed", !!app.S.pinnedOnly);
 }
 function renderFloors() {
@@ -360,34 +368,6 @@ export function renderMarkers() {
   });
   apply();
   renderFx(fx);
-}
-
-export function renderGps() {
-  const M = app.M, g = M.gGps; g.innerHTML = "";
-  const bar = $("#gpsbar"), gp = app.gps;
-  if (!gp || (gp.map && gp.map !== M.key)) { bar.hidden = true; return; }
-  app.trail.forEach((p, i) => {
-    const [x, y] = M.proj.toSvg(p.x, p.z);
-    const dg = mk("g", { class: "sc", "data-x": x, "data-y": y, opacity: 0.25 + (0.5 * (i + 1)) / (app.trail.length + 1), "pointer-events": "none" }, g);
-    mk("circle", { r: 4, fill: "#40c057", stroke: "#000", "stroke-width": 1.2 }, dg);
-    const m = Math.round((Date.now() - p.t) / 60000);
-    mk("text", { x: 7, y: 3.5, "font-size": 10, "font-family": "bender, Arial, sans-serif", fill: "#fff", stroke: "#000", "stroke-width": 2.5, "paint-order": "stroke" }, dg).textContent = m < 1 ? "<1 min ago" : m + " min ago";
-  });
-  const [x, y] = M.proj.toSvg(gp.x, gp.z);
-  const ag = mk("g", { class: "sc", "data-x": x, "data-y": y, "data-r": arrowRotation(M.cfg, gp.yaw).toFixed(1), "pointer-events": "none" }, g);
-  mk("circle", { r: 12, fill: "#40c057", stroke: "#fff", "stroke-width": 2.2 }, ag);
-  mk("path", { d: "M0,-8L5.5,2H1.8V8H-1.8V2H-5.5Z", fill: "#fff" }, ag);
-  const f = floorBadge(M.cfg, gp.x, gp.y, gp.z);
-  if (f) {
-    const fg = mk("g", { class: "sc", "data-x": x, "data-y": y, "pointer-events": "none" }, g);
-    mk("circle", { cx: 11, cy: -11, r: 6, fill: "#000", stroke: "#fff", "stroke-width": 1.2 }, fg);
-    mk("text", { x: 11, y: -7.7, "text-anchor": "middle", "font-size": 9, "font-weight": 700, "font-family": "bender, Arial, sans-serif", fill: "#fff" }, fg).textContent = f;
-  }
-  bar.hidden = false;
-  const mins = Math.round((Date.now() - gp.t) / 60000);
-  bar.innerHTML = `📍 You${f ? ` (floor ${esc(f)})` : ""} · ${mins < 1 ? "just now" : mins + " min ago"} <button class="lnk" id="gpsgo">Show</button>`;
-  $("#gpsgo").onclick = () => centerOn(gp, false);
-  apply();
 }
 
 // ---------------------------------------------------------------- selection / popup

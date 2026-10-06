@@ -9,6 +9,7 @@ export const app = {
   M: null,               // current map page context
   gps: null, trail: [],  // last position from an in-raid screenshot
   capture: null,         // scan in progress
+  findMePulseStartedAt: 0, // when the "find me" pulse last started (features/find-me)
 };
 
 let saveTimer = null, saving = false, dirty = false;

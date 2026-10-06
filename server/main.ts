@@ -26,7 +26,7 @@ import { LogWatcher } from "./logs.ts";
 import { Screens } from "./screens.ts";
 import { initWikiCache, categorize, testKey, readTaskList, DEFAULT_MODEL } from "./ai.ts";
 
-const VERSION = "2.0.1";
+const VERSION = "2.1.0";
 const SVGS: Record<string, string> = {
   "StreetsOfTarkov.svg": svgStreets, "GroundZero.svg": svgGZ, "Customs.svg": svgCustoms, "Factory.svg": svgFactory,
   "Interchange.svg": svgInterchange, "Lighthouse.svg": svgLighthouse, "Reserve.svg": svgReserve, "Shoreline.svg": svgShoreline, "Woods.svg": svgWoods,
