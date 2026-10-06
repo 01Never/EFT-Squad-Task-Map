@@ -47,6 +47,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	mock.signingKey, err = loadSigningKey(settings.testdataFolder)
+	if err != nil {
+		return err
+	}
 
 	address := net.JoinHostPort("127.0.0.1", strconv.Itoa(settings.port))
 	listener, err := net.Listen("tcp", address)

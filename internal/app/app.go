@@ -16,6 +16,7 @@ import (
 	"squadtaskmap/internal/features/gps"
 	"squadtaskmap/internal/features/raid"
 	"squadtaskmap/internal/features/taskscan"
+	"squadtaskmap/internal/features/updates"
 	"squadtaskmap/internal/gamedata"
 	"squadtaskmap/internal/gamefolders"
 	"squadtaskmap/internal/openai"
@@ -41,6 +42,7 @@ type App struct {
 	categorizer *aicategorize.Categorizer
 	jobs        *aicategorize.Jobs
 	ai          *openai.Client
+	updates     *updates.Updater
 
 	// raidAndPosition keeps a raid end and a new position from interleaving: the log and the
 	// screenshots folder are watched on different goroutines, and a position must never arrive
@@ -49,6 +51,10 @@ type App struct {
 
 	keybindMutex sync.Mutex
 	keybind      *keybindStatus // nil until the log shows the control settings
+
+	// exitRequested is closed when an update has started the new copy and this one must close.
+	exitRequested chan struct{}
+	exitOnce      sync.Once
 }
 
 type keybindStatus struct {
@@ -57,9 +63,10 @@ type keybindStatus struct {
 }
 
 // newApp creates the features and connects them. Nothing is watched yet; see startWatchers.
-func newApp(version string, files storage.Files, builtInGameData func() (gamedata.GameData, error)) *App {
+// updatedFrom is the old version when an update started this copy ("" otherwise).
+func newApp(version, updatedFrom string, files storage.Files, builtInGameData func() (gamedata.GameData, error)) *App {
 	userAgent := "SquadTaskMap/" + version + " (personal local map tool)"
-	app := &App{version: version, files: files, raid: &raid.Tracker{}, position: &gps.Tracker{}}
+	app := &App{version: version, files: files, raid: &raid.Tracker{}, position: &gps.Tracker{}, exitRequested: make(chan struct{})}
 
 	storage.BackupV1IfNeeded(files)
 	app.settings = storage.ReadSettings(files.Settings)
@@ -72,6 +79,7 @@ func newApp(version string, files storage.Files, builtInGameData func() (gamedat
 	app.logs = gamelog.NewWatcher(app.onLogEvent)
 	app.screenshots = screenshots.NewWatcher(gps.IsImageFile, app.onScreenshot)
 	app.scan = taskscan.New(app.screenshots, app.ai, app.onCaptureListChanged)
+	app.updates = newUpdater(app, updatedFrom, userAgent)
 	return app
 }
 
@@ -186,6 +194,14 @@ func (app *App) onCaptureListChanged(files []taskscan.CapturedFile) {
 
 func (app *App) onGameDataChanged() {
 	app.hub.Broadcast(events.New(events.Data, map[string]any{"status": app.gameData.Status()}))
+}
+
+// ---------------------------------------------------------------- updates
+
+// onUpdateStatusChanged tells the open page how "Check for updates" is going (check result,
+// download progress, installing). Live only: a page opened later reads /api/status.
+func (app *App) onUpdateStatusChanged(status updates.Status) {
+	app.hub.Broadcast(events.New(events.Updates, map[string]any{"status": status}))
 }
 
 // ---------------------------------------------------------------- settings

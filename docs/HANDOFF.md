@@ -61,6 +61,9 @@ Go dependencies: `github.com/fsnotify/fsnotify` (screenshots folder notification
 | `STM_LOGS_DIR` / `STM_SCREENSHOTS_DIR` | Override detected game folders |
 | `STM_JSON_BASE` | Game-data base URL (default `https://json.tarkov.dev`) |
 | `STM_OPENAI_API` / `STM_WIKI_API` | OpenAI and wiki endpoints (for the mock server) |
+| `STM_UPDATES_BASE` | Replaces `https://github.com/01Never/EFT-Squad-Task-Map` for "Check for updates" (the mock serves a fake GitHub at `http://127.0.0.1:7820/github/01Never/EFT-Squad-Task-Map`) |
+| `STM_UPDATES_PUBLIC_KEY` | Only when `STM_UPDATES_BASE` is on this PC (127.0.0.1, ::1, localhost); otherwise ignored: trust this base64 public key instead of the built-in one (the mock's test key is in `testdata/updates/mock-public-key.txt`) |
+| `STM_RELEASE_KEY` | For `cmd/release` only: the path of the owner's private signing key file |
 | `STM_ASSETS_DIR` | Serve the page files from this folder instead of the ones built into the exe (automatic under `go run`) |
 
 **One copy at a time:** the running copy writes `squad-task-map-instance.json` (port, pid) in the data folder; a second launch on the same data folder opens that copy's page and exits. Copies with different `STM_DATA_DIR`s run side by side (tests, squad dev setups).
@@ -72,6 +75,46 @@ Go dependencies: `github.com/fsnotify/fsnotify` (screenshots folder notification
 4. Zip `SquadTaskMap.exe` + `USER-GUIDE.md` (from `docs/`) in a `SquadTaskMap-v2/` folder. The Go exe zips well under the chat's 30 MB limit; only if a zip is over 30 MB, also make a `.7z` with Windows' own tar: `tar --format 7zip --options "7zip:compression=lzma2,7zip:compression-level=9" -cf SquadTaskMap-<version>.7z SquadTaskMap-v2`.
 5. Zip the source: `git archive --format=zip --prefix=squad-task-map-<version>-source/ -o <file>.zip HEAD`.
 6. Update `docs/USER-GUIDE.md` for user-visible changes, and this file.
+
+---
+
+## 3b. Publishing an update (ticket 04c)
+
+Friends update from inside the app (Settings → Updates → Check for updates), from this repo's
+GitHub Releases. The app never checks by itself. It trusts a release only if its `latest.json` is
+signed with the owner's Ed25519 key, so a tampered release or account can't push code. Details and
+the HTTP API: `internal/features/updates/README.md`; the tool: `cmd/release/README.md`.
+
+**Once: make the signing key**
+1. `go run ./cmd/release -init-keys`. It writes the **private key** to
+   `%AppData%\SquadTaskMap\release-private-key.txt` (or `-key-out <path>`) and prints the public key.
+2. **Back the private key up** (password manager or a USB stick). Never put it in the repo, in
+   GitHub (not even Actions secrets) or in chat. If it's lost, friends must update by hand once;
+   if it leaks, anyone can publish "updates": make a new key pair and hand out a new build.
+3. Paste the printed public key into `EmbeddedPublicKey` (`internal/features/updates/rules.go`,
+   replacing the `TODO(owner)` placeholder), build, and give that version to the squad by hand.
+   Until then every check ends with "This copy can't check for updates yet".
+4. Point the tool at the key: `$env:STM_RELEASE_KEY = "C:\...\release-private-key.txt"`
+   (`setx STM_RELEASE_KEY ...` to keep it).
+
+**Each release**
+1. Bump the version in `internal/app/run.go`, `package.json` and `winres/winres.json` (then
+   `go-winres make --arch amd64 --out rsrc`); write `notes.md` (what's new, plain text, one bullet
+   per line).
+2. `go run ./cmd/release -version X.Y.Z -notes notes.md`. It checks the three versions match and
+   that your key is the app's key, runs `go test ./...` and `npm test`, builds
+   `dist/SquadTaskMap.exe`, and writes the signed `dist/latest.json`.
+3. Publish on GitHub, with the command it prints:
+   `gh release create vX.Y.Z dist/SquadTaskMap.exe dist/latest.json --title "X.Y.Z" --notes-file notes.md`
+   or by hand: GitHub → Releases → Draft a new release → tag `vX.Y.Z` → attach **both** files →
+   Publish (not as a pre-release: "latest" skips drafts and pre-releases, which is also how you
+   stage a release nobody is offered yet).
+4. Tell the squad to click Check for updates. For the zip deliverables (§3 checklist) the exe is
+   the same `dist/SquadTaskMap.exe`.
+
+Gotchas: the exe attached must be exactly the one `latest.json` describes (re-run the tool if you
+rebuild); a release with only one of the two files makes friends see "no release"/a download error;
+publishing a version lower than a friend's shows them "older than the version you're running".
 
 ---
 
@@ -108,7 +151,9 @@ OpenAI ◄──(scan, categorize)───── taskscan / aicategorize ┘   
 | `internal/features/gps` | Position from screenshot names (`rules.go`), last position + trail (`tracker.go`). |
 | `internal/features/taskscan` | Capture mode, serving captured images, the vision read, confirm/cancel. |
 | `internal/features/aicategorize` | AI Categorize (prompt, tool loop, review of the answer), wiki fetch/clean/cache (7 days), jobs. |
-| `cmd/mock` | Offline stand-ins for json.tarkov.dev, OpenAI and the wiki (byte-equal to v2's Bun mock). |
+| `internal/features/updates` | "Check for updates" (ticket 04c): signed manifest from GitHub Releases, background download, rename-and-replace with rollback, restart. Starts only from a click: no timers. README has the full API. |
+| `cmd/mock` | Offline stand-ins for json.tarkov.dev, OpenAI, the wiki and a fake GitHub Releases (byte-equal to v2's Bun mock for the first three). |
+| `cmd/release` | The owner's release tool: version check, tests, Windows build, signed `latest.json`. See "Publishing an update". |
 
 ### Page (`web/`)
 - `index.html`: all CSS (tarkov.dev palette, Bender font) and the shell. Mobile breakpoints at 860 px and 600 px. Feature CSS added by roadmap tickets sits in its own clearly labelled block until ticket 04b moves CSS into files.
@@ -203,7 +248,7 @@ See SPEC §12. Fields: `cats`, `tasks{id: {active, source, addedAt, gamePct, sca
 - **Adding a field:** add its default to `freshState()`. `fill()` adds missing defaults when loading. Only bump `version` and add a `migrate` step for structural changes; keep the v1 → v2 path working (fixture: `tests/fixtures/v1-data.json`, the owner's real v1 file).
 
 ### 6.3 Files next to the exe
-`squad-task-map-data.json` (+ `.bak`), `squad-task-map-settings.json` (OpenAI key/model/effort, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`), `squad-task-map-gamedata-<mode>.json`, `squad-task-map-pending.json`, `squad-task-map-wikicache.json`, `squad-task-map-data.v1-backup.json`, `squad-task-map-instance.json` (port of the running copy).
+`squad-task-map-data.json` (+ `.bak`), `squad-task-map-settings.json` (OpenAI key/model/effort, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`), `squad-task-map-gamedata-<mode>.json`, `squad-task-map-pending.json`, `squad-task-map-wikicache.json`, `squad-task-map-data.v1-backup.json`, `squad-task-map-instance.json` (port of the running copy), `squad-task-map-data.before-<version>.json` (newest 3, made before an update), `squad-task-map-update-notice.json` (release notes for the copy an update starts); next to the exe, `SquadTaskMap.download.exe` and `SquadTaskMap.previous.exe` during/after an update.
 
 ---
 

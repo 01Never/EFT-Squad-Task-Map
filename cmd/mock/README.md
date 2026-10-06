@@ -65,6 +65,30 @@ for any title. Logged as `wiki <title>` (`wiki null` without `page`).
     tool results) moves nothing.
 - Any other `/v1/` path → 404 `nf`.
 
+**Fake GitHub Releases** (ticket 04c, `github.go`): for testing "Check for updates" offline. Point
+the app at it, and at the mock's TEST public key (the matching private key is
+`testdata/updates/mock-private-key.txt`; it only ever signs the mock's manifests):
+```
+STM_UPDATES_BASE=http://127.0.0.1:7820/github/01Never/EFT-Squad-Task-Map
+STM_UPDATES_PUBLIC_KEY=<contents of testdata/updates/mock-public-key.txt>
+```
+| Address | Answer |
+|---|---|
+| `/github/<repo>/releases/latest/download/latest.json` | 404 when no release is published, else a 302 to `…/releases/download/v<version>/latest.json` (as GitHub does) |
+| `/github/<repo>/releases/download/v<version>/{latest.json,SquadTaskMap.exe}` | 302 to the "download host" |
+| `/github-objects/<version>/latest.json` | the manifest, signed with the test key |
+| `/github-objects/<version>/SquadTaskMap.exe` | a fake exe (`MZ mock exe v<version>` + filler, 200 KB), or the file named by `MOCK_UPDATE_EXE` (a script lets you watch the app start the "new" copy) |
+| `POST /github-set` | change what it serves (below); `{"ok":true}` |
+
+`POST /github-set` takes any of `"release"` (`"none"` = no release yet, `"published"`),
+`"version"` (default `9.9.9`; set an older one to see "older version"), `"notes"`, `"exeSize"`,
+`"fault"`, or `{"reset": true}`. Faults: `bad-signature` (signed by an untrusted key), `bad-hash`
+(exe differs from the manifest), `wrong-size` (10 bytes short), `oversize` (twice as long),
+`off-allowlist-redirect` (the download host redirect goes to `localhost` instead of
+`127.0.0.1`), `huge-manifest` (over 64 KB), `server-error` (503 for latest.json),
+`slow-download` (16 KB every 100 ms, to watch progress and Cancel). The request log gets one
+line per request, `github <path>`: there are none unless the app was asked to check.
+
 Anything else → 404 `nf`.
 
 ## How tests use it
@@ -102,6 +126,7 @@ which keeps JavaScript's rules:
 - `main.go`: settings and start-up.
 - `server.go`: path dispatch, test controls, json.tarkov.dev files, wiki.
 - `openai.go`: key check, models, vision and categorize answers.
+- `github.go`: the fake GitHub Releases (ticket 04c).
 - `documents.go`: loading the snapshot or real files.
 - `javascript_json.go`: JavaScript-style JSON values.
 
@@ -110,6 +135,9 @@ which keeps JavaScript's rules:
 - each endpoint: files, outage, key check, vision and `/set-rows`, categorize, log lines, wiki,
   bad bodies;
 - loading both doc sets from `testdata/`;
+- the fake GitHub (`github_test.go`), driven by the app's own update code: published release,
+  no release, each fault refused with its code, older version, reset, slow download and cancel,
+  nothing logged until the app asks;
 - JavaScript number format, key order, escapes and truthiness.
 
 **Checked side by side against v2** (ticket 04): `bun tests/mock-server.ts` on one port and

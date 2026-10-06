@@ -9,6 +9,7 @@ import (
 
 	"squadtaskmap/internal/features/aicategorize"
 	"squadtaskmap/internal/features/taskscan"
+	"squadtaskmap/internal/features/updates"
 	"squadtaskmap/internal/gamedata"
 )
 
@@ -51,6 +52,10 @@ type Backend interface {
 	ReadScanImage(ctx context.Context, dataURL string) (taskscan.ReadResult, error)
 	// ScanEnded tells the page the scan finished (confirmed or cancelled).
 	ScanEnded(how string)
+
+	// Updates is "Check for updates": check, download, cancel, install. Nothing in it runs
+	// unless a route below asks for it.
+	Updates() *updates.Updater
 }
 
 // SettingsChange holds the settings fields a PUT /api/settings sent; nil means "not sent".
