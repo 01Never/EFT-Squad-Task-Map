@@ -26,9 +26,9 @@ Project: **Squad Task Map, local edition.** It's a Windows desktop helper for Es
 ## Layout
 - Root: only `README.md` (GitHub landing page), `CLAUDE.md`, the Go entry files and build files. Docs live in `docs/` (`USER-GUIDE.md` is the player manual).
 - `main.go`, `embed.go` (files built into the exe), `internal/app` (creates and connects every feature: read first).
-- `internal/features/<name>/` (gamelog, raid, gps, taskscan, aicategorize, …): one folder per feature, `rules.go` for the logic, a README each.
+- `internal/features/<name>/` (gamelog, raid, gps, taskscan, aicategorize, updates, …): one folder per feature, `rules.go` for the logic, a README each.
 - `internal/` infrastructure: `httpapi` (routes), `events` (SSE + pending queue), `storage` (files next to the exe), `gamedata` (download/cache/convert), `gamefolders`, `screenshots`, `openai`.
-- `web/js/logic/`: DOM-free page logic with tests; `web/js/features/<name>/`: page features (tickets 01+); `web/js/`: UI modules.
+- `web/js/`: `main.js` (start-up), `app/` (saved data, API, live-event router, types), `map/` (view, projection, layer order), `panel/` (panel shell), `features/<name>/` (`rules.js` + `*.test.js`, `panel.js`, `map-layer.js`, CSS, README). `web/css/base.css` holds the shared colour variables.
 - `assets/`: map SVGs, `maps-config.json`, bundled game-data snapshot, fonts. `testdata/`: fixtures and v2 golden outputs. `cmd/mock`: offline stand-ins.
 - `docs/FEATURES.md`: every feature with its Go package and page folder.
 
