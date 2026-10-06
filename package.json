@@ -5,6 +5,11 @@
   "type": "module",
   "description": "Page tests only: the app itself is built with Go (see README, Building from source).",
   "scripts": {
-    "test": "node --test \"tests/*.test.js\" \"web/js/**/*.test.js\""
+    "test": "node --test \"tests/*.test.js\" \"web/js/**/*.test.js\"",
+    "test:browser": "node --test --test-concurrency=1 --test-global-setup=tests/browser/global-setup.js \"tests/browser/*.e2e.mjs\""
+  },
+  "devDependencies": {
+    "playwright-core": "^1.63.0",
+    "pngjs": "^7.0.0"
   }
 }

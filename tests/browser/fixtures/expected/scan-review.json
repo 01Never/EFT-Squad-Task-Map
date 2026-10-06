@@ -1,0 +1,19 @@
+{
+  "note": "Read 8 rows from 1 screenshot. New tasks are added. Tasks on your list that aren't in these screenshots are removed.",
+  "sections": [
+    "New tasks (5)",
+    "New hand-in-only tasks (1)",
+    "Already on your list (1)",
+    "Not recognised (1)"
+  ],
+  "newTasks": [
+    "A Fuel Matter Ragman 0%",
+    "Anesthesia Prapor 33%",
+    "Ballet Lover Ragman 0%",
+    "Seizing the Initiative Peacekeeper 0% spelling fixed",
+    "The Good Times - Part 1 Prapor 40%",
+    "Booze Ragman 10%"
+  ],
+  "spellingFixed": 1,
+  "button": "Update list & delete 1 screenshot"
+}

@@ -1,0 +1,82 @@
+{
+  "version": 2,
+  "cats": [
+    {
+      "id": "b-boss",
+      "name": "Boss hunts",
+      "color": "#ff4d4d",
+      "icon": "star",
+      "builtin": "boss",
+      "visible": true
+    },
+    {
+      "id": "b-pmc",
+      "name": "PMC kills",
+      "color": "#ff922b",
+      "icon": "triangle",
+      "builtin": "pmc",
+      "visible": true
+    },
+    {
+      "id": "b-scav",
+      "name": "Scav / any kills",
+      "color": "#c0eb75",
+      "icon": "triangle",
+      "builtin": "scav",
+      "visible": true
+    },
+    {
+      "id": "b-mark",
+      "name": "Mark",
+      "color": "#ffd43b",
+      "icon": "diamond",
+      "builtin": "mark",
+      "visible": true
+    },
+    {
+      "id": "b-plant",
+      "name": "Plant / stash",
+      "color": "#3bc9db",
+      "icon": "square",
+      "builtin": "plant",
+      "visible": true
+    },
+    {
+      "id": "b-retrieve",
+      "name": "Retrieve",
+      "color": "#f783ac",
+      "icon": "circle",
+      "builtin": "retrieve",
+      "visible": true
+    },
+    {
+      "id": "b-go",
+      "name": "Scout & extract",
+      "color": "#51cf66",
+      "icon": "circle",
+      "builtin": "go",
+      "visible": true
+    },
+    {
+      "id": "unsorted",
+      "name": "Unsorted",
+      "color": "#c7c5b3",
+      "icon": "hexagon",
+      "builtin": "unsorted",
+      "visible": true
+    }
+  ],
+  "tasks": {},
+  "ticks": {},
+  "have": {},
+  "subs": [],
+  "draw": {},
+  "prefs": {},
+  "collapsed": {},
+  "pinnedOnly": false,
+  "panelTab": "tasks",
+  "panelHidden": false,
+  "dcolor": "#ff4d4d",
+  "dwidth": 4,
+  "aiOpen": true
+}

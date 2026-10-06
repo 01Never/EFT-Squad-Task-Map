@@ -1,0 +1,69 @@
+{
+  "version": 2,
+  "cats": [
+    {
+      "id": "c-mine",
+      "name": "Mine",
+      "color": "#66d9e8",
+      "icon": "circle",
+      "visible": true,
+      "builtin": null
+    },
+    {
+      "id": "unsorted",
+      "name": "Unsorted",
+      "color": "#c7c5b3",
+      "icon": "hexagon",
+      "builtin": "unsorted",
+      "visible": true
+    }
+  ],
+  "tasks": {
+    "65734c186dc1e402c80dc19e": {
+      "active": true,
+      "source": "log",
+      "addedAt": 1790000000000,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "639135a7e705511c8a4a1b78": {
+      "active": false,
+      "source": "manual",
+      "addedAt": 1790000000000,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    }
+  },
+  "ticks": {
+    "657356c410becd24bc776f55": true
+  },
+  "prefs": {
+    "streets-of-tarkov": {
+      "ext": {
+        "pmc": true,
+        "scav": true,
+        "shared": true,
+        "transit": true
+      },
+      "labels": true,
+      "drawOn": true,
+      "extMarked": {}
+    }
+  },
+  "have": {},
+  "subs": [],
+  "draw": {},
+  "collapsed": {},
+  "pinnedOnly": false,
+  "panelTab": "tasks",
+  "panelHidden": false,
+  "dcolor": "#ff4d4d",
+  "dwidth": 4,
+  "aiOpen": true
+}

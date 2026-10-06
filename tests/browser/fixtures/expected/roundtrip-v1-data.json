@@ -1,0 +1,625 @@
+{
+  "version": 2,
+  "cats": [
+    {
+      "id": "b-boss",
+      "name": "Boss hunts",
+      "color": "#ff4d4d",
+      "icon": "star",
+      "builtin": "boss",
+      "visible": true
+    },
+    {
+      "id": "b-pmc",
+      "name": "PMC kills",
+      "color": "#ff922b",
+      "icon": "triangle",
+      "builtin": "pmc",
+      "visible": true
+    },
+    {
+      "id": "b-scav",
+      "name": "Scav / any kills",
+      "color": "#c0eb75",
+      "icon": "triangle",
+      "builtin": "scav",
+      "visible": true
+    },
+    {
+      "id": "b-mark",
+      "name": "Mark",
+      "color": "#ffd43b",
+      "icon": "diamond",
+      "builtin": "mark",
+      "visible": true
+    },
+    {
+      "id": "b-plant",
+      "name": "Plant / stash",
+      "color": "#3bc9db",
+      "icon": "square",
+      "builtin": "plant",
+      "visible": true
+    },
+    {
+      "id": "b-retrieve",
+      "name": "Retrieve",
+      "color": "#f783ac",
+      "icon": "circle",
+      "builtin": "retrieve",
+      "visible": true
+    },
+    {
+      "id": "b-go",
+      "name": "Scout & extract",
+      "color": "#51cf66",
+      "icon": "circle",
+      "builtin": "go",
+      "visible": true
+    },
+    {
+      "id": "unsorted",
+      "name": "Unsorted",
+      "color": "#c7c5b3",
+      "icon": "hexagon",
+      "builtin": "unsorted",
+      "visible": true
+    }
+  ],
+  "tasks": {
+    "597a0b2986f77426d66c0633": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "59c512ad86f7741f0d09de9b": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 64,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "5b4795fb86f7745876267770": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 50,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "5979eee086f774311955e614": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 66,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "60e71d6d7fcf9c556f325055": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "675c085d59b0575973005f52": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 75,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "639136fa9444fb141f4e6eee": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "639135e0fa894f0a866afde6": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "665eeacf5d86b6c8aa03c79b": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 33,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "5bc479e586f7747f376c7da3": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "5d25bfd086f77442734d3007": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "64f6aafd67e11a7c6206e0d0": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "5d25e2ee86f77443e35162ea": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "60c0c018f7afb4354815096a": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "666314b4d7f171c4c20226c3": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 40,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "639135e8c115f907b14700aa": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "673f348dd3346c21670217e7": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "67a09636b8725511260bc421": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "5ae4497b86f7744cf402ed00": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 50,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "675c1d6d59b0575973008fc7": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "6a5ccda873f06065630d61b0": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "5ac3477486f7741d651d6885": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "639135f286e646067c176a87": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "63a5cf262964a7488f5243ce": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 40,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "639135d89444fb141f4e6eea": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "5969f9e986f7741dde183a50": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "5a03153686f77442d90e2171": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 60,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "669fa38fad7f1eac2607ed46": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "658027799634223183395339": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 90,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "66aa58245ab22944110db6e9": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "60e71dc0a94be721b065bbfc": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 75,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "5b47926a86f7747ccc057c15": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 50,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "5a27b87686f77460de0252a8": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 45,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "6a5c1578f2689567c30eb0f3": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "5a68665c86f774255929b4c7": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "639872f9decada40426d3447": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "5c0d190cd09282029f5390d8": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 20,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "639136d68ba6894d155e77cf": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "64f5aac4b63b74469b6c14c2": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "596a1e6c86f7741ddc2d3206": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 33,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "669fa3a08b4a64b332041ff7": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "64e7b9bffd30422ed03dad38": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "639dbaf17c898a131e1cffff": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "65734c186dc1e402c80dc19e": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "65733403eefc2c312a759ddb": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "5f04886a3937dc337a6b8238": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 50,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "639136e84ed9512be67647db": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "60e71b9bbd90872cb85440f3": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": 8,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "626bd75e47ea7f506e5493c5": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "64f5e20652fc01298e2c61e3": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "638fcd23dc65553116701d33": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "59c9392986f7742f6923add2": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "6752f6d83038f7df520c83e8": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "669fa3910c828825de06d69f": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790291879105,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    }
+  },
+  "ticks": {},
+  "have": {},
+  "subs": [],
+  "draw": {},
+  "prefs": {},
+  "collapsed": {},
+  "pinnedOnly": false,
+  "panelTab": "tasks",
+  "panelHidden": false,
+  "dcolor": "#ff4d4d",
+  "dwidth": 4,
+  "aiOpen": true,
+  "migratedFrom": 1,
+  "showScanBanner": true
+}

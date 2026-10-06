@@ -1,0 +1,267 @@
+{
+  "version": 2,
+  "cats": [
+    {
+      "id": "b-boss",
+      "name": "Boss hunts",
+      "color": "#ff4d4d",
+      "icon": "star",
+      "builtin": "boss",
+      "visible": true
+    },
+    {
+      "id": "b-pmc",
+      "name": "PMC kills",
+      "color": "#ff922b",
+      "icon": "triangle",
+      "builtin": "pmc",
+      "visible": true
+    },
+    {
+      "id": "b-scav",
+      "name": "Scav / any kills",
+      "color": "#c0eb75",
+      "icon": "triangle",
+      "builtin": "scav",
+      "visible": false
+    },
+    {
+      "id": "b-mark",
+      "name": "Mark",
+      "color": "#ffd43b",
+      "icon": "diamond",
+      "builtin": "mark",
+      "visible": true
+    },
+    {
+      "id": "b-plant",
+      "name": "Plant / stash",
+      "color": "#3bc9db",
+      "icon": "square",
+      "builtin": "plant",
+      "visible": true
+    },
+    {
+      "id": "b-retrieve",
+      "name": "Retrieve",
+      "color": "#f783ac",
+      "icon": "circle",
+      "builtin": "retrieve",
+      "visible": true
+    },
+    {
+      "id": "b-go",
+      "name": "Scout & extract",
+      "color": "#51cf66",
+      "icon": "circle",
+      "builtin": "go",
+      "visible": true
+    },
+    {
+      "id": "c-night-raids",
+      "name": "Night raids",
+      "color": "#e599f7",
+      "icon": "hexagon",
+      "visible": true,
+      "builtin": null
+    },
+    {
+      "id": "unsorted",
+      "name": "Unsorted",
+      "color": "#c7c5b3",
+      "icon": "hexagon",
+      "builtin": "unsorted",
+      "visible": true
+    }
+  ],
+  "tasks": {
+    "639135f286e646067c176a87": {
+      "active": true,
+      "source": "scan",
+      "addedAt": 1790000000000,
+      "gamePct": 33,
+      "scannedAt": 1790000060000,
+      "noSplit": false,
+      "pinned": true,
+      "partCats": {}
+    },
+    "64f5aac4b63b74469b6c14c2": {
+      "active": true,
+      "source": "log",
+      "addedAt": 1790000000000,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {
+        "64f5aac4b63b74469b6c14c2:go": {
+          "cat": "c-night-raids",
+          "manual": true
+        }
+      }
+    },
+    "6396700fea19ac7ed845db32": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790000000000,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": true,
+      "pinned": false,
+      "partCats": {}
+    },
+    "65734c186dc1e402c80dc19e": {
+      "active": true,
+      "source": "log",
+      "addedAt": 1790000000000,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {
+        "65734c186dc1e402c80dc19e:plant": {
+          "cat": "b-retrieve",
+          "manual": true
+        }
+      }
+    },
+    "639135a7e705511c8a4a1b78": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790000001000,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "5936da9e86f7742d65037edf": {
+      "active": true,
+      "source": "scan",
+      "addedAt": 1790000000000,
+      "gamePct": 0,
+      "scannedAt": 1790000060000,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "59674eb386f774539f14813a": {
+      "active": true,
+      "source": "manual",
+      "addedAt": 1790000000000,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {}
+    },
+    "5967733e86f774602332fc84": {
+      "active": false,
+      "source": "manual",
+      "addedAt": 1790000000000,
+      "gamePct": null,
+      "scannedAt": null,
+      "noSplit": false,
+      "pinned": false,
+      "partCats": {
+        "*": {
+          "cat": "c-night-raids",
+          "manual": true
+        }
+      }
+    }
+  },
+  "ticks": {
+    "63927f14744e452011470816": true,
+    "65734c186dc1e402c80dc1a2": 4,
+    "64f5aac4b63b74469b6c14c7": true
+  },
+  "have": {
+    "5991b51486f77447b112d44f": 2,
+    "63a39e1d234195315d4020bd": 1
+  },
+  "used": {
+    "63927f14744e452011470816": 1
+  },
+  "subs": [
+    {
+      "id": "sub-spare-marker",
+      "task": "639135f286e646067c176a87",
+      "text": "Bring a spare marker",
+      "done": false,
+      "map": "streets-of-tarkov",
+      "x": -10.72,
+      "z": 179.28,
+      "f": "2"
+    },
+    {
+      "id": "sub-third-floor",
+      "task": "64f5aac4b63b74469b6c14c2",
+      "text": "Check the third floor",
+      "done": true,
+      "map": null,
+      "x": null,
+      "z": null,
+      "f": ""
+    }
+  ],
+  "draw": {
+    "streets-of-tarkov": [
+      {
+        "c": "#ff4d4d",
+        "w": 1.5,
+        "pts": [
+          [
+            -11,
+            179
+          ],
+          [
+            29,
+            204
+          ],
+          [
+            59,
+            169
+          ]
+        ]
+      }
+    ]
+  },
+  "prefs": {
+    "streets-of-tarkov": {
+      "ext": {
+        "pmc": true,
+        "scav": true,
+        "shared": true,
+        "transit": false
+      },
+      "extMarked": {
+        "Crash Site": true
+      },
+      "labels": true,
+      "drawOn": true
+    },
+    "customs": {
+      "ext": {
+        "pmc": true,
+        "scav": false,
+        "shared": true,
+        "transit": true
+      },
+      "extMarked": {},
+      "labels": false,
+      "drawOn": false
+    }
+  },
+  "collapsed": {
+    "b-boss": true
+  },
+  "pinnedOnly": false,
+  "panelTab": "tasks",
+  "panelHidden": false,
+  "dcolor": "#2fbf3a",
+  "dwidth": 6,
+  "aiOpen": false,
+  "migratedFrom": 1,
+  "showScanBanner": false
+}

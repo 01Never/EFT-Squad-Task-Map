@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "cats": [
+    {
+      "id": "c-mine",
+      "name": "Mine",
+      "color": "#66d9e8",
+      "icon": "circle",
+      "visible": true,
+      "builtin": null
+    }
+  ],
+  "tasks": {
+    "65734c186dc1e402c80dc19e": {
+      "active": true,
+      "source": "log",
+      "addedAt": 1790000000000
+    },
+    "639135a7e705511c8a4a1b78": {
+      "active": false,
+      "pinned": false,
+      "addedAt": 1790000000000
+    }
+  },
+  "ticks": {
+    "657356c410becd24bc776f55": true
+  },
+  "prefs": {
+    "streets-of-tarkov": {
+      "ext": {
+        "scav": true
+      },
+      "labels": true,
+      "drawOn": true
+    }
+  }
+}

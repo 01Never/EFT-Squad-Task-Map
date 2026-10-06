@@ -267,6 +267,12 @@ Create `<scratch>\logs\log_2026.10.01_10-00-00_1.1.5.1\` containing empty `x pus
 
 **Port parity (ticket 04):** before the TypeScript server was deleted, both servers ran side by side against the mock with the same inputs: static files byte-identical; `/api/data` JSON-equal; `/api/status` same shape and values; state round trip and `.bak`; the same SSE events in the same order for the same log lines and GPS file; the same pending queue and acks; settings; AI key, categorize, scan read/confirm/cancel and their errors (34 checks, all passing). Browser checks for tickets 01–04 (headless Edge via `puppeteer-core`, scratch scripts) passed against the Go server. Ticket 04b turns them into a permanent suite. The page keeps an SSE connection open, so wait for an element rather than for network idle.
 
+**Browser smoke suite (ticket 04b, part 1):**
+- **Where and how:** `tests/browser/`, run with `npm run test:browser` from PowerShell; Edge won't start from Git Bash. It needs Go, Node, `npm install` (playwright-core, pngjs) and Microsoft Edge.
+- **What it checks:** it builds the app and `cmd/mock` from the working tree, and covers every scenario in ticket 04b plus the checks from tickets 01–03, including the 0-paint trace for the selection flash and the find-me pulse. It takes about 3 minutes.
+- **Baselines:** `STM_E2E_RECORD=<dir>` records screenshots, each scenario's API requests and saved-data round trips. `node tests/browser/compare.mjs <before> <after>` diffs two recordings. The baseline of the 2.4.0 page is in `dist/04b-baseline/before/` (gitignored, so only on this PC).
+- **More detail:** ports, env vars and the DOM hooks it relies on are in `tests/browser/README.md`.
+
 ---
 
 ## 10. Unverified: needs the owner in-game
