@@ -109,7 +109,8 @@ function renderView(status, view) {
       return `<div class="upd-bar" data-progress><i></i></div>
         <p class="mnote"><span data-progress-text></span> <button class="lnk" id="sCancelUpdate">Cancel</button></p>`;
     case "installing":
-      return `<p class="mnote">Installing and restarting… this page reloads by itself.</p>`;
+      return `<p class="mnote">Installing and restarting… this page reloads by itself.</p>
+        <p class="mnote">If it hasn't come back after a minute, close the console window and start SquadTaskMap.exe again. If it won't start, rename SquadTaskMap.previous.exe to SquadTaskMap.exe to go back.</p>`;
     default:
       return "";
   }
