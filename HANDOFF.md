@@ -65,8 +65,8 @@ No dependencies to install (empty `dependencies`; there's no `tsconfig` or `@typ
 1. Bump `VERSION` in `server/main.ts` and `version` in `package.json`.
 2. `bun test`, then the manual checks in §9 that touch your change.
 3. `bun run build`.
-4. Zip `SquadTaskMap.exe` + `README.md` in a `SquadTaskMap-v2/` folder. If over 30 MB (it is, ~43 MB), also make a `.7z` with LZMA2 max (~28 MB). The owner receives files through a chat with a 30 MB limit.
-5. Zip the source without `node_modules/`, `dist/`, `web/dist/`.
+4. Zip `SquadTaskMap.exe` + `README.md` in a `SquadTaskMap-v2/` folder. If over 30 MB (2.1.0: 39 MB), also make a `.7z` with LZMA2 max (2.1.0: 29.3 MB). The owner receives files through a chat with a 30 MB limit. 7-Zip isn't needed; Windows' own tar writes 7z: `tar --format 7zip --options "7zip:compression=lzma2,7zip:compression-level=9" -cf SquadTaskMap-<version>.7z SquadTaskMap-v2`.
+5. Zip the source without `node_modules/`, `dist/`, `web/dist/`: `git archive --format=zip --prefix=squad-task-map-<version>-source/ -o <file>.zip HEAD`.
 6. Update `README.md` for user-visible changes, and this file.
 
 ---
