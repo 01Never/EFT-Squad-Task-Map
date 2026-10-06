@@ -6,6 +6,12 @@ thing you see on the map: a disc in its own colour inside a ring, with a heading
 20 seconds. When you've panned away, a chip on the map edge points toward you with the distance;
 clicking it brings you back into view. Find me and the chip never change your zoom.
 
+**Auto-center (ticket 02):** with "Center the map on me" on (⌖ Follow on the toolbar, or
+Settings), every new position pans the map so you're in the middle, at whatever zoom you had,
+like a minimap. With it off (the default), a new position only moves the map when it would be
+off-screen, and only with "Follow my position" on, as in v2; the zoom never changes there either.
+When "Follow my position" switches maps, the new map opens at its default zoom, centred on you.
+
 **Where the data comes from:** Tarkov writes your position and facing into each screenshot's file
 name. The server parses it (`server/gpsname.ts`), works out the map from the game log, and sends a
 `gps` event (live only, not saved) with the position and the last 5 positions (the trail).
@@ -23,10 +29,16 @@ name. The server parses it (`server/gpsname.ts`), works out the map from the gam
   (`chipPositionToward()`).
 - Distance is straight-line on the map (x/z), ignoring height; game units are metres.
   Rounded to 5 m under 100 m, 10 m above, km from 1000 m (`formatDistance()`).
+- A new position: `viewChangeForNewPosition()` says "centre" when auto-center is on, or when
+  Follow is on and you're not well in view; "well in view" ignores the outer
+  `BRING_INTO_VIEW_EDGE_FRACTION` = 10% of the view (`isWellInsideArea()`). Otherwise "leave".
+- The centring waits while a finger or mouse button is down on the map (`afterUserLetsGo()` in
+  `map.js`), then runs once you let go.
 
 **Flow:**
 `screenshot file → server/screens.ts → gpsname.ts → main.ts gps() → event "gps" → live.js →
-onNewPosition() (starts the pulse) → renderPlayer() → map.js apply() → placeFindMeOverlays()`
+onNewPosition() (starts the pulse) → renderPlayer() → moveViewForNewPosition() → map.js apply() →
+placeFindMeOverlays()`
 
 **Light while Tarkov runs:** the marker, label and trail are plain SVG, drawn once per update.
 The pulse rings and the chip are HTML over the map (`#findme-fx`, `#findme-chip`), moved with CSS
@@ -35,13 +47,15 @@ compositor without repainting the map. A trace of 3 s of pulse showed 0 Paint an
 main thread. Each ring removes itself when its animation ends; after 20 s nothing animates.
 With "reduce motion" turned on in Windows, the pulse is one still ring for the same 20 s.
 
-**Saved data / settings:** none. The pulse start time lives in `app.findMePulseStartedAt`
+**Saved data / settings:** `autoCenter` (off by default) and `followPosition` in
+`squad-task-map-settings.json`, read from `/api/status` and changed with `PUT /api/settings`
+(the ⌖ Follow toggle and Settings both use it). The pulse start time lives in `app.findMePulseStartedAt`
 (memory only). The player colour is the CSS variable `--player` in `web/index.html`.
 
 **Files:**
-- `rules.js`: pulse timing, on-screen test, chip placement, distance.
+- `rules.js`: pulse timing, on-screen test, chip placement, distance, what a new position does to the view.
 - `map-layer.js`: draws the marker, label, floor badge, trail and position bar; the pulse rings;
-  the off-screen chip; the Find me button.
+  the off-screen chip; the Find me button and the ⌖ Follow toggle; moving the view for a new position.
 - `rules.test.js`: tests for `rules.js`.
 - Styles: the `features/find-me` block in `web/index.html` (moves to `find-me.css` in ticket 04b).
 

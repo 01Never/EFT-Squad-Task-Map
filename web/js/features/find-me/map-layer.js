@@ -1,20 +1,24 @@
 // Find me: draws your position on the map (marker, "You" label, floor badge, trail), the pulse
-// after a new position, the off-screen chip and the Find me button. The rules are in rules.js.
+// after a new position, the off-screen chip, the Find me button and the Follow (auto-center)
+// toggle. The rules are in rules.js.
 // The pulse and the chip are HTML over the map, moved with CSS transform only: nothing animates
 // inside the map SVG (repainting the map art is expensive while Tarkov runs).
 import { app, mapName } from "../../store.js";
-import { esc, mk } from "../../util.js";
+import { esc, mk, api, toast } from "../../util.js";
 import { floorBadge, arrowRotation } from "../../logic/projection.js";
-import { apply, panTo } from "../../map.js";
+import { apply, panTo, afterUserLetsGo } from "../../map.js";
 import {
   CHIP_EDGE_GAP_PIXELS,
   ON_SCREEN_MARGIN_PIXELS,
+  BRING_INTO_VIEW_EDGE_FRACTION,
   pulseRemainingMs,
   pulseRingTimings,
   isInsideArea,
+  isWellInsideArea,
   chipPositionToward,
   distanceMeters,
   formatDistance,
+  viewChangeForNewPosition,
 } from "./rules.js";
 
 const SVG_FONT = "bender, Arial, sans-serif";
@@ -25,6 +29,26 @@ const PLAYER_FILL = "fill:var(--player)";
 /** A new GPS position arrived from the game: start the pulse. */
 export function onNewPosition() {
   app.findMePulseStartedAt = Date.now();
+}
+
+/**
+ * After a new position is drawn on the open map: centre on it, or leave the view alone, as the
+ * auto-center rule says (ticket 02). Never changes the zoom. Waits if you're mid-drag or mid-pinch.
+ */
+export function moveViewForNewPosition() {
+  const settings = app.STATUS.settings;
+  const placement = playerPointInArea();
+  if (!placement) {
+    return;
+  }
+  const decision = viewChangeForNewPosition({
+    isAutoCenterOn: !!settings.autoCenter,
+    isFollowOn: !!settings.followPosition,
+    isWellInView: isWellInsideArea(placement.point, placement.area, BRING_INTO_VIEW_EDGE_FRACTION),
+  });
+  if (decision === "centre") {
+    afterUserLetsGo(centreOnPlayer);
+  }
 }
 
 /**
@@ -55,6 +79,7 @@ export function renderPlayer() {
   layer.innerHTML = "";
   const position = positionOnThisMap();
   updateFindMeButton(position);
+  updateFollowButton();
   renderPulse(position);
   renderPositionBar(position);
   if (!position) {
@@ -205,17 +230,35 @@ function onPulseRingEnded(event) {
  * chip's text when the distance changes.
  */
 export function placeFindMeOverlays() {
-  const mapView = app.M;
-  const overlay = document.getElementById("findme-fx");
   const pulse = document.getElementById("findme-pulse");
-  const position = positionOnThisMap();
-  if (!mapView || !overlay || !pulse || !position) {
+  const placement = playerPointInArea();
+  if (!pulse || !placement) {
     hideChip();
     return;
   }
+  const { point, area, position } = placement;
+  pulse.style.transform = `translate(${point.x.toFixed(1)}px,${point.y.toFixed(1)}px)`;
+  if (isInsideArea(point, area, ON_SCREEN_MARGIN_PIXELS)) {
+    hideChip();
+    return;
+  }
+  showChip(area, point, distanceFromViewCentre(app.M, position));
+}
+
+/**
+ * Where your position is on screen, in pixels from the map area's top-left, plus the map area's
+ * size. Null when there's no position on this map (or the map isn't laid out yet).
+ */
+function playerPointInArea() {
+  const mapView = app.M;
+  const overlay = document.getElementById("findme-fx");
+  const position = positionOnThisMap();
+  if (!mapView || !overlay || !position) {
+    return null;
+  }
   const screenMatrix = mapView.svg.getScreenCTM();
   if (!screenMatrix) {
-    return;
+    return null;
   }
   const overlayBox = overlay.getBoundingClientRect();
   const [svgX, svgY] = mapView.proj.toSvg(position.x, position.z);
@@ -223,14 +266,8 @@ export function placeFindMeOverlays() {
     x: screenMatrix.a * svgX + screenMatrix.c * svgY + screenMatrix.e - overlayBox.left,
     y: screenMatrix.b * svgX + screenMatrix.d * svgY + screenMatrix.f - overlayBox.top,
   };
-  pulse.style.transform = `translate(${point.x.toFixed(1)}px,${point.y.toFixed(1)}px)`;
-
   const area = { width: overlayBox.width, height: overlayBox.height };
-  if (isInsideArea(point, area, ON_SCREEN_MARGIN_PIXELS)) {
-    hideChip();
-    return;
-  }
-  showChip(area, point, distanceFromViewCentre(mapView, position));
+  return { point, area, position };
 }
 
 /** Straight-line metres from the middle of what you're looking at to your position. */
@@ -296,11 +333,44 @@ export function findMe() {
   renderPulse(positionOnThisMap());
 }
 
-/** Wire up the Find me button, the off-screen chip and the pulse clean-up. Called when a map opens. */
+/** The ⌖ Follow toggle mirrors the "Center the map on me" setting. */
+function updateFollowButton() {
+  const button = document.getElementById("bfollow");
+  if (!button) {
+    return;
+  }
+  button.setAttribute("aria-pressed", String(!!app.STATUS.settings.autoCenter));
+}
+
+/**
+ * ⌖ Follow: turn auto-center on or off. It's the same setting as in Settings, saved on the
+ * server, so the toolbar and Settings always agree, also after a reload.
+ */
+async function onFollowClicked() {
+  const isTurningOn = !app.STATUS.settings.autoCenter;
+  try {
+    const response = await api("/api/settings", { method: "PUT", body: { autoCenter: isTurningOn } });
+    app.STATUS = response.status;
+  } catch (error) {
+    toast(String(error.message || error));
+    return;
+  }
+  updateFollowButton();
+  if (isTurningOn) {
+    centreOnPlayer();
+    toast("Following you: each screenshot centres the map on you (your zoom stays)");
+  }
+}
+
+/** Wire up the Find me and Follow buttons, the off-screen chip and the pulse clean-up. Called when a map opens. */
 export function bindFindMe() {
   const findMeButton = document.getElementById("bfindme");
   if (findMeButton) {
     findMeButton.onclick = findMe;
+  }
+  const followButton = document.getElementById("bfollow");
+  if (followButton) {
+    followButton.onclick = onFollowClicked;
   }
   const chip = document.getElementById("findme-chip");
   if (chip) {

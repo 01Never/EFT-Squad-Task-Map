@@ -41,7 +41,7 @@ export async function openMap(key) {
   $("#crumbs").innerHTML = `<a href="#/">Maps</a> / <b>${esc(cfg.name)}</b>`;
   $("#view").innerHTML = `<div class="app${app.S.panelHidden ? " nopanel" : ""}"><div class="stage" id="stage"><div class="fx" id="fx"></div>
     <div class="findme-fx" id="findme-fx"><div class="findme-pulse" id="findme-pulse"></div></div><button class="findme-chip" id="findme-chip" hidden title="Centre on you"><span class="findme-chip-arrow">➜</span><span class="findme-chip-text"></span></button><div class="mapui">
-    <div class="grp"><button id="zin" title="Zoom in">+</button><button id="zout" title="Zoom out">−</button><button id="zfit" title="Reset view">⤢</button><button id="bfindme" disabled>📍<span class="lbl"> Find me</span></button><button id="bdraw" aria-pressed="false" title="Draw on the map">✎<span class="lbl"> Draw</span></button><button id="bpin" title="Show only pinned tasks">📌<span class="lbl"> Pinned only</span></button><span id="floors" style="display:flex;align-items:center"></span></div>
+    <div class="grp"><button id="zin" title="Zoom in">+</button><button id="zout" title="Zoom out">−</button><button id="zfit" title="Reset view">⤢</button><button id="bfindme" disabled>📍<span class="lbl"> Find me</span></button><button id="bfollow" aria-pressed="false" title="Center the map on me at each screenshot (keeps your zoom)">⌖<span class="lbl"> Follow</span></button><button id="bdraw" aria-pressed="false" title="Draw on the map">✎<span class="lbl"> Draw</span></button><button id="bpin" title="Show only pinned tasks">📌<span class="lbl"> Pinned only</span></button><span id="floors" style="display:flex;align-items:center"></span></div>
     <div class="grp" id="drawbar" hidden></div></div><div class="hint" id="hint"></div><div class="gpsbar" id="gpsbar" hidden></div><div class="pop" id="pop"></div><button class="showpanel" id="showpanel" title="Show the task list">◂ Tasks</button></div><aside id="panel"></aside></div>`;
   const txt = await getSvg(cfg.svg);
   if (location.hash !== "#/map/" + key) return; // navigated away while loading
@@ -55,7 +55,8 @@ export async function openMap(key) {
   M.gZones = mk("g", {}, svg); M.gLabels = mk("g", {}, svg); M.gDraw = mk("g", {}, svg); M.gExt = mk("g", {}, svg); M.gMk = mk("g", {}, svg); M.gGps = mk("g", {}, svg);
   M.mapData = app.DATA.maps.find((m) => m.key === key) || { extracts: [], transits: [] };
   bindMap(); bindPanel(); bindFindMe(); renderFloors(); renderAll(); fitTo(home, 0);
-  if (app.gps && app.gps.map === key) centerOn(app.gps, false);
+  // Opened because of a new position (Follow my position): centre on it at the map's default zoom.
+  if (app.gps && app.gps.map === key) { const [x, y] = M.proj.toSvg(app.gps.x, app.gps.z); panTo(x, y); }
 }
 
 // ---------------------------------------------------------------- view
@@ -126,21 +127,26 @@ function zoomAt(f, cx, cy) {
   M.vb = { x: px - (px - vb.x) * nf, y: py - (py - vb.y) * nf, w: nw, h: vb.h * nf }; applySoon();
 }
 function toSvgPt(cx, cy) { const M = app.M, r = M.svg.getBoundingClientRect(); return [M.vb.x + ((cx - r.left) / r.width) * M.vb.w, M.vb.y + ((cy - r.top) / r.height) * M.vb.h]; }
-export function centerOn(pos, onlyIfOff = true) {
+/**
+ * Run `fn` once the user isn't dragging or pinching the map: now if no finger or button is down,
+ * otherwise when the last one lets go. Only the latest request is kept. (Ticket 02: a new position
+ * must not yank the map out from under a drag.)
+ */
+export function afterUserLetsGo(fn) {
   const M = app.M; if (!M) return;
-  const [x, y] = M.proj.toSvg(pos.x, pos.z), vb = M.vb;
-  const inside = x > vb.x + vb.w * 0.1 && x < vb.x + vb.w * 0.9 && y > vb.y + vb.h * 0.1 && y < vb.y + vb.h * 0.9;
-  if (onlyIfOff && inside) return;
-  const w = Math.min(vb.w, M.home.w / 2.5), h = w * (vb.h / vb.w);
-  M.vb = { x: x - w / 2, y: y - h / 2, w, h }; apply();
+  if (M.pointersDown) M.afterGesture = fn; else fn();
 }
 
 // ---------------------------------------------------------------- input
 function bindMap() {
   const M = app.M, svg = M.svg, pts = new Map(), S = app.S;
   let moved = 0, pinch = null, live = null;
+  const released = (id) => {
+    pts.delete(id); M.pointersDown = pts.size;
+    if (!pts.size && M.afterGesture) { const fn = M.afterGesture; M.afterGesture = null; fn(); }
+  };
   svg.addEventListener("pointerdown", (e) => {
-    svg.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); moved = 0;
+    svg.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); moved = 0; M.pointersDown = pts.size;
     if (pts.size === 2) { pinch = null; if (live) { live.el.remove(); live = null; } }
     if (M.mode === "draw" && pts.size === 1) {
       const [sx, sy] = toSvgPt(e.clientX, e.clientY); const w = +(S.dwidth * K()).toFixed(3);
@@ -177,10 +183,11 @@ function bindMap() {
       else if (ex) toggleExtract(ex.dataset.name);
       else if (M.sel) { M.sel = null; M.pop = null; renderAll(); }
     }
-    pts.delete(e.pointerId); if (pts.size < 2) pinch = null;
+    if (pts.size <= 2) pinch = null;
+    released(e.pointerId);
   };
   svg.addEventListener("pointerup", up);
-  svg.addEventListener("pointercancel", (e) => { pts.delete(e.pointerId); pinch = null; if (live) { live.el.remove(); live = null; } });
+  svg.addEventListener("pointercancel", (e) => { pinch = null; if (live) { live.el.remove(); live = null; } released(e.pointerId); });
   svg.addEventListener("wheel", (e) => { e.preventDefault(); zoomAt(e.deltaY > 0 ? 1.15 : 1 / 1.15, e.clientX, e.clientY); }, { passive: false });
   const ctr = () => { const r = svg.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
   $("#zin").onclick = () => zoomAt(1 / 1.4, ...ctr());

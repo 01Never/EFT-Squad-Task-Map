@@ -18,6 +18,42 @@ export const ON_SCREEN_MARGIN_PIXELS = 12;
 // Gap between the off-screen chip and the edge of the map area.
 export const CHIP_EDGE_GAP_PIXELS = 8;
 
+// When auto-center is off, a new position in the outer 10% of the view still counts as
+// off-screen and is brought into view, so you're never left right at the edge (as in v2).
+export const BRING_INTO_VIEW_EDGE_FRACTION = 0.1;
+
+/**
+ * What a new GPS position should do to the view (ticket 02). The zoom never changes.
+ * - "Center the map on me" (autoCenter) on: always centre on you, like a minimap.
+ * - Off: only bring you into view when you'd be off-screen, and only with "Follow my position"
+ *   on, as v2 did.
+ * @param {{ isAutoCenterOn: boolean, isFollowOn: boolean, isWellInView: boolean }} situation
+ * @returns {"centre" | "leave"}
+ */
+export function viewChangeForNewPosition(situation) {
+  if (situation.isAutoCenterOn) {
+    return "centre";
+  }
+  if (situation.isFollowOn && !situation.isWellInView) {
+    return "centre";
+  }
+  return "leave";
+}
+
+/**
+ * Whether a point is inside the area, ignoring a band of `edgeFraction` along every edge.
+ * @param {{ x: number, y: number }} point
+ * @param {{ width: number, height: number }} area
+ * @param {number} edgeFraction e.g. 0.1 for the outer 10%
+ */
+export function isWellInsideArea(point, area, edgeFraction) {
+  const bandX = area.width * edgeFraction;
+  const bandY = area.height * edgeFraction;
+  const isInsideHorizontally = point.x > bandX && point.x < area.width - bandX;
+  const isInsideVertically = point.y > bandY && point.y < area.height - bandY;
+  return isInsideHorizontally && isInsideVertically;
+}
+
 /**
  * How long the pulse still has to run.
  * @param {number} pulseStartedAtMs when the pulse started (0 = never)

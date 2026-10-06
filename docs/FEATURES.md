@@ -9,4 +9,4 @@ Ticket 04 adds their Go packages and ticket 04b moves their page code into `web/
 
 | Feature | Ticket | Go package | Page folder | Saved data it owns | Events | Settings |
 |---|---|---|---|---|---|---|
-| Find me: player marker, pulse, off-screen chip, Find me button | 01 | (server: `server/gpsname.ts`, `main.ts` until 04) | `web/js/features/find-me/` | none (pulse start in memory) | receives `gps` | `followPosition` (switch map) |
+| Find me: player marker, pulse, off-screen chip, Find me button, auto-center (⌖ Follow) | 01, 02 | (server: `server/gpsname.ts`, `main.ts` until 04) | `web/js/features/find-me/` | none (pulse start in memory) | receives `gps` | `followPosition` (switch map), `autoCenter` |

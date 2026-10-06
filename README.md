@@ -63,7 +63,7 @@ The **Bring list** tab lists what the tasks currently shown on the map need: key
 - Extracts show faded. Click one on the map to mark it solid; click again to unmark. Marks clear after each raid (or **Clear marked**). The PMC / Scav / Shared / Transit chips choose which kinds show.
 
 ## Your position (GPS)
-During a raid, Tarkov puts your position and facing in each screenshot's **file name**. When a new one appears, the app switches to the raid's map (setting **Follow my position**, on by default), draws your marker with a short trail, and centers on it if it's off-screen. The app reads the file name only, never the picture.
+During a raid, Tarkov puts your position and facing in each screenshot's **file name**. When a new one appears, the app switches to the raid's map (setting **Follow my position**, on by default), draws your marker with a short trail, and brings it into view if it's off-screen (your zoom stays). The app reads the file name only, never the picture.
 
 - **Your marker** is a coloured disc with a heading arrow inside a ring, labelled **You**, drawn above everything else. No task or extract uses its colour or shape.
 - **Each new position pulses** with big expanding rings for about 20 seconds, so you spot the update. Then the marker sits still (no animation runs after that).
@@ -79,7 +79,8 @@ You need a **screenshot key** bound in Tarkov's control settings. The app warns 
 - **Game mode:** PvP, PvE or PvP Season. Picks the task data and which log events count. If the game reports a different mode, the top bar offers to switch.
 - **Game logs folder:** found automatically from the launcher's install entry or Steam. Paste it if not, e.g. `C:\Battlestate Games\EFT\Logs`.
 - **Screenshots folder:** `Documents\Escape From Tarkov\Screenshots`, found automatically even if OneDrive moved Documents.
-- **Follow my position**
+- **Follow my position:** switch to the raid's map when a GPS screenshot comes in.
+- **Center the map on me when I take a screenshot:** off by default. When on, every new position pans the map so you're in the middle, keeping your zoom, like a minimap. Same as **⌖ Follow** on the map toolbar. If you're dragging the map when a screenshot comes in, it waits until you let go.
 - **Game data:** where it came from and **Update game data now**.
 - **OpenAI:** key, model and reasoning level.
 

@@ -8,6 +8,7 @@ export type Settings = {
   gameMode?: "regular" | "pve" | "pvp-season";
   logsPath?: string; screenshotsPath?: string;
   followPosition?: boolean;
+  autoCenter?: boolean; // ticket 02: centre the map on each new position (off by default)
   [k: string]: any;
 };
 

@@ -11,7 +11,33 @@ import {
   chipPositionToward,
   distanceMeters,
   formatDistance,
+  viewChangeForNewPosition,
+  isWellInsideArea,
 } from "./rules.js";
+
+test("with auto-center on, every new position centres the map", () => {
+  for (const isWellInView of [true, false]) {
+    for (const isFollowOn of [true, false]) {
+      assert.equal(viewChangeForNewPosition({ isAutoCenterOn: true, isFollowOn, isWellInView }), "centre");
+    }
+  }
+});
+
+test("with auto-center off, an on-screen position leaves the map where it is", () => {
+  assert.equal(viewChangeForNewPosition({ isAutoCenterOn: false, isFollowOn: true, isWellInView: true }), "leave");
+});
+
+test("with auto-center off, an off-screen position is brought into view if Follow is on", () => {
+  assert.equal(viewChangeForNewPosition({ isAutoCenterOn: false, isFollowOn: true, isWellInView: false }), "centre");
+  assert.equal(viewChangeForNewPosition({ isAutoCenterOn: false, isFollowOn: false, isWellInView: false }), "leave");
+});
+
+test("a position in the outer 10% of the view doesn't count as well in view", () => {
+  const area = { width: 1000, height: 500 };
+  assert.equal(isWellInsideArea({ x: 500, y: 250 }, area, 0.1), true);
+  assert.equal(isWellInsideArea({ x: 950, y: 250 }, area, 0.1), false);
+  assert.equal(isWellInsideArea({ x: 500, y: 30 }, area, 0.1), false);
+});
 
 test("a pulse that never started has nothing left to run", () => {
   assert.equal(pulseRemainingMs(0, 123456), 0);

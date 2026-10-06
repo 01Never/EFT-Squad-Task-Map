@@ -26,7 +26,7 @@ import { LogWatcher } from "./logs.ts";
 import { Screens } from "./screens.ts";
 import { initWikiCache, categorize, testKey, readTaskList, DEFAULT_MODEL } from "./ai.ts";
 
-const VERSION = "2.1.0";
+const VERSION = "2.2.0";
 const SVGS: Record<string, string> = {
   "StreetsOfTarkov.svg": svgStreets, "GroundZero.svg": svgGZ, "Customs.svg": svgCustoms, "Factory.svg": svgFactory,
   "Interchange.svg": svgInterchange, "Lighthouse.svg": svgLighthouse, "Reserve.svg": svgReserve, "Shoreline.svg": svgShoreline, "Woods.svg": svgWoods,
@@ -102,7 +102,7 @@ function status() {
   return {
     version: VERSION, statePath: FILES.state, home: HOME,
     data: dataStatus(),
-    settings: { gameMode: settings.gameMode || "regular", logsPath: settings.logsPath || "", screenshotsPath: settings.screenshotsPath || "", followPosition: settings.followPosition !== false },
+    settings: { gameMode: settings.gameMode || "regular", logsPath: settings.logsPath || "", screenshotsPath: settings.screenshotsPath || "", followPosition: settings.followPosition !== false, autoCenter: settings.autoCenter === true },
     logs: logs.status, screenshots: screens.status, keybind,
     raid: { active: raid.active, map: raid.map || raid.pendingMap, sessionMode: raid.sessionMode },
     gps, trail,
@@ -144,6 +144,7 @@ async function handler(req: Request): Promise<Response> {
     if (typeof b.logsPath === "string") next.logsPath = b.logsPath.trim();
     if (typeof b.screenshotsPath === "string") next.screenshotsPath = b.screenshotsPath.trim();
     if (typeof b.followPosition === "boolean") next.followPosition = b.followPosition;
+    if (typeof b.autoCenter === "boolean") next.autoCenter = b.autoCenter;
     const modeChanged = (next.gameMode || "regular") !== (settings.gameMode || "regular");
     const pathsChanged = next.logsPath !== settings.logsPath || next.screenshotsPath !== settings.screenshotsPath;
     settings = next; writeSettings(settings);

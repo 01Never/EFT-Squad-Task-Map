@@ -194,7 +194,7 @@ See SPEC §12. Fields: `cats`, `tasks{id: {active, source, addedAt, gamePct, sca
 - **Adding a field:** add its default to `freshState()`. `fill()` adds missing defaults when loading. Only bump `version` and add a `migrate` step for structural changes; keep the v1 → v2 path working (fixture: `tests/fixtures/v1-data.json`, the owner's real v1 file).
 
 ### 6.3 Files next to the exe
-`squad-task-map-data.json` (+ `.bak`), `squad-task-map-settings.json` (OpenAI key/model/effort, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`), `squad-task-map-gamedata-<mode>.json`, `squad-task-map-pending.json`, `squad-task-map-wikicache.json`, `squad-task-map-data.v1-backup.json`.
+`squad-task-map-data.json` (+ `.bak`), `squad-task-map-settings.json` (OpenAI key/model/effort, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`), `squad-task-map-gamedata-<mode>.json`, `squad-task-map-pending.json`, `squad-task-map-wikicache.json`, `squad-task-map-data.v1-backup.json`.
 
 ---
 
@@ -291,6 +291,7 @@ Browser end-to-end checks are driven with `puppeteer-core` + the installed Micro
   - Esc deselects.
 - **After 2.0.1, before ticket 01:** a confirmed scan replaces the task list instead of only adding (owner's request).
 - **2.1.0 (ticket 01, Find me):** player marker in its own colour and ring shape with a "You" label; a new position (or 📍 Find me) pulses for ~20 s, then nothing animates (owner replaced the ticket's continuous radar with this); off-screen chip with distance; Find me and the chip centre without changing zoom; fainter trail. Includes the scan-replaces-list change.
+- **2.2.0 (ticket 02, auto-center):** setting `autoCenter` (off by default) + ⌖ Follow toolbar toggle: each new position centres the map at your zoom. With it off, only off-screen positions are brought into view (if Follow my position is on). The zoom-changing `centerOn()` is gone: nothing changes zoom automatically any more. A position that arrives mid-drag waits for the release (`afterUserLetsGo`).
 - **Roadmap (`docs/ROADMAP.md`):** tickets 01 → 10, one branch each. Progress is tracked in `docs/FEATURES.md` and below.
 
 **References:**
