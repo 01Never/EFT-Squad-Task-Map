@@ -4,7 +4,7 @@
 game sessions' log events count), the game logs and screenshots folders (found automatically,
 with ✓ or why not), "Follow my position", "Center the map on me", the game data in use with
 "Update game data now", and the OpenAI key (its own dialog: key, model, reasoning effort,
-"Save & test", "Remove key").
+"Save & test", "Remove key"), and the Updates section (`features/updates`).
 
 **Where the data comes from:** `/api/status` (the settings, folder checks, game data, key status);
 the server keeps them in `squad-task-map-settings.json` (`internal/storage`, wired in `internal/app`).

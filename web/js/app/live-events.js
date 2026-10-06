@@ -21,6 +21,7 @@ import {
 } from "../features/find-me/map-layer.js";
 import { renderClosestExtract } from "../features/extracts/map-layer.js";
 import { onCaptureChanged } from "../features/scan/panel.js";
+import { onUpdatesChanged, onStreamConnected } from "../features/updates/panel.js";
 
 /**
  * @import { LiveEvent, TaskEvent, RaidEndEvent, RaidStartEvent, RaidMapEvent, GpsEvent,
@@ -42,6 +43,7 @@ export function connectToLiveEvents() {
   };
   stream.onopen = () => {
     findElement("#conn").hidden = true;
+    onStreamConnected();
   };
   stream.onerror = () => {
     findElement("#conn").hidden = false;
@@ -59,6 +61,7 @@ const HANDLER_BY_EVENT_NAME = {
   [EVENT_NAMES.data]: onGameDataChanged,
   [EVENT_NAMES.mode]: onGameModeReported,
   [EVENT_NAMES.keybind]: onKeybindChecked,
+  [EVENT_NAMES.updates]: onUpdatesChanged,
 };
 
 /**
