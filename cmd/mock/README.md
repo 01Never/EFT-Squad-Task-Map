@@ -14,7 +14,7 @@ Point the app at it:
 STM_JSON_BASE=http://127.0.0.1:7820  STM_OPENAI_API=http://127.0.0.1:7820/v1  STM_WIKI_API=http://127.0.0.1:7820/wiki
 ```
 (plus `STM_DATA_DIR`, `STM_LOGS_DIR`, `STM_SCREENSHOTS_DIR` and `STM_NO_BROWSER=1` for scratch
-folders, as in `HANDOFF.md`).
+folders, as in `docs/HANDOFF.md`).
 
 ## Settings (environment variables)
 | Variable | Default | Meaning |

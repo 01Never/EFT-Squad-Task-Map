@@ -9,7 +9,7 @@ Twelve tickets, in the order to build them. Each ticket file has its goal, scope
 | 03 | Closest extract | S | page | 01 |
 | 04 | Go backend: port the server to Go, written readable from the start; serve the JS unbundled | L | server | 01–03 merged |
 | 04b | Reorganise the page for readability (no behaviour change) | M | page | 04 |
-| 04c | Check for updates from a Google Drive folder (manual button) | M | server + page + release tool | 04, 04b |
+| 04c | Check for updates from GitHub Releases (manual button) | M | server + page + release tool | 04, 04b |
 | 05 | Squad multiplayer over Tailscale (tsnet) | L | server + page | 04, 04b |
 | 06 | Read my extracts from the first raid screenshot (AI) | M | server + page | 04, 04b (and 03 to be useful) |
 | 07 | Item icons as task markers | S–M | page + server icon cache | 04, 04b |
@@ -28,7 +28,7 @@ S = a day or two of focused work for Claude Code, M = a few days, L = a week or 
    - **Why two tickets:** they're kept apart so each is checkable on its own. 04 swaps the backend under an unchanged page (a 1:1 copy of behaviour, compared against the current app). 04b reorganises the page on top of a proven backend (no behaviour change, checked with browser smoke tests).
    - Every ticket after that lands in the readable, feature-by-feature layout.
 3. **04c (Check for updates) right after the rewrite.**
-   - Every later ticket ships a new exe to the squad. With this in place, a release is "upload to Drive, click Check for updates" instead of passing zips around.
+   - Every later ticket ships a new exe to the squad. With this in place, a release is "publish a GitHub release, click Check for updates" instead of passing zips around.
    - It's manual by design: nothing is checked or installed until someone clicks the button.
 4. **05 next.** tsnet is the main reason for Go, and multiplayer is the squad's biggest ask. Doing it before 06–10 also means each later feature (extract marks, key lists, routes) can be designed as shareable from day one instead of being added to sharing afterwards.
 5. **06 and 07: small server-backed improvements** on top of the new backend. 06 makes 03 automatic.
@@ -40,7 +40,7 @@ S = a day or two of focused work for Claude Code, M = a few days, L = a week or 
 If the owner would rather not touch the Bun version at all, do 04, 04b and 04c first and then 01–03. Nothing else changes.
 
 ## Rules for every ticket
-- One ticket per branch/PR. Bump the version, update `README.md` for anything user-visible, and keep `HANDOFF.md` current.
+- One ticket per branch/PR. Bump the version, update `docs/USER-GUIDE.md` (and `README.md` if the feature list changes) for anything user-visible, and keep `docs/HANDOFF.md` current.
 - **Readability first: follow `docs/CODE-STYLE.md`.**
   - Each feature gets its own folder on both sides, with a README, and `docs/FEATURES.md` is updated.
   - Tickets 01–03 come before the rewrite. Even so, write their new code in that style and in its own `web/js/features/<name>/` folder where practical; 04b moves the rest.
@@ -132,7 +132,7 @@ An option to keep the map centred on you: every time a GPS screenshot comes in, 
 5. Re-use the helper from ticket 01 ("centre on, keep zoom"). Retire the zoom-changing branch of `centerOn()` if the owner agrees.
 
 ## Acceptance checks
-- With it on: zoom in, take three GPS screenshots at different spots (the synthetic file names in `HANDOFF.md` §9 work), and each one centres at the same zoom.
+- With it on: zoom in, take three GPS screenshots at different spots (the synthetic file names in `docs/HANDOFF.md` §9 work), and each one centres at the same zoom.
 - With it off: an on-screen fix doesn't move the map; an off-screen fix brings it into view without a zoom change.
 - The toolbar toggle and Settings stay in sync after a reload.
 
@@ -251,7 +251,7 @@ The page itself is reorganised in **ticket 04b**, straight after this one. In 04
 - **OpenAI:** plain `net/http` + JSON is enough; keep the same instructions and strict schemas from `server/ai.ts`. Keep the API key server-side; it's only sent to api.openai.com.
 - **Ports and binding:** 127.0.0.1 only, 7777 → 7800 fallback, as now.
 - **Open the browser:** `rundll32 url.dll,FileProtocolHandler <url>` (or `cmd /c start "" <url>`). Respect `STM_NO_BROWSER`.
-- **Environment variables:** keep every `STM_*` and `PORT` variable from `HANDOFF.md` §3 so the test setup carries over.
+- **Environment variables:** keep every `STM_*` and `PORT` variable from `docs/HANDOFF.md` §3 so the test setup carries over.
 - **Build:** `GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o dist/SquadTaskMap.exe .`, as a console app like today.
 
 ## Tests
@@ -273,7 +273,7 @@ Run old and new side by side against `cmd/mock`, with the same scratch folders:
 - Scan flow: capture, read, confirm-deletes and cancel-keeps behave the same.
 - The browser checks from v2 still pass: tasks added and removed from logs, raid end resets, mode switch, settings and scan.
 
-Then delete `server/*.ts`, the TS tests and the Bun scripts. Update `README.md` ("Building from source"), `HANDOFF.md` and `CLAUDE.md`.
+Then delete `server/*.ts`, the TS tests and the Bun scripts. Update `README.md` ("Building from source"), `docs/HANDOFF.md` and `CLAUDE.md`.
 
 ## Acceptance checks
 - `go test ./...` and the JS logic tests pass. The parity check passes.
@@ -337,7 +337,7 @@ The Go rewrite (04) gives the backend this structure from the start. Doing the p
    - Test names are rewritten as sentences.
 8. **Docs:**
    - `docs/FEATURES.md` (the start-here table) and a README for every feature folder, using the template in CODE-STYLE §9.
-   - Update `HANDOFF.md`'s code map.
+   - Update `docs/HANDOFF.md`'s code map.
 
 ## Checking nothing changed
 1. **Saved data:** load the owner's real `squad-task-map-data.json` (a copy) and the v1 fixture. After a load-and-save with no edits, the saved JSON is equal (same keys and values) to before; migration output is unchanged.
@@ -369,47 +369,50 @@ The Go rewrite (04) gives the backend this structure from the start. Doing the p
 
 ---
 
-# 04c · Check for updates (from a Google Drive folder)
+# 04c · Check for updates (from GitHub Releases)
 
 **Size:** M · **Touches:** server (new `internal/features/updates`), page (`web/js/features/updates/`, a Settings section), a release tool (`cmd/release`) · **Depends on:** 04, 04b
 
+*Owner's change (2026-10-06): the update source is this repo's GitHub Releases instead of a Google Drive folder, now that the project is on GitHub. Everything else (manual button only, signed manifest, rename-and-replace) stays as first planned.*
+
 ## Goal
-When the owner uploads a new version to a shared Google Drive folder, everyone in the squad can update from inside the app:
+When the owner publishes a new release on GitHub, everyone in the squad can update from inside the app:
 - Settings → **Check for updates** → see what's new → **Download and restart**.
 - **Nothing happens automatically.** The app never checks, downloads or installs on its own. It only acts when someone clicks the button. (Owner's decision.)
 
 ## Why it comes right after the rewrite
-Every later ticket (05–10) ships a new exe to the squad. With this in place, each release is "upload to Drive, tell the squad to click Check for updates", instead of passing zips around.
+Every later ticket (05–10) ships a new exe to the squad. With this in place, each release is "publish a GitHub release, tell the squad to click Check for updates", instead of passing zips around.
 
 ## How the app finds the latest version
-- **A small manifest file,** `latest.json`, sits in the owner's Drive folder, shared "Anyone with the link can view":
+- **The repo is public,** so release downloads need no token or account.
+- **Each release has two assets:** `SquadTaskMap.exe` and a small signed manifest, `latest.json`:
   ```jsonc
   {
-    "version": "2.3.0",
+    "version": "2.6.0",
     "released": "2026-10-20",
-    "notes": "• Find me: radar ping…\n• Closest extract…",
-    "file": { "driveId": "<exe file id>", "name": "SquadTaskMap.exe", "size": 31457280, "sha256": "<hex>" },
+    "notes": "• Check for updates…\n• …",
+    "file": { "name": "SquadTaskMap.exe", "size": 12582912, "sha256": "<hex>" },
     "signature": "<ed25519 signature of everything above, base64>"
   }
   ```
-- **The manifest's Drive file ID is fixed and built into the app** as the update source. Keep it in one constant with a comment, so switching to a different host later (e.g., GitHub Releases) is a one-line change.
-- **To publish a new version, the owner uploads new copies over the existing files** with Drive's **Manage versions → Upload new version**. That keeps each file's ID and link the same, so the app always reads the same manifest.
-- **Fetch with Drive's direct-download URL** for a file shared by link. Two things to handle and test:
-  1. For larger files, Google may return an HTML page ("Google Drive can't scan this file for viruses") instead of the file. The size where that starts isn't documented. The downloader must:
-     - detect an HTML response;
-     - follow the page's confirm link or form;
-     - never treat HTML as the exe.
-  2. Drive can block downloads of `.exe` files it flags. If that happens, ship a `.zip` instead and unzip after verifying (see the open question).
+- **The app reads the manifest from GitHub's stable "latest release" asset URL:**
+  `https://github.com/01Never/EFT-Squad-Task-Map/releases/latest/download/latest.json`
+  and downloads the exe from `…/releases/download/v<version>/SquadTaskMap.exe`.
+  - These URLs are **not** the GitHub REST API, so its 60-requests-an-hour limit for anonymous callers doesn't apply.
+  - "Latest" skips drafts and pre-releases, so the owner can stage a release as a draft or a pre-release without anyone being offered it.
+- **The repo (`01Never/EFT-Squad-Task-Map`) is one constant with a comment,** built into the app. Both URLs are derived from it.
+- **For tests,** `STM_UPDATES_BASE` overrides the base URL (`https://github.com/<repo>`) so `cmd/mock` can serve a fake GitHub. Like the other `STM_*` overrides, it's for development only.
+- **Redirects:** GitHub answers asset URLs with a redirect to its download host. Follow redirects only to the allowlisted hosts (below).
 
 ## Safety (must-have)
-Self-updating software that runs on friends' PCs is a target. Even if the Drive folder or a link is tampered with, the app must refuse anything the owner didn't publish:
+Self-updating software that runs on friends' PCs is a target. Even if the GitHub account or a release is tampered with, the app must refuse anything the owner didn't sign:
 1. **Signed manifest:**
-   - The owner's release tool signs the manifest with an **Ed25519 private key** that never leaves the owner's PC.
+   - The owner's release tool signs the manifest with an **Ed25519 private key** that never leaves the owner's PC (never in the repo, never in GitHub Actions secrets).
    - The app embeds the matching **public key** (Go `crypto/ed25519`, built in) and rejects any manifest whose signature doesn't verify.
    - Document where the private key lives and how to back it up: losing it means friends must update by hand once.
 2. **Hash check:** the downloaded file's SHA-256 and size must match the signed manifest before anything is replaced.
 3. **Only newer versions** (semantic version compare); no downgrades through the button.
-4. **Fetch only from Google Drive** (an allowlist of hosts), over HTTPS, with a size cap of manifest size + 10%.
+4. **Fetch only from GitHub** (host allowlist: `github.com`, `objects.githubusercontent.com`, `release-assets.githubusercontent.com`), over HTTPS, with a size cap of manifest size + 10%. The manifest itself is capped at 64 KB.
 
 ## Replacing the running exe on Windows
 A running exe can't be overwritten, but it can be renamed:
@@ -420,54 +423,58 @@ A running exe can't be overwritten, but it can be renamed:
 5. The new process waits for the old one's port to free up, then starts as normal.
 
 **Notes:**
-- `github.com/minio/selfupdate` implements this rename-and-replace (plus checksum and signature checks). Use it or write the same steps by hand; either way, comment each step.
+- Write these steps by hand with a comment on each (no new dependency). Keep the file operations behind a small interface so the steps and the rollback can be tested on any OS.
 - **If any step fails, roll back:** rename `previous` back and tell the user. Their data files are never touched.
 - **Before the first start of a new version,** copy `squad-task-map-data.json` to `squad-task-map-data.before-<version>.json`. Keep the last 3.
-- If the exe's folder isn't writable, show "Couldn't update here. Download it from the Drive folder instead", with a link.
+- If the exe's folder isn't writable, show "Couldn't update here. Download it from GitHub instead", with a link to the release page.
+- Under `go run` (no installed exe), Check for updates still works but **Download and restart** is disabled with "Updates only apply to the built exe".
 
 ## Page
 - **Settings → Updates:**
-  - "You're on 2.2.0". **Check for updates**. "Last checked …" (shown only after a manual check).
+  - "You're on 2.5.0". **Check for updates**. "Last checked …" (shown only after a manual check).
   - Results:
     - **Up to date:** "You're up to date."
-    - **New version:** "2.3.0 is available", then the release notes, the size and a **Download and restart** button. The button asks for confirmation before it does anything.
-    - **Error:** a plain explanation (no internet, Drive blocked the download, signature didn't match → "This update isn't from the owner; not installed").
+    - **New version:** "2.6.0 is available", then the release notes, the size, a "View on GitHub" link and a **Download and restart** button. The button asks for confirmation before it does anything.
+    - **Error:** a plain explanation (no internet, GitHub unreachable, no release published yet, signature didn't match → "This update isn't from the owner; not installed").
   - **Progress** while downloading, with Cancel.
 - **After restart:** the page reconnects on its own. The open SSE stream drops and is reopened; the page notices `/api/status` reports a new version and reloads.
-  - It then shows "Updated to 2.3.0" with the notes once.
+  - It then shows "Updated to 2.6.0" with the notes once.
 
 ## Release tool for the owner (`cmd/release`)
-`go run ./cmd/release -version 2.3.0 -notes notes.md`:
-1. Runs the tests and builds the Windows exe.
-2. Computes its size and SHA-256.
-3. Writes `latest.json` and signs it with the private key (path from an environment variable, never in the repo).
-4. Prints what to upload where: "Upload `dist/SquadTaskMap.exe` as a new version of the exe file; upload `dist/latest.json` as a new version of the manifest."
+`go run ./cmd/release -version 2.6.0 -notes notes.md`:
+1. Checks that `-version` equals `Version` in `internal/app/run.go`, `package.json` and `winres/winres.json`.
+2. Runs the tests and builds the Windows exe into `dist/`.
+3. Computes its size and SHA-256.
+4. Writes `dist/latest.json` and signs it with the private key (path from the `STM_RELEASE_KEY` environment variable, never in the repo).
+5. Prints the next step, both ways:
+   - with the GitHub CLI if it's installed: `gh release create v2.6.0 dist/SquadTaskMap.exe dist/latest.json --title "2.6.0" --notes-file notes.md`;
+   - or by hand: "On GitHub → Releases → Draft a new release, tag `v2.6.0`, attach `dist/SquadTaskMap.exe` and `dist/latest.json`, publish."
 
 Also `go run ./cmd/release -init-keys` creates the key pair once and prints the public key to paste into the code.
 
 ## Acceptance checks
-- **Against `cmd/mock` serving a fake Drive** (manifest + exe + the virus-scan interstitial page):
-  - "up to date", "new version", and the interstitial are handled.
-  - A bad signature, a bad hash, a wrong size and an older version are each refused with a clear message.
-- **On Windows:** update 2.3.0 → 2.3.1 from a test Drive folder.
+- **Against `cmd/mock` serving a fake GitHub** (latest-release redirect, assets, a redirect to the download host):
+  - "up to date", "new version", and "no release yet" (404) are handled.
+  - A bad signature, a bad hash, a wrong size, an older version and a redirect to a host not on the allowlist are each refused with a clear message.
+- **On Windows:** update 2.5.0 → 2.5.1 from a test release (a draft or pre-release can't be used, since "latest" skips them; use a fork or a short-lived real release).
   - The data files are untouched, a pre-update backup exists, and `previous.exe` exists.
   - The new version runs, and the page reloads by itself.
 - **Failure halfway** (kill the download, or make the folder read-only): the old exe still runs and nothing is lost.
-- The app makes **zero** network requests to Drive unless the button is clicked (check with the mock's request log).
-- **README:**
-  - an "Updating" section for players;
-  - a "Publishing an update" section for the owner (Drive steps, release tool, key backup);
-  - a privacy note: the app contacts Google Drive only when you click Check for updates.
+- The app makes **zero** network requests to GitHub unless the button is clicked (check with the mock's request log).
+- **Docs:**
+  - `docs/USER-GUIDE.md`: an "Updating" section for players, and the privacy note "the app contacts GitHub only when you click Check for updates";
+  - a "Publishing an update" section for the owner (release tool, GitHub steps, key backup) in `docs/HANDOFF.md`;
+  - `README.md`'s Privacy section gets the same one-line note.
 
 ## Owner checks
 - Run `-init-keys` once and keep the private key safe (password manager or a USB stick).
-- Do one real release through Drive, and have a squadmate update with the button.
+- Do one real release on GitHub, and have a squadmate update with the button.
 
 ## Open questions (proposed default in brackets)
-- Ship the exe directly, or a zip? [the exe; switch to a zip only if Drive blocks exe downloads]
-- Where does the update-source ID live: built into the exe, or also editable in Settings (so the squad can follow a different folder)? [built in; not editable, so it can't be pointed somewhere malicious]
+- Ship the exe directly, or a zip? [the exe; GitHub doesn't block exe assets]
+- Where does the update source live: built into the exe, or also editable in Settings? [built in; not editable, so it can't be pointed somewhere malicious]
 - Show a small "update available" dot after a manual check, until the user updates? [yes]
-- Move to GitHub Releases later? [possible: one constant plus a small fetcher; not now]
+- Build releases with GitHub Actions? [not now: the signing key must stay on the owner's PC; Actions could build and the owner sign, later]
 
 
 ---
