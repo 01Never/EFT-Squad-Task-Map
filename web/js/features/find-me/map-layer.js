@@ -55,7 +55,7 @@ export function moveViewForNewPosition() {
  * The position to show on the open map, or null when there's no position yet or it's on
  * another map. A position whose map is unknown is shown on whichever map is open.
  */
-function positionOnThisMap() {
+export function positionOnThisMap() {
   const mapView = app.M;
   const position = app.gps;
   if (!mapView || !position) {
@@ -143,10 +143,11 @@ function drawPlayerMarker(layer, position, mapView) {
   }
 }
 
-/** The "📍 You · 2 min ago  Show" bar at the bottom of the map. */
+/** The "📍 You · 2 min ago  Show" part of the bar at the bottom of the map (features/extracts adds "Closest: …"). */
 function renderPositionBar(position) {
   const bar = document.getElementById("gpsbar");
-  if (!bar) {
+  const youPart = document.getElementById("gpsbar-you");
+  if (!bar || !youPart) {
     return;
   }
   if (!position) {
@@ -159,7 +160,7 @@ function renderPositionBar(position) {
   const when = minutesAgo < 1 ? "just now" : minutesAgo + " min ago";
   const floorText = floor ? ` (floor ${esc(floor)})` : "";
   bar.hidden = false;
-  bar.innerHTML = `📍 You${floorText} · ${when} <button class="lnk" id="gpsgo">Show</button>`;
+  youPart.innerHTML = `📍 You${floorText} · ${when} <button class="lnk" id="gpsgo">Show</button>`;
   const showButton = document.getElementById("gpsgo");
   if (showButton) {
     showButton.onclick = findMe;
@@ -333,7 +334,7 @@ export function findMe() {
   renderPulse(positionOnThisMap());
 }
 
-/** The ⌖ Follow toggle mirrors the "Center the map on me" setting. */
+/** The ◎ Follow toggle mirrors the "Center the map on me" setting. */
 function updateFollowButton() {
   const button = document.getElementById("bfollow");
   if (!button) {
@@ -343,7 +344,7 @@ function updateFollowButton() {
 }
 
 /**
- * ⌖ Follow: turn auto-center on or off. It's the same setting as in Settings, saved on the
+ * ◎ Follow: turn auto-center on or off. It's the same setting as in Settings, saved on the
  * server, so the toolbar and Settings always agree, also after a reload.
  */
 async function onFollowClicked() {

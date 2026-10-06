@@ -60,7 +60,7 @@ The **Bring list** tab lists what the tasks currently shown on the map need: key
 
 ## Pins and extracts
 - **📌** on a task row or map popup pins the task. **Pinned only** (panel and map toolbar) shows only pinned tasks everywhere, bring list included. **Clear pins** unpins all. Finished tasks unpin themselves.
-- Extracts show faded. Click one on the map to mark it solid; click again to unmark. Marks clear after each raid (or **Clear marked**). The PMC / Scav / Shared / Transit chips choose which kinds show.
+- Extracts show faded. Click one on the map to mark it solid (an extract you have this raid); click again to unmark. Marked extracts decide the **closest extract** (see Your position). Marks clear after each raid (or **Clear marked**). The PMC / Scav / Shared / Transit chips choose which kinds show.
 
 ## Your position (GPS)
 During a raid, Tarkov puts your position and facing in each screenshot's **file name**. When a new one appears, the app switches to the raid's map (setting **Follow my position**, on by default), draws your marker with a short trail, and brings it into view if it's off-screen (your zoom stays). The app reads the file name only, never the picture.
@@ -70,6 +70,7 @@ During a raid, Tarkov puts your position and facing in each screenshot's **file 
 - **📍 Find me** (map toolbar) centres the map on you without changing the zoom, and pulses again. The **Show** button in the position bar does the same. Find me is greyed out until there's a position on this map.
 - **When you're off-screen,** a chip on the edge of the map points toward you with the distance ("You · 240 m", straight line from the middle of the view). Click it to centre on you, keeping the zoom.
 - The trail of your last few positions is drawn small and faint, so it doesn't compete with the marker.
+- **Closest extract:** after each GPS screenshot, the closest of *your* extracts gets a ring, a dashed line from you with the distance ("~180 m", straight line, not the walking distance), and a "Closest: …" link in the position bar; click it to centre on that extract (zoom stays). "Your" extracts are the ones you marked on this map. With none marked, it picks the closest one the chips show and says "Closest shown"; transits only count once you mark them.
 
 When the raid ends, the app deletes that raid's GPS screenshots, resets your bring-list counts and clears extract marks.
 
@@ -80,7 +81,7 @@ You need a **screenshot key** bound in Tarkov's control settings. The app warns 
 - **Game logs folder:** found automatically from the launcher's install entry or Steam. Paste it if not, e.g. `C:\Battlestate Games\EFT\Logs`.
 - **Screenshots folder:** `Documents\Escape From Tarkov\Screenshots`, found automatically even if OneDrive moved Documents.
 - **Follow my position:** switch to the raid's map when a GPS screenshot comes in.
-- **Center the map on me when I take a screenshot:** off by default. When on, every new position pans the map so you're in the middle, keeping your zoom, like a minimap. Same as **⌖ Follow** on the map toolbar. If you're dragging the map when a screenshot comes in, it waits until you let go.
+- **Center the map on me when I take a screenshot:** off by default. When on, every new position pans the map so you're in the middle, keeping your zoom, like a minimap. Same as **◎ Follow** on the map toolbar. If you're dragging the map when a screenshot comes in, it waits until you let go.
 - **Game data:** where it came from and **Update game data now**.
 - **OpenAI:** key, model and reasoning level.
 

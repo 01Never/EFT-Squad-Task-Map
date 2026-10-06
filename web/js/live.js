@@ -5,6 +5,7 @@ import { $, toast, esc, MODE_NAME, api } from "./util.js";
 import { onCapture } from "./scan.js";
 import { renderAll } from "./map.js";
 import { renderPlayer, onNewPosition, moveViewForNewPosition } from "./features/find-me/map-layer.js";
+import { renderClosestExtract } from "./features/extracts/map-layer.js";
 import { clearPartsCache } from "./logic/parts.js";
 import { makeMatcher } from "./logic/match.js";
 import { showPicker } from "./picker.js";
@@ -76,7 +77,7 @@ function handle(ev) {
       app.gps = ev.gps; app.trail = ev.trail || [];
       onNewPosition(); // ticket 01: a new position pulses for ~20 s
       if (follow(ev.gps.map)) break;
-      if (app.M && (!ev.gps.map || ev.gps.map === app.M.key)) { renderPlayer(); moveViewForNewPosition(); }
+      if (app.M && (!ev.gps.map || ev.gps.map === app.M.key)) { renderPlayer(); renderClosestExtract(); moveViewForNewPosition(); }
       break;
     }
     case "capture": onCapture(ev); break;

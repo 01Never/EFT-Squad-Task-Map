@@ -9,4 +9,5 @@ Ticket 04 adds their Go packages and ticket 04b moves their page code into `web/
 
 | Feature | Ticket | Go package | Page folder | Saved data it owns | Events | Settings |
 |---|---|---|---|---|---|---|
-| Find me: player marker, pulse, off-screen chip, Find me button, auto-center (⌖ Follow) | 01, 02 | (server: `server/gpsname.ts`, `main.ts` until 04) | `web/js/features/find-me/` | none (pulse start in memory) | receives `gps` | `followPosition` (switch map), `autoCenter` |
+| Find me: player marker, pulse, off-screen chip, Find me button, auto-center (◎ Follow) | 01, 02 | (server: `server/gpsname.ts`, `main.ts` until 04) | `web/js/features/find-me/` | none (pulse start in memory) | receives `gps` | `followPosition` (switch map), `autoCenter` |
+| Closest extract: ring + dashed line to the closest of your (marked / shown) extracts, "Closest: …" in the position bar | 03 | (none until 04) | `web/js/features/extracts/` | reads `prefs[map].extMarked`, `prefs[map].ext` | receives `gps`, `raidEnd` | none |

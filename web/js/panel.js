@@ -126,7 +126,7 @@ export function renderPanel() {
     for (const e of extractList()) counts[e.k]++;
     const nMarked = Object.keys(p.extMarked || {}).length;
     h += `<div class="sec"><h4>Extracts & labels</h4><div class="chips">${[["pmc", "PMC"], ["scav", "Scav"], ["shared", "Shared"], ["transit", "Transits"]].map(([f, n]) => `<button class="chip" data-ext="${f}" aria-pressed="${p.ext[f]}"><span class="dia" style="background:${EXT_COLORS[f]}"></span>${n}<span class="n">${counts[f]}</span></button>`).join("")}<button class="chip" data-act="labels" aria-pressed="${p.labels}">Place names</button></div>
-      <p class="bnote">Click an extract on the map to mark it (solid). Marks clear after each raid.${nMarked ? ` <button class="lnk" data-act="clearext">Clear ${nMarked} marked</button>` : ""}</p></div>`;
+      <p class="bnote">Click an extract on the map to mark it as one you have (solid). After each GPS screenshot the closest marked one is highlighted; with none marked, the closest shown one (transits count only when marked). Marks clear after each raid.${nMarked ? ` <button class="lnk" data-act="clearext">Clear ${nMarked} marked</button>` : ""}</p></div>`;
     const byCat = new Map(S.cats.map((c) => [c.id, []]));
     for (const x of rows) (byCat.get(x.cat.id) || byCat.get("unsorted") || []).push(x);
     for (const c of S.cats) h += catBlock(c, byCat.get(c.id) || []);

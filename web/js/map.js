@@ -7,6 +7,7 @@ import { objOnMap, partOnMap, partDone, objDone, partProgress, isCounter, tickVa
 import { objReady, missingFor, requirementsOf } from "./logic/ready.js";
 import { renderPanel, bindPanel } from "./panel.js";
 import { renderPlayer, placeFindMeOverlays, bindFindMe } from "./features/find-me/map-layer.js";
+import { renderClosestExtract } from "./features/extracts/map-layer.js";
 
 const svgCache = {};
 export async function getSvg(file) {
@@ -41,8 +42,8 @@ export async function openMap(key) {
   $("#crumbs").innerHTML = `<a href="#/">Maps</a> / <b>${esc(cfg.name)}</b>`;
   $("#view").innerHTML = `<div class="app${app.S.panelHidden ? " nopanel" : ""}"><div class="stage" id="stage"><div class="fx" id="fx"></div>
     <div class="findme-fx" id="findme-fx"><div class="findme-pulse" id="findme-pulse"></div></div><button class="findme-chip" id="findme-chip" hidden title="Centre on you"><span class="findme-chip-arrow">➜</span><span class="findme-chip-text"></span></button><div class="mapui">
-    <div class="grp"><button id="zin" title="Zoom in">+</button><button id="zout" title="Zoom out">−</button><button id="zfit" title="Reset view">⤢</button><button id="bfindme" disabled>📍<span class="lbl"> Find me</span></button><button id="bfollow" aria-pressed="false" title="Center the map on me at each screenshot (keeps your zoom)">⌖<span class="lbl"> Follow</span></button><button id="bdraw" aria-pressed="false" title="Draw on the map">✎<span class="lbl"> Draw</span></button><button id="bpin" title="Show only pinned tasks">📌<span class="lbl"> Pinned only</span></button><span id="floors" style="display:flex;align-items:center"></span></div>
-    <div class="grp" id="drawbar" hidden></div></div><div class="hint" id="hint"></div><div class="gpsbar" id="gpsbar" hidden></div><div class="pop" id="pop"></div><button class="showpanel" id="showpanel" title="Show the task list">◂ Tasks</button></div><aside id="panel"></aside></div>`;
+    <div class="grp"><button id="zin" title="Zoom in">+</button><button id="zout" title="Zoom out">−</button><button id="zfit" title="Reset view">⤢</button><button id="bfindme" disabled>📍<span class="lbl"> Find me</span></button><button id="bfollow" aria-pressed="false" title="Center the map on me at each screenshot (keeps your zoom)">◎<span class="lbl"> Follow</span></button><button id="bdraw" aria-pressed="false" title="Draw on the map">✎<span class="lbl"> Draw</span></button><button id="bpin" title="Show only pinned tasks">📌<span class="lbl"> Pinned only</span></button><span id="floors" style="display:flex;align-items:center"></span></div>
+    <div class="grp" id="drawbar" hidden></div></div><div class="hint" id="hint"></div><div class="gpsbar" id="gpsbar" hidden><span id="gpsbar-you"></span><span id="gpsbar-closest"></span></div><div class="pop" id="pop"></div><button class="showpanel" id="showpanel" title="Show the task list">◂ Tasks</button></div><aside id="panel"></aside></div>`;
   const txt = await getSvg(cfg.svg);
   if (location.hash !== "#/map/" + key) return; // navigated away while loading
   const doc = new DOMParser().parseFromString(txt, "image/svg+xml").documentElement;
@@ -52,7 +53,7 @@ export async function openMap(key) {
   $("#stage").prepend(svg);
   const vbx = svg.viewBox.baseVal, home = { x: vbx.x, y: vbx.y, w: vbx.width, h: vbx.height };
   const M = (app.M = { key, cfg, svg, home, vb: { ...home }, proj: makeProj(cfg, [vbx.x, vbx.y, vbx.width, vbx.height]), floor: "ground", mode: "pan", placing: null, sel: null, pop: null, expanded: null, menu: null, redo: [] });
-  M.gZones = mk("g", {}, svg); M.gLabels = mk("g", {}, svg); M.gDraw = mk("g", {}, svg); M.gExt = mk("g", {}, svg); M.gMk = mk("g", {}, svg); M.gGps = mk("g", {}, svg);
+  M.gZones = mk("g", {}, svg); M.gLabels = mk("g", {}, svg); M.gDraw = mk("g", {}, svg); M.gExt = mk("g", {}, svg); M.gClosest = mk("g", {}, svg); M.gMk = mk("g", {}, svg); M.gGps = mk("g", {}, svg);
   M.mapData = app.DATA.maps.find((m) => m.key === key) || { extracts: [], transits: [] };
   bindMap(); bindPanel(); bindFindMe(); renderFloors(); renderAll(); fitTo(home, 0);
   // Opened because of a new position (Follow my position): centre on it at the map's default zoom.
@@ -284,6 +285,7 @@ export function renderExtracts() {
     mk("circle", { r: 14, fill: "transparent" }, eg);
   }
   apply();
+  renderClosestExtract(); // ticket 03: marks and chips change which extract is closest
 }
 function toggleExtract(name) {
   const p = prefs(app.M.key); p.extMarked = p.extMarked || {};

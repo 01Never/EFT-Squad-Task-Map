@@ -6,7 +6,7 @@ thing you see on the map: a disc in its own colour inside a ring, with a heading
 20 seconds. When you've panned away, a chip on the map edge points toward you with the distance;
 clicking it brings you back into view. Find me and the chip never change your zoom.
 
-**Auto-center (ticket 02):** with "Center the map on me" on (⌖ Follow on the toolbar, or
+**Auto-center (ticket 02):** with "Center the map on me" on (◎ Follow on the toolbar, or
 Settings), every new position pans the map so you're in the middle, at whatever zoom you had,
 like a minimap. With it off (the default), a new position only moves the map when it would be
 off-screen, and only with "Follow my position" on, as in v2; the zoom never changes there either.
@@ -49,13 +49,13 @@ With "reduce motion" turned on in Windows, the pulse is one still ring for the s
 
 **Saved data / settings:** `autoCenter` (off by default) and `followPosition` in
 `squad-task-map-settings.json`, read from `/api/status` and changed with `PUT /api/settings`
-(the ⌖ Follow toggle and Settings both use it). The pulse start time lives in `app.findMePulseStartedAt`
+(the ◎ Follow toggle and Settings both use it). The pulse start time lives in `app.findMePulseStartedAt`
 (memory only). The player colour is the CSS variable `--player` in `web/index.html`.
 
 **Files:**
 - `rules.js`: pulse timing, on-screen test, chip placement, distance, what a new position does to the view.
 - `map-layer.js`: draws the marker, label, floor badge, trail and position bar; the pulse rings;
-  the off-screen chip; the Find me button and the ⌖ Follow toggle; moving the view for a new position.
+  the off-screen chip; the Find me button and the ◎ Follow toggle; moving the view for a new position.
 - `rules.test.js`: tests for `rules.js`.
 - Styles: the `features/find-me` block in `web/index.html` (moves to `find-me.css` in ticket 04b).
 

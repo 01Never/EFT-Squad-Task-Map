@@ -14,7 +14,7 @@ export function openSettings() {
     <label class="frow"><span>Screenshots folder</span><input type="text" id="sShots" value="${esc(s.screenshotsPath)}" placeholder="Found automatically — Documents\\Escape From Tarkov\\Screenshots"></label>
     <p class="mnote">${okb(st.screenshots)}${st.keybind && !st.keybind.ok ? `<br><b class="warnc">${esc(st.keybind.warning)}</b>` : ""}</p>
     <label class="chk frow"><input type="checkbox" id="sFollow" ${s.followPosition ? "checked" : ""}> Follow my position (switch to the raid's map when a GPS screenshot comes in)</label>
-    <label class="chk frow"><input type="checkbox" id="sCenter" ${s.autoCenter ? "checked" : ""}> Center the map on me when I take a screenshot (keeps your zoom; same as ⌖ Follow on the map)</label>
+    <label class="chk frow"><input type="checkbox" id="sCenter" ${s.autoCenter ? "checked" : ""}> Center the map on me when I take a screenshot (keeps your zoom; same as ◎ Follow on the map)</label>
     <h4>Game data</h4>
     <p class="mnote">${esc(MODE_NAME[d.mode] || d.mode)} · ${d.tasks} tasks · ${d.origin === "live" ? "downloaded " + ago(d.fetchedAt) : d.origin === "cache" ? "saved copy from " + ago(d.fetchedAt) : "built-in copy" + (d.generated ? " (" + esc(String(d.generated).slice(0, 10)) + ")" : "")}${d.error ? `<br><span class="bad">Last update failed: ${esc(d.error)}</span>` : ""}</p>
     <button class="btn sm line" id="sRefresh">${d.refreshing ? "Updating…" : "Update game data now"}</button>
