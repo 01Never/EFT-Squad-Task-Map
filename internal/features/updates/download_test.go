@@ -94,7 +94,7 @@ func TestAnOversizedDownloadIsCutOffAtTheCap(t *testing.T) {
 		// No Content-Length: the app can only stop it by counting.
 		total := 0
 		chunk := make([]byte, 4096)
-		for total < 5_000_000 {
+		for total < 64_000_000 { // far more than loopback socket buffers can hold
 			count, err := writer.Write(chunk)
 			total += count
 			if err != nil {
@@ -108,7 +108,7 @@ func TestAnOversizedDownloadIsCutOffAtTheCap(t *testing.T) {
 	if errorCode(err) != CodeBadSize {
 		t.Fatalf("error = %v, want code %s", err, CodeBadSize)
 	}
-	if sent := <-delivered; sent >= 5_000_000 {
+	if sent := <-delivered; sent >= 64_000_000 {
 		t.Fatalf("the app kept reading all %d bytes instead of stopping at the cap", sent)
 	}
 }
