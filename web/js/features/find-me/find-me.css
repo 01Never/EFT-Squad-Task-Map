@@ -6,8 +6,9 @@
 .mapui button:disabled{opacity:.4;cursor:default}
 .findme-fx{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:hidden}
 .findme-pulse{position:absolute;left:0;top:0;width:0;height:0}
-.findme-ring{position:absolute;left:-150px;top:-150px;width:300px;height:300px;border-radius:50%;box-sizing:border-box;
-  border:7px solid var(--player);box-shadow:0 0 0 3px #000,inset 0 0 0 3px #fff;background:color-mix(in srgb,var(--player) 14%,transparent);
+/* 120 px across at its widest (owner's change: 300 px was too large) */
+.findme-ring{position:absolute;left:-60px;top:-60px;width:120px;height:120px;border-radius:50%;box-sizing:border-box;
+  border:4px solid var(--player);box-shadow:0 0 0 2px #000,inset 0 0 0 2px #fff;background:color-mix(in srgb,var(--player) 14%,transparent);
   opacity:0;animation-name:findme-ring;animation-duration:1.5s;animation-timing-function:ease-out;will-change:transform,opacity}
 @keyframes findme-ring{0%{transform:scale(.2);opacity:1}70%{opacity:.85}100%{transform:scale(1);opacity:0}}
 @keyframes findme-hold{0%,100%{transform:scale(.3);opacity:1}}

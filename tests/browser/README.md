@@ -27,7 +27,7 @@ npm run test:browser
 ```
 That's `node --test --test-concurrency=1 --test-global-setup=tests/browser/global-setup.js "tests/browser/*.e2e.mjs"`.
 The global set-up builds both programs and starts the mock once; the files run one after the
-other. About 3 minutes; most of it is waiting for the game-log check (every 5 s) and the 20 s
+other. About 3 minutes; most of it is waiting for the game-log check (every 5 s) and the 6 s
 find-me pulse.
 
 One file, or some tests by name:
@@ -93,7 +93,7 @@ pixel by pixel (prints the % of differing pixels and writes a diff image to `<af
 | `task-list.e2e.mjs` | add a task by name; tick a marker objective → "have" goes down, untick gives it back (and only what that tick took); pins and Pinned only (list, markers, Bring list); mark / unmark / clear extracts; Move to, Re-sort everything + Undo, Don't split; selection highlight, flash, marker click, Esc, empty-map click; Hide / ◂ Tasks keeping the view; Settings save; phone width layout and Find me. |
 | `ai-and-scan.e2e.mjs` | AI key (wrong, then right), categorize, apply, undo (mock); Scan without a key asks for one; Scan capture → review → confirm replaces the list and deletes the screenshot; cancel at review and while capturing keep the screenshots. |
 | `game-log.e2e.mjs` | log: "Pve" then "PvpSeason" leaves no prompt; accepted task added, finished task removed; a PvE session's task ignored, the prompt switches data; GPS screenshot → arrow turned by the heading; raid end resets bag counts and extract marks and deletes that raid's GPS screenshots. |
-| `find-me.e2e.mjs` | ticket 01: marker, 20 s pulse, off-screen chip, Find me and Show keep the zoom; ticket 02: Follow off/on, mid-drag, toolbar ↔ Settings; ticket 03: closest extract (shown, marked, transits, raid end). |
+| `find-me.e2e.mjs` | ticket 01: marker, 6 s pulse, off-screen chip, Find me and Show keep the zoom; ticket 02: Follow off/on, mid-drag, toolbar ↔ Settings; ticket 03: closest extract (shown, marked, transits, raid end). |
 | `paint.e2e.mjs` | a Chrome trace sees paints while zooming (control); 0 main-thread Paint/Layout during the selection flash and during the find-me pulse. |
 | `saved-data.e2e.mjs` | v1 fixture → recorded migration; rich v2 fixture saves back unchanged; v2 with missing fields → recorded fill; `STM_E2E_STATE` (skipped unless set). |
 | `icons.e2e.mjs` | ticket 07: A Fuel Matter on Reserve shows the MS2000 icon (`image[href="/icons/<id>.webp"]` in `g.mk`; the app fetched it once from the mock's `/assets/`); Dandies on Streets shows the stashed items; with the icon 404 (`POST /icons-missing` on the mock) markers silently become shapes (no `image` left); Settings → Task markers (`#sMarkers`) "shapes" is saved as `taskIcons: false`; a plant with alternatives has a `circle[r="3.4"]` "+" badge; frame timing and a Chrome trace with every task active on Streets, shapes vs icons. `STM_E2E_SHOTS=<dir>` saves screenshots. |
@@ -129,7 +129,7 @@ Files in the data folder: `squad-task-map-data.json`, `squad-task-map-settings.j
 **Map:** `svg.map` (its `viewBox` is the pan/zoom; the map art's own groups have class `.lyr`),
 `svg.map g.mk` (task markers: a `path`, or for an item icon a `rect` tile + `image`), `svg.map g.ex` (`data-name`, `.on` when marked,
 a `rect` inside), `svg.map g[data-r]` (your marker; `data-r` = arrow turn in degrees, one decimal),
-`svg.map text` "You", `svg.map polyline[stroke-dasharray="9 6"]` (line to the closest extract),
+`svg.map text` "You", `svg.map polyline[stroke-dasharray="7 5"]` (line to the closest extract),
 `svg.map polygon` outside `.lyr` (zones + extract outlines), `#stage`, `#fx .ping` with
 `i.halo` / `i.wave` (CSS animations `halo` / `wave`, infinite), `#findme-fx`, `.findme-ring`,
 `#findme-chip` (`hidden`), `#gpsbar` (`hidden`), `#gpsbar-you`, `#gpsbar-closest`, `#gpsgo`,

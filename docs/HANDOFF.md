@@ -330,7 +330,7 @@ Measured idle cost with the page open (2 min, 2026-10-05): **Go 2.4.0: 0.000% of
 - Server timers stay as they are: log poll 5 s (an `os.Stat`, then read only new bytes); folder rescan 30 s; missing-folder retry 60 s; game-data check hourly (downloads at most daily). Screenshots use OS file notifications (fsnotify). **No faster timers.**
 - **The page:** no polling, no timers, no continuous animation, with these exceptions:
   - **The selection flash** is HTML rings in `#fx` over the map, animated only with CSS `transform`/`opacity`. That runs on the compositor with zero main-thread paint. A trace showed 0 Paint/Layout per second, versus ~120 paints per second for the old SVG `r` animation.
-  - **The find-me pulse** (ticket 01) uses the same technique, and only for ~20 s after a new position or a Find me click.
+  - **The find-me pulse** (ticket 01) uses the same technique, and only for ~6 s after a new position or a Find me click.
   - **Never animate SVG attributes** or anything inside the map SVG: the map is a huge SVG, and each repaint is expensive.
   - `renderSelectionFlash()` (`map/selection-flash.js`) rebuilds the rings only when the selection signature changes, so re-renders don't restart the animation; `placeSelectionFlash()` repositions them in `applyView()` using `svg.getScreenCTM()`.
 - Pan/zoom uses `requestAnimationFrame` (`applyViewSoon()` in `map/view.js`).

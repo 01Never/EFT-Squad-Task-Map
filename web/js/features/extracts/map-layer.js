@@ -30,6 +30,8 @@ const SVG_FONT = "bender, Arial, sans-serif";
 // ones you marked stand out.
 const UNMARKED_EXTRACT_OPACITY = 0.45;
 const UNMARKED_AREA_OPACITY = 0.6;
+// The dashed line from you to the closest extract: see-through so the map shows through it.
+const CLOSEST_LINE_OPACITY = 0.55;
 
 /** Every extract and transit of the open map, each with its kind. */
 export function extractsOfOpenMap() {
@@ -177,9 +179,11 @@ function drawHighlight(mapView, position, extract, distanceText) {
   const [toX, toY] = mapView.projection.toSvg(extract.x, extract.z);
   const linePoints = `${fromX.toFixed(2)},${fromY.toFixed(2)} ${toX.toFixed(2)},${toY.toFixed(2)}`;
 
-  // The line keeps the same on-screen width at any zoom (non-scaling stroke).
-  createSvgElement("polyline", { points: linePoints, fill: "none", stroke: "#000", "stroke-width": 5, "stroke-linecap": "round", "vector-effect": "non-scaling-stroke", "pointer-events": "none" }, layer);
-  createSvgElement("polyline", { points: linePoints, fill: "none", style: "stroke:var(--player)", "stroke-width": 2.5, "stroke-dasharray": "9 6", "vector-effect": "non-scaling-stroke", "pointer-events": "none" }, layer);
+  // The line keeps the same on-screen width at any zoom (non-scaling stroke). Thin and
+  // see-through (owner's change), so it doesn't hide the map under it.
+  const line = createSvgElement("g", { opacity: CLOSEST_LINE_OPACITY, "pointer-events": "none" }, layer);
+  createSvgElement("polyline", { points: linePoints, fill: "none", stroke: "#000", "stroke-width": 2.5, "stroke-linecap": "round", "vector-effect": "non-scaling-stroke" }, line);
+  createSvgElement("polyline", { points: linePoints, fill: "none", style: "stroke:var(--player)", "stroke-width": 1.2, "stroke-dasharray": "7 5", "vector-effect": "non-scaling-stroke" }, line);
 
   const ring = createSvgElement("g", { class: "sc", "data-x": toX, "data-y": toY, "pointer-events": "none" }, layer);
   createSvgElement("circle", { r: 16, fill: "none", stroke: "#000", "stroke-width": 5.5 }, ring);

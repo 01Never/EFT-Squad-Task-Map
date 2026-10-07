@@ -7,7 +7,7 @@ frame; the others stay see-through (SPEC §7.3). "Clear n marked" unmarks them a
 section turns place names on and off.
 
 After each GPS screenshot, the closest of *your* extracts is
-highlighted: a ring in the player colour on the extract, a dashed line from you to it with the
+highlighted: a ring in the player colour on the extract, a thin, see-through dashed line from you to it with the
 distance ("~180 m"), and "Closest: Crash Site · ~180 m" in the position bar. Clicking that name
 centres the map on the extract without changing the zoom.
 
