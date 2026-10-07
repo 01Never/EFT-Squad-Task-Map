@@ -146,8 +146,7 @@ nothing: the network is inside the exe. The owner sets it up once:
 3. **Settings → Keys → Generate auth key**: **reusable**, **pre-approved**, tags: **`tag:stm`**,
    expiry 90 days or less. That key (`tskey-auth-…`) is the squad's **invite code**. Share it
    privately (e.g. a Discord DM), never in a public channel.
-4. Each friend pastes it into **Settings → Squad → Join** (the page part is ticket 05 part 2;
-   until then: `POST /api/squad/join {"authKey": "tskey-auth-…"}`).
+4. Each friend pastes it into **Settings → Squad → Join** (the page part is `web/js/features/squad/`).
    - Devices stay joined after the key expires: a new key is only needed for new people.
    - In the admin console's **Machines** list, check that **key expiry is disabled** for the squad
      machines (tagged devices usually have it off), so nobody is logged out after the default

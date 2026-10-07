@@ -240,6 +240,20 @@ export {};
  * @property {boolean} aiOpen
  * @property {boolean} [showScanBanner]
  * @property {number} [migratedFrom]
+ * @property {SquadChoices} [squad] your choices about friends (2.7.0); absent until you change one
+ */
+
+/**
+ * @typedef {object} SquadChoices What you chose about the squad (features/squad). Absent in files
+ * from before 2.7.0: friends then get the defaults (drawings on, tasks off, filter off).
+ * @property {Record<string, FriendPrefs>} friends by friend's player id
+ * @property {boolean} [sharedOnly] the "Shared with squad" filter
+ */
+
+/**
+ * @typedef {object} FriendPrefs
+ * @property {boolean} drawings show this friend's drawings
+ * @property {boolean} tasks show this friend's tasks (when they share them)
  */
 
 // ---------------------------------------------------------------- server status (/api/status)
@@ -354,8 +368,45 @@ export {};
 /** @typedef {{ type: "keybind", ok: boolean, warning: string }} KeybindEvent */
 /** @typedef {{ type: "data", status: GameDataStatus }} DataEvent */
 /** @typedef {{ type: "updates", status: UpdatesStatus }} UpdatesEvent */
+/** @typedef {{ type: "squad", squad: SquadView }} SquadEvent */
 
 /**
  * @typedef {TaskEvent | RaidEndEvent | GpsEvent | CaptureEvent | RaidStartEvent | RaidMapEvent
- *   | ModeEvent | KeybindEvent | DataEvent | UpdatesEvent} LiveEvent
+ *   | ModeEvent | KeybindEvent | DataEvent | UpdatesEvent | SquadEvent} LiveEvent
+ */
+
+// ---------------------------------------------------------------- squad (/api/squad, features/squad)
+
+/**
+ * @typedef {object} FriendShare What a friend shares (untrusted: checked by the server, but the
+ * page still escapes every text and checks every colour).
+ * @property {number} rev
+ * @property {number} updatedAt
+ * @property {Record<string, Stroke[]>} [draw] by map key
+ * @property {Record<string, { ticks?: Record<string, true | number>, pct?: number }> | null} [tasks]
+ */
+
+/**
+ * @typedef {object} SquadFriend
+ * @property {string} playerId
+ * @property {string} name
+ * @property {string} color
+ * @property {boolean} online
+ * @property {number} lastSeen ms since 1970
+ * @property {FriendShare | null} [share]
+ */
+
+/**
+ * @typedef {object} SquadView The answer of GET /api/squad and the body of the `squad` event.
+ * @property {{ playerId: string, name: string, color: string, rev: number, updatedAt: number }} me
+ * @property {{ shareTasks: boolean, joined: boolean }} settings
+ * @property {string} transport "tsnet" or "dev"
+ * @property {{ state: string, text: string, friendsOnline: number, friendsKnown: number, problem: string }} status
+ * @property {SquadFriend[]} friends
+ */
+
+/**
+ * @typedef {object} MyShare What the page sends with PUT /api/squad/share.
+ * @property {Record<string, Stroke[]>} draw
+ * @property {Record<string, { ticks: Record<string, true | number>, pct: number }> | null} tasks
  */

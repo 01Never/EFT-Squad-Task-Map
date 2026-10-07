@@ -5,7 +5,7 @@
 
 /**
  * @import { SavedState, GameData, MapConfig, Status, Task, Position, TrailPoint, Part,
- *   CapturedFile, MapInfo, SubTask, Objective, Stroke } from "./types.js"
+ *   CapturedFile, MapInfo, SubTask, Objective, Stroke, SquadView } from "./types.js"
  */
 
 /**
@@ -20,9 +20,11 @@
  * @typedef {object} MapLayers The map's own SVG groups, bottom to top (map/layers.js).
  * @property {SVGGElement} zones
  * @property {SVGGElement} placeNames
+ * @property {SVGGElement} friendDrawings
  * @property {SVGGElement} drawings
  * @property {SVGGElement} extracts
  * @property {SVGGElement} closestExtract
+ * @property {SVGGElement} friendTasks
  * @property {SVGGElement} taskMarkers
  * @property {SVGGElement} player
  */
@@ -40,6 +42,7 @@
  * @property {SubTask} [sub] for sub-task markers
  * @property {string} icon
  * @property {string} color
+ * @property {string[]} [squadColors] colours of friends who also have this task (bottom-left dots)
  * @property {boolean} [ready] false = you're missing something it needs
  * @property {boolean} [split]
  * @property {boolean} [done]
@@ -121,6 +124,8 @@ export const app = {
   trail: [],
   /** @type {ScanCapture | null} */
   capture: null,
+  /** @type {SquadView | null} the squad as the server last said (features/squad); null before it loads */
+  squad: null,
   /** When the "find me" pulse last started, ms since 1970 (features/find-me). */
   findMePulseStartedAt: 0,
   /** @type {string | null} the game mode the log reported, when it differs from the setting (features/raid) */

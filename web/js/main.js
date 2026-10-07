@@ -13,6 +13,8 @@ import { connectToLiveEvents } from "./app/live-events.js";
 import { renderNav } from "./features/raid/nav.js";
 import { openSettings } from "./features/settings/panel.js";
 import { renderUpdateDot, showUpdatedNotice } from "./features/updates/panel.js";
+import { sendShare } from "./features/squad/share-sync.js";
+import { shouldSendShareAtStart } from "./features/squad/rules.js";
 
 saveUnsavedChangesOnClose();
 addEventListener("hashchange", showPageForAddress);
@@ -41,6 +43,7 @@ async function start() {
     app.status = status;
     app.gps = status.gps;
     app.trail = status.trail || [];
+    app.squad = await loadSquad();
     const isOlderData = savedData && savedData.version !== SAVED_DATA_VERSION;
     app.saved = migrateSavedData(savedData);
     indexGameData();
@@ -52,8 +55,22 @@ async function start() {
     connectToLiveEvents();
     showPageForAddress();
     showUpdatedNotice();
+    if (shouldSendShareAtStart(app.squad)) sendShare(true);
   } catch (error) {
     showStartUpError(error);
+  }
+}
+
+/**
+ * The squad as the program sees it (GET /api/squad), or null when it doesn't answer: the squad is
+ * optional, so a failure here never stops the page from starting.
+ */
+async function loadSquad() {
+  try {
+    const view = await fetchJson("/api/squad");
+    return view && view.me ? view : null;
+  } catch {
+    return null;
   }
 }
 

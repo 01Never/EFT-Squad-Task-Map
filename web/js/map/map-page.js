@@ -17,6 +17,7 @@ import { togglePinnedOnly } from "../features/tasks/panel.js";
 import { renderExtracts } from "../features/extracts/map-layer.js";
 import { renderDrawings, renderDrawingBar, bindDrawing } from "../features/drawing/map-layer.js";
 import { renderPlayer, bindFindMe } from "../features/find-me/map-layer.js";
+import { renderFriendDrawings, renderFriendTaskMarkers } from "../features/squad/map-layer.js";
 
 /** @import { MapConfig, MapInfo } from "../app/types.js" */
 
@@ -159,8 +160,10 @@ export function renderMapPage() {
   renderPanel();
   renderPlaceNames();
   renderExtracts();
+  renderFriendDrawings();
   renderDrawings();
-  renderTaskMarkers();
+  renderFriendTaskMarkers();
+  renderTaskMarkers(); // also puts every marker at screen size, friends' included
   renderPlayer();
   renderPopup();
   findElement("#bpin").setAttribute("aria-pressed", String(!!app.saved.pinnedOnly));

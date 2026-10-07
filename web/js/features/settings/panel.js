@@ -10,6 +10,7 @@ import { GAME_MODE_NAMES } from "../../app/game-modes.js";
 import { reloadGameData } from "../../app/game-data.js";
 import { rerenderPage } from "../../app/routing.js";
 import { renderUpdatesSectionBox, bindUpdatesSection } from "../updates/panel.js";
+import { renderSquadSettingsBox, bindSquadSection } from "../squad/settings-section.js";
 import { DEFAULT_AI_MODEL, REASONING_EFFORTS, gameDataDescription } from "./rules.js";
 
 /** @import { FolderStatus, Status } from "../../app/types.js" */
@@ -30,6 +31,7 @@ export function openSettings() {
   findElement("#sRefresh", dialog).onclick = (event) => onUpdateGameDataClicked(event.target, close);
   findElement("#sSave", dialog).onclick = () => onSaveClicked(dialog, close);
   bindUpdatesSection(dialog);
+  bindSquadSection(dialog);
 }
 
 /** @param {Status} status */
@@ -45,6 +47,7 @@ function renderSettings(status) {
     ${renderGameDataStatus(status)}
     <button class="btn sm line" id="sRefresh">${status.data.refreshing ? "Updating…" : "Update game data now"}</button>
     <h4>OpenAI</h4><p class="mnote">${renderAiStatus(status)} <button class="lnk" id="sAI">Change</button></p>
+    ${renderSquadSettingsBox()}
     ${renderUpdatesSectionBox()}
     <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn line" id="sClose">Close</button><button class="btn" id="sSave">Save</button></div>`;
 }

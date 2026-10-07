@@ -44,6 +44,13 @@ import {
   onAiScopeChanged,
 } from "../features/ai-categorize/panel.js";
 import { startScan } from "../features/scan/panel.js";
+import {
+  SQUAD_SECTION_ACTIONS,
+  renderSquadSection,
+  renderFriendsTasksSection,
+  onFriendDrawingsToggled,
+  onFriendTasksToggled,
+} from "../features/squad/panel.js";
 
 /** @import { PartOnMap } from "../app/types.js" */
 
@@ -54,10 +61,12 @@ import { startScan } from "../features/scan/panel.js";
  */
 const TASKS_TAB_SECTIONS = [
   renderListTools, // 📌 Pinned only, Clear pins, ⇅ Auto-sort (features/tasks)
+  renderSquadSection, // a chip per friend, "Shared with squad" (features/squad)
   renderAiCategorizeBox, // 🤖 AI Categorize (features/ai-categorize)
   renderExtractsSection, // Extracts & labels (features/extracts)
   renderCategoryLists, // the categories and their task rows (features/tasks)
   renderNewCategoryBox, // + Category (features/tasks)
+  renderFriendsTasksSection, // friends' tasks you don't have, read-only (features/squad)
 ];
 
 // ---------------------------------------------------------------- drawing
@@ -133,6 +142,7 @@ const PANEL_ACTIONS = {
   ...BRING_LIST_ACTIONS,
   ...EXTRACTS_SECTION_ACTIONS,
   ...SUB_TASK_ACTIONS,
+  ...SQUAD_SECTION_ACTIONS,
 };
 
 /**
@@ -146,6 +156,8 @@ const PANEL_BUTTONS_BY_ATTRIBUTE = [
   ["data-goto", onOtherPartClicked],
   ["data-tick", onCounterButtonClicked],
   ["data-have", onBagStepClicked],
+  ["data-squad-drawings", onFriendDrawingsToggled],
+  ["data-squad-tasks", onFriendTasksToggled],
 ];
 
 const ANY_PANEL_BUTTON = "[data-act]," + PANEL_BUTTONS_BY_ATTRIBUTE.map(([attribute]) => `[${attribute}]`).join(",");

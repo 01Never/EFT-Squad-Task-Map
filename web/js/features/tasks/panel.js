@@ -15,6 +15,7 @@ import { selectPartFromList, clearSelectionAndOpenRow } from "./selection.js";
 import { renderObjectiveLine, onTickCounterClicked } from "./objective-line.js";
 import { isPartPossible, countKeysNeeded } from "../readiness/rules.js";
 import { renderSubTasksBox } from "../sub-tasks/panel.js";
+import { renderAlsoOnRow } from "../squad/panel.js";
 
 /** @import { PartOnMap, Task } from "../../app/types.js" */
 
@@ -43,7 +44,7 @@ function renderRowButton(row) {
   const notReadyBadge = !isReady ? '<span class="bang" title="You don\'t have everything this needs">!</span>' : "";
   const keysBadge = keysNeeded ? `<span class="kb" title="Keys needed">🔑 ${keysNeeded}</span>` : "";
   const progress = row.done ? "✓" : partProgressPercent(part, saved.ticks) + "%";
-  return `<button class="trow" data-act="open">${renderShapeSwatch(cat.icon, cat.color, 15)}<span class="nm">${renderRowName(row)}<span class="tr">${renderRowSubtitle(row)}</span></span>${notReadyBadge}${keysBadge}<span class="pct">${progress}</span></button>`;
+  return `<button class="trow" data-act="open">${renderShapeSwatch(cat.icon, cat.color, 15)}<span class="nm">${renderRowName(row)}<span class="tr">${renderRowSubtitle(row)}</span>${renderAlsoOnRow(task.id)}</span>${notReadyBadge}${keysBadge}<span class="pct">${progress}</span></button>`;
 }
 
 /** The task's name, plus "◫ part 2/3" for a split part. */

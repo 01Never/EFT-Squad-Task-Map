@@ -1,0 +1,34 @@
+/* Squad: the chips and the "Friends' tasks" block in the panel, "Also:" lines, the Settings box,
+   and the map's friend layers. A friend's colour reaches CSS only as --friend, set from a value
+   that passed the strict #rrggbb check (rules.js: safeFriendColor). Nothing here animates. */
+
+/* the chips: one row per friend, a colour dot, the name and status, and two toggles */
+.squad-chips{display:grid;gap:6px}
+.squad-chip{display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid #3a3a3d;border-left:4px solid var(--friend,var(--muted));background:rgb(255 255 255 / .03)}
+.squad-dot{flex:none;width:12px;height:12px;border-radius:50%;background:var(--friend,var(--muted));border:1px solid #000}
+.squad-who{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.squad-name{color:#fff;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.squad-state{font-size:12.5px;color:var(--muted)}
+.squad-chip.online .squad-state{color:#7fd67f}
+.squad-toggle{background:transparent;border:1px solid var(--gold-two);color:var(--muted);height:26px;padding:0 8px;cursor:pointer;font-weight:700;font-size:13px;white-space:nowrap}
+.squad-toggle[aria-pressed="true"]{background:var(--gold-two);color:#000}
+.squad-toggle.dim{opacity:.55}
+.sec.squad .tools{margin-top:8px}
+
+/* "Also: Mike, Sam" under a task row's name */
+.trow .also{display:block;font-size:13px;color:var(--accent)}
+.pop .squad-also{color:var(--accent);margin:0 0 2px}
+.pop .squad-progress{margin:0 0 6px}
+
+/* the bottom of the list: tasks friends have and you don't (read-only) */
+.squad-group{margin:0 0 10px}
+.squad-grouphead{display:flex;align-items:center;gap:8px;margin-bottom:3px;color:#fff}
+.squad-grouphead small{color:var(--muted);margin-left:auto;font-size:12.5px}
+.squad-task{display:flex;align-items:center;gap:8px;padding:4px 6px 4px 20px;border-left:3px solid var(--friend,var(--muted))}
+.squad-task .nm{flex:1;min-width:0;color:var(--gold-one)}
+.squad-task .tr{display:block;font-size:13px;color:var(--muted)}
+.squad-task .pct{color:var(--muted);font-size:13px}
+
+/* Settings → Squad */
+.sq-row{display:flex;gap:10px;align-items:center;margin-top:8px}
+.frow input[type=color]{flex:none;width:48px;height:32px;padding:0;border:2px solid var(--gold-two);background:var(--gunmetal-dark);cursor:pointer}

@@ -351,7 +351,7 @@ export function usesCounter(objective) {
 }
 
 /** The objectives that count for progress: the non-optional ones, or all when every one is optional. */
-function requiredObjectives(part) {
+export function requiredObjectives(part) {
   const required = part.objs.filter((objective) => !objective.opt);
   return required.length ? required : part.objs;
 }
