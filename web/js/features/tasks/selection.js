@@ -1,7 +1,7 @@
 // @ts-check
 // Selecting a part (2.0.1): its row opens with a white outline, its markers grow and flash, and the
 // popup shows it. From the list, the map zooms to its spots; from a marker, the list scrolls to
-// its row. Esc, a click on empty map or the popup's × deselects.
+// its row. Esc, a click on empty map or the popup's × deselects and closes the row.
 import { app } from "../../app/state.js";
 import { fitViewTo } from "../../map/view.js";
 import { renderMapPage } from "../../map/map-page.js";
@@ -61,10 +61,11 @@ function selectPart(partKey, marker) {
   return row;
 }
 
-/** Deselect: no flash, no popup. The open row stays open. */
+/** Deselect: no flash, no popup, and the row it had opened closes (so the next click selects it again). */
 export function deselectPart() {
   const mapView = app.mapView;
   mapView.selectedPartKey = null;
+  mapView.expandedPartKey = null;
   mapView.popup = null;
   renderMapPage();
 }
