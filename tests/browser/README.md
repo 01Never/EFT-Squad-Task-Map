@@ -137,7 +137,7 @@ a `rect` inside), `svg.map g[data-r]` (your marker; `data-r` = arrow turn in deg
 
 **Panel:** `#panel`, `#panel .phead`, `#panel .phead h2 small`, `#addtask`, `[data-tab="tasks"]`,
 `[data-tab="bring"]`, `[data-act="pinnedonly"]` (`aria-pressed`, `.n`), `[data-act="clearpins"]`,
-`[data-act="clearext"]`, `[data-act="hidepanel"]`, `details.menu summary`, `[data-act="resortall"]`,
+`[data-act="clearext"]`, `#panel .exlist` / `.tag.ai` (marked extracts, ticket 06), `#sReadExt`, `#exOn` / `#exOff` (the extracts notice), `[data-act="hidepanel"]`, `details.menu summary`, `[data-act="resortall"]`,
 `[data-ext="pmc|scav|shared|transit"]` (`aria-pressed`, `.n`), `.cat` (`data-cat`, `.tog .name`,
 `.tog .cnt`), `.tasks .task`, `.task` (`data-task`, `data-part`, `.sel`), `.task .trow`,
 `.trow-wrap`, `.nm` (its first text node is the task name), `.bang`, `.partof`,

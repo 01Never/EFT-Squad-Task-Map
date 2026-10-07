@@ -19,6 +19,11 @@ type Settings struct {
 	FollowPosition  *bool  `json:"followPosition,omitempty"`  // switch to the raid's map on a new position; default on
 	AutoCenter      *bool  `json:"autoCenter,omitempty"`      // ticket 02: centre on each new position; default off
 
+	// Ticket 06: read my extracts from the first in-raid screenshot (the picture goes to OpenAI).
+	// nil = the default: on once an OpenAI key exists and the notice explaining it was seen.
+	ReadExtracts       *bool `json:"readExtracts,omitempty"`
+	ExtractsNoticeSeen bool  `json:"extractsNoticeSeen,omitempty"` // the one-time "what's sent" notice was shown
+
 	// Squad (ticket 05): your player id, name, colour, "Share my tasks", and whether you joined.
 	// Never the invite code. nil until the squad feature first saves it.
 	Squad *SquadSettings `json:"squad,omitempty"`
@@ -101,9 +106,33 @@ func (s Settings) IsFollowPositionOn() bool { return s.FollowPosition == nil || 
 // IsAutoCenterOn is false unless the user turned it on.
 func (s Settings) IsAutoCenterOn() bool { return s.AutoCenter != nil && *s.AutoCenter }
 
+// IsReadExtractsOn says whether the first in-raid screenshot may be sent to OpenAI to read the
+// player's extracts. The player's own choice wins. Without one, it is on only when there is a key
+// and the player has seen the notice that explains what is sent (so an update never starts sending
+// pictures before the player was told).
+func (s Settings) IsReadExtractsOn() bool {
+	if s.OpenAIKey == "" {
+		return false
+	}
+	if s.ReadExtracts != nil {
+		return *s.ReadExtracts
+	}
+	return s.ExtractsNoticeSeen
+}
+
+// ReadExtractsChoice is the checkbox's value in Settings: the player's choice, else the default (on).
+func (s Settings) ReadExtractsChoice() bool { return s.ReadExtracts == nil || *s.ReadExtracts }
+
+// NeedsExtractsNotice is true when the one-time notice should be shown: a key exists, the player
+// hasn't chosen yet and hasn't seen the notice.
+func (s Settings) NeedsExtractsNotice() bool {
+	return s.OpenAIKey != "" && s.ReadExtracts == nil && !s.ExtractsNoticeSeen
+}
+
 var knownSettingsFields = map[string]bool{
 	"openaiKey": true, "openaiModel": true, "openaiEffort": true, "gameMode": true, "logsPath": true,
 	"screenshotsPath": true, "followPosition": true, "autoCenter": true, "squad": true,
+	"readExtracts": true, "extractsNoticeSeen": true,
 }
 
 // UnmarshalJSON reads the known fields and keeps the rest untouched.

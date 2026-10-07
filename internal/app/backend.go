@@ -48,6 +48,8 @@ func (app *App) Status() any {
 			"screenshotsPath": settings.ScreenshotsPath,
 			"followPosition":  settings.IsFollowPositionOn(),
 			"autoCenter":      settings.IsAutoCenterOn(),
+			"readExtracts":    settings.ReadExtractsChoice(),
+			"extractsNotice":  settings.NeedsExtractsNotice(),
 		},
 		"logs":        app.logs.Status(),
 		"screenshots": app.screenshots.Status(),
@@ -109,6 +111,12 @@ func (app *App) UpdateSettings(change httpapi.SettingsChange) any {
 	}
 	if change.AutoCenter != nil {
 		next.AutoCenter = change.AutoCenter
+	}
+	if change.ReadExtracts != nil {
+		next.ReadExtracts = change.ReadExtracts
+	}
+	if change.ExtractsNoticeSeen != nil {
+		next.ExtractsNoticeSeen = *change.ExtractsNoticeSeen
 	}
 	app.settings = next
 	app.settingsMutex.Unlock()

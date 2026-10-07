@@ -25,6 +25,10 @@ const (
 // message (server/ai.ts in v2, internal/features/aicategorize in Go).
 const partsMarker = "PARTS:\n"
 
+// The app's extract-list request asks "Read the extract list in this screenshot." (ticket 06);
+// the task scan's asks for task rows.
+const extractListMarker = "extract list"
+
 // handleOpenAI checks the key, then answers /v1/models/<id> and /v1/responses.
 // Any other /v1/ path gets 404 "nf", as in v2.
 func (mock *mockServer) handleOpenAI(writer http.ResponseWriter, request *http.Request, path string) {
@@ -74,9 +78,21 @@ func (mock *mockServer) handleResponses(writer http.ResponseWriter, request *htt
 
 	inputJSON := input.stringify()
 	isVision := strings.Contains(inputJSON, "input_image")
-	mock.addToLog(responsesLogLine(body, inputJSON, isVision))
+	isExtractList := isVision && strings.Contains(inputJSON, extractListMarker)
+	logLine := responsesLogLine(body, inputJSON, isVision)
+	if isExtractList {
+		logLine += " extracts=true" // lets tests count the extract reads apart from the task scan's
+	}
+	mock.addToLog(logLine)
 
 	model := body.get("model")
+	if isExtractList {
+		mock.mutex.Lock()
+		list := mock.extractList
+		mock.mutex.Unlock()
+		writeJSON(writer, http.StatusOK, responseWithText("r3", model, list.stringify()))
+		return
+	}
 	if isVision {
 		mock.mutex.Lock()
 		rows := mock.visionRows

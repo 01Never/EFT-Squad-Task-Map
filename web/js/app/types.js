@@ -215,7 +215,8 @@ export {};
 /**
  * @typedef {object} MapPrefs Per-map choices.
  * @property {Record<string, boolean>} ext which extract kinds are shown (pmc, scav, shared, transit)
- * @property {Record<string, unknown>} extMarked extracts you marked as yours (name → truthy)
+ * @property {Record<string, true | { auto: true, note: string | null }>} extMarked extracts you marked as
+ *   yours: `true` for a click, `{ auto: true, note }` when read from your screenshot (ticket 06)
  * @property {boolean} labels place names shown
  * @property {boolean} drawOn drawings shown
  */
@@ -265,6 +266,8 @@ export {};
  * @property {string} screenshotsPath
  * @property {boolean} followPosition switch to the raid's map on a new position
  * @property {boolean} autoCenter centre on each new position (ticket 02)
+ * @property {boolean} readExtracts the "Read my extracts from my first raid screenshot" checkbox (ticket 06)
+ * @property {boolean} extractsNotice the one-time "what is sent" notice is due
  */
 
 /**
@@ -369,10 +372,21 @@ export {};
 /** @typedef {{ type: "data", status: GameDataStatus }} DataEvent */
 /** @typedef {{ type: "updates", status: UpdatesStatus }} UpdatesEvent */
 /** @typedef {{ type: "squad", squad: SquadView }} SquadEvent */
+/**
+ * @typedef {object} ExtractsEvent Your extracts read from the extract-list screenshot (ticket 06).
+ * With `map` set, the server matched the names (`marked`, `unknown`); with `map` null it sends the
+ * names it read (`read`) for the page to match against the open map.
+ * @property {"extracts"} type
+ * @property {number} [id]
+ * @property {string | null} map
+ * @property {{ name: string, note: string | null }[]} [marked]
+ * @property {string[]} [unknown]
+ * @property {{ name: string, note: string | null }[]} [read]
+ */
 
 /**
  * @typedef {TaskEvent | RaidEndEvent | GpsEvent | CaptureEvent | RaidStartEvent | RaidMapEvent
- *   | ModeEvent | KeybindEvent | DataEvent | UpdatesEvent | SquadEvent} LiveEvent
+ *   | ModeEvent | KeybindEvent | DataEvent | UpdatesEvent | SquadEvent | ExtractsEvent} LiveEvent
  */
 
 // ---------------------------------------------------------------- squad (/api/squad, features/squad)

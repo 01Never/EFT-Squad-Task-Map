@@ -37,3 +37,16 @@ test("a v2 file with missing fields gets their defaults and an Unsorted category
   assert.deepEqual(saved.prefs.customs.extMarked, {});
   assert.equal(saved.prefs.customs.ext.pmc, true);
 });
+
+test("extract marks saved before ticket 06 (true) survive loading, next to auto marks", () => {
+  const saved = migrateSavedData({
+    version: 2,
+    cats: [],
+    tasks: {},
+    prefs: { customs: { extMarked: { Crossroads: true, "Old Gas Station Gate": { auto: true, note: "Requires paracord" } } } },
+  });
+  assert.deepEqual(saved.prefs.customs.extMarked, {
+    Crossroads: true,
+    "Old Gas Station Gate": { auto: true, note: "Requires paracord" },
+  });
+});

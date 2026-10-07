@@ -31,6 +31,7 @@ The HTTP method is ignored, as in v2. Paths are checked in this order.
 |---|---|
 | `GET /log` | JSON list of the request log, oldest first (lines below). |
 | `POST /set-rows` with a JSON body | That JSON becomes what the fake vision model reads. `{"ok":true}` |
+| `POST /set-extracts` with `{"visible": bool, "extracts": [{"name", "note"}]}` | What the fake vision model reads from a screenshot of the in-game extract list (ticket 06). `{"visible":false,"extracts":[]}` is the "no list on this screenshot" case. `{"ok":true}` |
 | `POST /fail` with `{"fail":true}` | json.tarkov.dev answers 503 `down` until `{"fail":false}`. `{"ok":true}` |
 
 **json.tarkov.dev:** `/<mode>/<name>`, with mode `regular`, `pve` or `pvp-season`.
@@ -58,6 +59,10 @@ for any title. Logged as `wiki <title>` (`wiki null` without `page`).
     `{"rows": [...]}`. The default rows are 8 tasks, including the misspelled
     "Seizing the Initative" and the made-up "Some Story Chapter", which exercise name matching.
     `/set-rows` replaces them.
+  - **Extract list (ticket 06):** a vision request whose text says "extract list". The answer is
+    `{"visible": true, "extracts": [...]}`: by default five Customs entries (two exact names, one
+    misread by a letter, one transit, one that is on no map). `/set-extracts` replaces it. The log
+    line ends with ` extracts=true`, so tests can count these calls apart from the task scan's.
   - **AI Categorize:** any other request. It reads the parts JSON after `PARTS:\n` in the first
     message. It creates a "Key runs" category (`#4dabf7`, star) and moves every part with an
     objective that has `keys` into it, with the reason `Needs <first key>`. The reply is
