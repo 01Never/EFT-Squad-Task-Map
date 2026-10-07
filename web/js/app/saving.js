@@ -71,5 +71,10 @@ export function saveUnsavedChangesOnClose() {
  * @returns {Promise<Response>}
  */
 function putSavedData(options) {
-  return fetch("/api/state", { method: "PUT", body: JSON.stringify(app.saved), ...options });
+  return fetch("/api/state", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" }, // the server refuses anything else (ticket 04d)
+    body: JSON.stringify(app.saved),
+    ...options,
+  });
 }

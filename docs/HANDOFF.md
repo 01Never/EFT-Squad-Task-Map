@@ -134,14 +134,15 @@ OpenAI ◄──(scan, categorize)───── taskscan / aicategorize ┘   
   - `deliver(ev)`: events that change saved data (`task` started/finished/failed, `raidEnd`). They're queued in `squad-task-map-pending.json` and resent until the page acks (`POST /api/events/ack`). That way a task accepted while the browser was closed still lands.
   - `broadcast(ev)`: transient events (`gps`, `capture`, `raidStart`, `raidMap`, `mode`, `keybind`, `data`). They're dropped if no page is open.
 - The page handles events in `web/js/app/live-events.js`: one named handler per event name (`app/event-names.js`, checked against `internal/events/names.go` by `names_test.go`).
+- **Only the app's own page is answered** (ticket 04d, `internal/httpapi/guard.go`). Every request goes through `httpapi.Guard` with the allowed hosts `internal/app` builds for the bound port (`127.0.0.1:<port>`, `localhost:<port>`): another Host → 421 (blocks DNS rebinding); a state-changing request (not GET/HEAD/OPTIONS) whose `Origin` isn't `http://` + an allowed host, or, without `Origin`, whose `Sec-Fetch-Site` isn't `same-origin`/`none` → 403 (blocks cross-site POSTs); a body not sent as `application/json` on a JSON-body route → 415. Clients that send neither header (curl, tests, the single-copy check) pass. The page sends every JSON body with `Content-Type: application/json` (`app/api.js`, `app/saving.js`, `features/updates/panel.js`). Ticket 05's tailnet listener gets its own list and rules.
 - **The page never polls,** with one exception: it polls `/api/ai/job/:id` while an AI Categorize request runs.
 
 ### Server (Go; start with `internal/app/app.go`)
 | Package | Role |
 |---|---|
 | `main.go`, `embed.go` | Entry point; `//go:embed` of `web/` and `assets/` (the page is served as-is, no bundler). |
-| `internal/app` | Creates every part and wires them (`app.go`: log event → raid/gps/events; screenshot → gps or scan), the backend behind every route (`backend.go`), start-up (`run.go`: data folder, single copy, port 7777→7800, banner, browser). |
-| `internal/httpapi` | Route table and thin handlers (`routes.go`), static files with explicit content types and an ETag = version (`static.go`), the `Backend` interface listing everything the page can ask for. |
+| `internal/app` | Creates every part and wires them (`app.go`: log event → raid/gps/events; screenshot → gps or scan), the backend behind every route (`backend.go`), start-up (`run.go`: data folder, single copy, port 7777→7800, the allowed hosts for that port, banner, browser). |
+| `internal/httpapi` | `Guard` (Host/Origin checks) and `jsonBody` (415) in `guard.go`, route table and thin handlers (`routes.go`), static files with explicit content types and an ETag = version (`static.go`), the `Backend` interface listing everything the page can ask for. |
 | `internal/events` | Event names (`names.go`, spelled identically in `web/js/app/event-names.js`; `names_test.go` fails if the lists differ) and the SSE hub: `Deliver` (queued in `squad-task-map-pending.json` until acked) and `Broadcast` (live only). |
 | `internal/storage` | Files next to the exe: settings (unknown fields kept, `tt*` dropped), the page's saved data as opaque text (atomic write + `.bak`), v1 backup. |
 | `internal/gamedata` | Saved copy or built-in snapshot; refresh when over 24 h old (checked hourly); validation (≥ max(200, 50% of previous) tasks, ≥ 5 maps); `convert.go`/`snapshot.go` = 1:1 port of v2's converter, JSON-equal to the v2 goldens. |

@@ -29,6 +29,8 @@ type updateRoutesRig struct {
 	t        *testing.T
 	api      *httptest.Server
 	requests atomic.Int32 // requests that reached the fake GitHub
+	app      *App
+	files    storage.Files
 }
 
 func newUpdateRoutesRig(t *testing.T) *updateRoutesRig {
@@ -63,6 +65,7 @@ func newUpdateRoutesRig(t *testing.T) *updateRoutesRig {
 	files := storage.FilesIn(t.TempDir())
 	notNeeded := func() (gamedata.GameData, error) { return gamedata.GameData{}, errors.New("not needed in this test") }
 	app := newApp("2.5.0", "", files, notNeeded)
+	rig.app, rig.files = app, files
 	rig.api = httptest.NewServer(httpapi.NewServer(app, nil))
 	t.Cleanup(rig.api.Close)
 	return rig

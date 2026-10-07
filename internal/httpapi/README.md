@@ -6,12 +6,30 @@ the page itself (`web/index.html` and the `web/js/` modules as they are, no bund
 the fonts and the maps config, all built into the exe.
 
 **What it deliberately doesn't do:** any feature logic (it lives in the features; `internal/app`
-connects them); log-in or CORS (the server only listens on 127.0.0.1, so only this PC reaches it).
+connects them); log-in or CORS (the server only listens on 127.0.0.1, so only this PC reaches it,
+and `Guard` makes sure only the app's own page in the browser can use it).
 
 **The rules / limits:**
 - Listens on `127.0.0.1` only, on the first free port from 7777 to 7800 (`PORT` changes the
   start). A second copy of the app on the same data folder just opens the running one's page and
   exits (`internal/app/run.go`).
+- **Only the app's own page is answered** (`guard.go`, ticket 04d). Other web pages open in the
+  same browser can send requests to 127.0.0.1 too, so every request (page, files, API, live
+  events) goes through `Guard` first, with a list of allowed hosts that `internal/app` builds for
+  the port it actually bound (`127.0.0.1:<port>` and `localhost:<port>`):
+  - **Host** must be one of them, or the answer is `421 Misdirected Request` (one plain-text
+    line). This blocks DNS rebinding (a site whose name points at 127.0.0.1).
+  - **State-changing requests** (every method but GET, HEAD, OPTIONS): an `Origin` header must be
+    `http://` + an allowed host, or `403`; `null` counts as foreign. With no `Origin`, a
+    `Sec-Fetch-Site` header must be `same-origin` or `none`, or `403`. With neither (curl, the
+    tests, a second copy checking for the first) the request passes. This blocks cross-site
+    "simple" POSTs, which a browser sends without asking first.
+  - **JSON-body routes** (`jsonBody` in the route table: events/ack, state, settings, ai/key,
+    ai/categorize, scan/remove, scan/read, scan/confirm, updates/download) take a body only as
+    `application/json` (a charset is fine), or `415`. A request with no body and no Content-Type
+    passes and reads as `{}`. So a form or `text/plain` POST can't reach them even from a
+    browser that leaves out `Origin`.
+  - Ticket 05's squad listener gets its own list and rules instead of loosening these.
 - Request bodies over `maxRequestBody` = 32 MB are refused (the biggest real one is a scan
   screenshot of a few MB).
 - An unknown path, or a known path with the wrong method, gets 404 "Not found" (as v2).
@@ -56,9 +74,15 @@ connects them); log-in or CORS (the server only listens on 127.0.0.1, so only th
 The update routes' requests, answers, error codes and events are written out in
 `internal/features/updates/README.md`. Nothing contacts GitHub unless one of them is called.
 
-**Files:** `routes.go` (route table and handlers), `updates.go` (the update routes), `backend.go` (the `Backend` interface and
+**Files:** `guard.go` (the Host, Origin and JSON-body checks), `routes.go` (route table and handlers), `updates.go` (the update routes), `backend.go` (the `Backend` interface and
 `SettingsChange`), `helpers.go` (JSON in and out, JavaScript-style text and limits), `static.go`
 (page, modules, map art, fonts).
 
-**Tests:** `static_test.go`: explicit content types, `*.test.js` and non-JS files under `/js/` refused, ETag and 304, fonts from `assets/fonts.json`, unknown paths "Not found", the state round trip, the request size limit and acks (with a small fake `Backend`). The routes were also compared with v2's Bun server in the ticket 04 parity
+**Tests:** `guard_test.go`: our hosts on our port pass for the page, its files and the live
+events; a foreign host, another port or no port → 421; a foreign, `null`, other-port or https
+Origin, or a cross-site/same-site `Sec-Fetch-Site`, → 403 on state-changing requests (GETs
+pass); `text/plain`, form or untyped bodies → 415; refused requests never reach the route.
+`internal/app/guard_test.go`: the hosts use the bound port, a second launch still finds the
+running copy, and a cross-site POST to `/api/updates/check` gets 403 without asking GitHub.
+`static_test.go`: explicit content types, `*.test.js` and non-JS files under `/js/` refused, ETag and 304, fonts from `assets/fonts.json`, unknown paths "Not found", the state round trip, the request size limit and acks (with a small fake `Backend`). The routes were also compared with v2's Bun server in the ticket 04 parity
 run.

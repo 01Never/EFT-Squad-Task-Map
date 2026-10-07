@@ -21,7 +21,8 @@ type Server struct {
 	mux     *http.ServeMux
 }
 
-// NewServer builds the route table.
+// NewServer builds the route table. Routes that read a JSON body are wrapped in jsonBody (415 for
+// a body not sent as JSON). The Host and Origin checks wrap the whole server: see Guard.
 func NewServer(backend Backend, static *staticFiles) *Server {
 	server := &Server{backend: backend, static: static, mux: http.NewServeMux()}
 	routes := []struct {
@@ -42,31 +43,31 @@ func NewServer(backend Backend, static *staticFiles) *Server {
 		{"GET /api/status", server.status},
 		{"POST /api/data/refresh", server.refreshGameData},
 		{"GET /api/events", server.events},
-		{"POST /api/events/ack", server.acknowledgeEvents},
+		{"POST /api/events/ack", jsonBody(server.acknowledgeEvents)},
 
 		// The page's saved data and the settings.
 		{"GET /api/state", server.readState},
-		{"PUT /api/state", server.writeState},
-		{"PUT /api/settings", server.updateSettings},
+		{"PUT /api/state", jsonBody(server.writeState)},
+		{"PUT /api/settings", jsonBody(server.updateSettings)},
 
 		// OpenAI key and AI Categorize.
-		{"PUT /api/ai/key", server.setAIKey},
+		{"PUT /api/ai/key", jsonBody(server.setAIKey)},
 		{"DELETE /api/ai/key", server.removeAIKey},
-		{"POST /api/ai/categorize", server.startCategorize},
+		{"POST /api/ai/categorize", jsonBody(server.startCategorize)},
 		{"GET /api/ai/job/{id}", server.job},
 
 		// Scan tasks.
 		{"POST /api/scan/start", server.startScan},
 		{"POST /api/scan/stop", server.stopScan},
 		{"POST /api/scan/cancel", server.cancelScan},
-		{"POST /api/scan/remove", server.removeFromScan},
+		{"POST /api/scan/remove", jsonBody(server.removeFromScan)},
 		{"GET /api/scan/image", server.scanImage},
-		{"POST /api/scan/read", server.readScanImage},
-		{"POST /api/scan/confirm", server.confirmScan},
+		{"POST /api/scan/read", jsonBody(server.readScanImage)},
+		{"POST /api/scan/confirm", jsonBody(server.confirmScan)},
 
 		// Check for updates (every one of these starts from a click; see updates.go).
 		{"POST /api/updates/check", server.checkForUpdates},
-		{"POST /api/updates/download", server.downloadUpdate},
+		{"POST /api/updates/download", jsonBody(server.downloadUpdate)},
 		{"POST /api/updates/cancel", server.cancelUpdateDownload},
 		{"POST /api/updates/apply", server.applyUpdate},
 		{"POST /api/updates/seen", server.updateNoticeSeen},

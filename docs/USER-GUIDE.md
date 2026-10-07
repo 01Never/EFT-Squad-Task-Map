@@ -111,6 +111,7 @@ The **🤖 AI Categorize** box in the panel sorts parts by your instructions, e.
   - Requests to **api.openai.com**: each scanned screenshot (shrunk to 2048 px), and for AI Categorize, task data plus wiki excerpts.
 - OpenAI is billed to your key's account. A scan costs roughly 1–2k input tokens per screenshot; an AI Categorize request roughly 5–30k.
 - The OpenAI key is stored in plain text in `squad-task-map-settings.json` next to the exe, and only sent to api.openai.com.
+- The program on 127.0.0.1 only answers its own page: only the app's own page can use it; other websites open in your browser can't.
 - The app deletes only two kinds of files: screenshots you confirmed in a scan, and GPS screenshots from the raid that just ended.
 
 ## Light on your PC

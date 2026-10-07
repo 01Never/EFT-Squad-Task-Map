@@ -3,7 +3,8 @@
 // here. Saving the page's data has its own module (app/saving.js).
 
 /**
- * Call an API route and return its JSON answer. A body that isn't text is sent as JSON.
+ * Call an API route and return its JSON answer. A body that isn't text is sent as JSON, with
+ * `Content-Type: application/json` (the server refuses a body sent any other way: ticket 04d).
  * Throws an Error with the server's message when the answer isn't OK or says `ok: false`.
  * @param {string} path
  * @param {{ method?: string, body?: unknown }} [options]
@@ -12,7 +13,8 @@
 export async function callApi(path, options = {}) {
   const isJsonBody = options.body && typeof options.body !== "string";
   const body = isJsonBody ? JSON.stringify(options.body) : options.body;
-  const response = await fetch(path, { ...options, body: /** @type {BodyInit} */ (body) });
+  const headers = isJsonBody ? { "Content-Type": "application/json" } : undefined;
+  const response = await fetch(path, { ...options, headers, body: /** @type {BodyInit} */ (body) });
   let answer = null;
   try {
     answer = await response.json();
