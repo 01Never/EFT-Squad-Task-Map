@@ -25,8 +25,9 @@ Windows SmartScreen may say "Windows protected your PC" the first time, because 
 | **Find me** | Your position and facing come from Tarkov's screenshot file names: a stand-out marker, a pulse when it updates, an off-screen pointer, optional auto-centre. |
 | **Closest extract** | The nearest of the extracts you have this raid, with a line and a straight-line distance. |
 | **Loot spots** | Safes, weapon boxes, PC blocks, jackets, filing cabinets and notable loose loot from tarkov.dev, toggled per type, with a "High value" preset. Small and secondary to your task markers. |
+| **My keys** | Your usual keys per map: the doors and trunks they open light up on the map, with the tasks that use each key and the loot likely behind it. Keys on the list count as had for tasks, raid after raid. |
 | **Bring list** | The keys, items to place and gear the tasks on the map need, with "have" counts that fade spots you can't do yet. |
-| **Squad** | Join friends with an invite code (private Tailscale network built into the exe, nothing else to install) and see each other's drawings live and, if you both choose, each other's tasks with "Also: Mike" badges. Optional. |
+| **Squad** | Join friends with an invite code (private Tailscale network built into the exe, nothing else to install) and see each other's drawings live and, if you both choose, each other's tasks with "Also: Mike" badges and key lists ("Mike has this key"). Optional. |
 | **AI Categorize** | Sort tasks by plain-English instructions, checked against each task's wiki page (optional). |
 
 The full manual is the **[user guide](docs/USER-GUIDE.md)**: setup, every feature, settings, privacy, and the files the app keeps next to the exe.

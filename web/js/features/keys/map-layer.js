@@ -10,7 +10,7 @@ import { app } from "../../app/state.js";
 import { createSvgElement, escapeHtml, findElement } from "../../app/dom.js";
 import { save } from "../../app/saving.js";
 import { floorBadge } from "../../map/projection.js";
-import { svgUnitsPerPixel, screenSizeTransform, fitViewTo } from "../../map/view.js";
+import { svgUnitsPerPixel, screenSizeTransform, fitViewTo, zoomViewAt } from "../../map/view.js";
 import { renderMapPage } from "../../map/map-page.js";
 import { lootOfMap } from "../loot/loot-data.js";
 import { spotsNearView, summarizeSpots } from "../loot/rules.js";
@@ -69,6 +69,10 @@ const MAX_FRIEND_DOTS = 3;
 
 // Flying to a key's doors leaves this fraction of the map's width around them.
 const FLY_PADDING_MAP_WIDTH_PARTS = 30;
+
+// ... and zooms in to at most 1/12 of the map's width (fitting a task's spots stops at 1/3.5, too
+// far out to tell a building's doors apart).
+const FLY_CLOSEST_MAP_WIDTH_PARTS = 12;
 
 // The popup lists at most this many tasks and loot lines.
 const MAX_POPUP_LINES = 8;
@@ -307,8 +311,20 @@ export function flyToKeyDoors(keyId) {
   const ys = points.map((point) => point[1]);
   const box = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
   fitViewTo(box, mapView.homeView.w / FLY_PADDING_MAP_WIDTH_PARTS);
+  zoomInOnTheMiddleTo(mapView.homeView.w / FLY_CLOSEST_MAP_WIDTH_PARTS);
   if (locks.length === 1) openDoorPopup(loot.locks.indexOf(locks[0]));
   return true;
+}
+
+/**
+ * Zoom in around the middle of the map area until the view is `width` SVG units wide (never out).
+ * @param {number} width
+ */
+function zoomInOnTheMiddleTo(width) {
+  const mapView = app.mapView;
+  if (mapView.viewBox.w <= width) return;
+  const area = mapView.svg.getBoundingClientRect();
+  zoomViewAt(width / mapView.viewBox.w, area.left + area.width / 2, area.top + area.height / 2);
 }
 
 // ---------------------------------------------------------------- tapping and the popup

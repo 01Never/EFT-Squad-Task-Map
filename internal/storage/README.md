@@ -38,7 +38,8 @@ temporary build is recognised by `go-build` or `\temp\` in the exe's path.
   yet, and it isn't `{"version": 2, …}`, copy it once before the page migrates it.
 - **Settings** (`ReadSettings`, `WriteSettings`): the known fields are `openaiKey`, `openaiModel`,
   `openaiEffort`, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`, and
-  the `squad` block (ticket 05: `playerId`, `name`, `color`, `shareTasks`, `joined`; never the
+  the `squad` block (ticket 05: `playerId`, `name`, `color`, `shareTasks`, `joined`; ticket 09:
+  `shareKeys`; never the
   invite code; `SquadOrEmpty` gives an empty block when there's none).
   - Defaults: game mode `regular`; Follow my position on; auto-center off; empty folders mean
     "found automatically"; not in a squad, tasks not shared (the squad feature fills in the

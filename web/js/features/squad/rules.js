@@ -505,7 +505,7 @@ function compareFriend(change, before, after, mapKey) {
     change.chipsChanged = true;
     if (mapKey) change.drawingsChanged.push(playerId);
     change.tasksChanged.push(playerId);
-    change.keysChanged.push(playerId);
+    if ((before || after).share?.keys) change.keysChanged.push(playerId); // only a friend sharing keys
     return;
   }
   const hasNewLook = before.name !== after.name || before.color !== after.color;

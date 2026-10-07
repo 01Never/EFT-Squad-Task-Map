@@ -91,6 +91,10 @@ Idle with every chip on: 0 ms of script, no DOM changes and no timers over 8–1
 suite also checks 0 Paint and 0 Layout in a 3 s Chrome trace. The redraw after a zoom notch
 takes about 40–70 ms of main-thread time in total, split into tasks under 50 ms.
 
+Ticket 09 (`features/keys`) draws the `locks` and uses the spots for "loot behind a door"; it
+loads through the same `loot-data.js` (`lootOfMap()`, which now runs every waiting feature's
+callback once the answer is in, and `loadLootOfMap()` for maps that aren't open).
+
 **Flow:** open the section or turn a chip on → `loot-data.js` `lootOfMap()` → `GET /api/loot/<map>`
 → `app.lootByMap[map]` → `map-layer.js` `renderLoot()` (spots the chips show → map positions and
 floors, once) → `drawLootNearView()` (near the view → bubbles → pictures) → pan/zoom →

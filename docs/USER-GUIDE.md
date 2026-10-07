@@ -58,6 +58,8 @@ The **Bring list** tab lists what the tasks currently shown on the map need: key
 - When you have none of something, those spots get a **"!"** and fade, and their zones get dotted borders.
 - Ticking a marker or placed-item objective takes 1 off "have" (unticking gives it back).
 - All counts reset to 0 after each raid. **Reset counts** clears them by hand.
+- Keys on the map's **My keys** list (next section) count as had on that map, raid after raid: their
+  line says **On your key list ✓** instead of a count.
 
 ## Pins and extracts
 - **📌** on a task row or map popup pins the task. **Pinned only** (panel and map toolbar) shows only pinned tasks everywhere, bring list included. **Clear pins** unpins all. Finished tasks unpin themselves.
@@ -79,6 +81,32 @@ it) shows where containers and notable loose loot spawn, from tarkov.dev's map d
 - Loot never selects a task and doesn't change the "!", the Bring list or your pins.
 - The spots come with the game data download. With the built-in data (first start without
   internet) the section says so until the data is downloaded.
+
+## My keys (the doors your keys open)
+Most players bring the same keys to a map every raid. The **My keys** section of the task list
+(click its heading; it shows how many keys, e.g. "My keys (5)") keeps that list per map.
+- **Add key:** type part of a key's name ("dorm 314"). The search covers this map's keys: every
+  key with a lock here and every key a task here needs, each with what it opens here
+  ("2 doors", "1 trunk"). Tick **all keys** to find any key; one that opens nothing on this map
+  says so.
+- Each key on your list shows its picture, its name and what it opens here. Click the name to
+  fly to its doors; **×** removes it (with **Undo**). **Copy from…** adds another map's keys that
+  matter here (the rest are left out, and the message says how many). **Clear** empties the list
+  (with Undo). The list is kept until you change it: **raid end doesn't reset it**.
+- **On the map**, every door and trunk your keys open shows a tile in blue-violet with the key's
+  picture, a floor badge, and ⚡ when it needs the power on. Where tarkov.dev has the door's
+  outline (only a few doors on Factory and Ground Zero) it's drawn too. That's the door, never the
+  room: the data has no room walls.
+- **Click a door** for the key, the lock (door or trunk, floor, power), the tasks here that use the
+  key, and the **loot nearby, approximate**: the loot spots within 8 m on the same floor, ringed on
+  the map while the popup is open. A door whose key isn't on your list has **+ Add to my keys**.
+- **All locked doors** also shows the doors for keys you don't have, dimmed, to help you decide
+  which keys are worth bringing. Some doors on Customs, Interchange, Streets and Ground Zero show
+  a **?** and "Unknown key (data incomplete)": tarkov.dev names a placeholder key for them.
+- **Tasks:** a key on this map's list counts as had for the tasks here, so they don't show **!**
+  for it, raid after raid, without touching the Bring list counts.
+- **When a raid starts** on a map you have keys for, a message says "Bring your 5 keys for
+  Customs"; **Show list** opens the list.
 
 ## Your position (GPS)
 During a raid, Tarkov puts your position and facing in each screenshot's **file name**. When a new one appears, the app switches to the raid's map (setting **Follow my position**, on by default), draws your marker with a short trail, and brings it into view if it's off-screen (your zoom stays). The app reads the file name only, never the picture.
@@ -111,7 +139,9 @@ You need a **screenshot key** bound in Tarkov's control settings. The app warns 
 ## Squad (see your friends' drawings and tasks)
 Friends who run the app can see each other's **drawings** live and, if each chooses, each other's **tasks**. There is no website and no server: the copies connect directly over a private network built into the program. Your squad leader sets that up once (next section); you only paste an invite code.
 
-**Join:** ⚙ Settings → **Squad**, paste the invite code, **Join**. It can take up to a minute and a half; if it fails the reason is shown. Once joined you see the status ("Connected · 3 of 4 friends online"), and can set **your name** and **your colour** (friends see your drawings in that colour) and turn **Share my tasks** on. It is **off** by default. **Leave squad** (after a confirm) logs this PC out of the squad network and forgets your friends' data.
+**Join:** ⚙ Settings → **Squad**, paste the invite code, **Join**. It can take up to a minute and a half; if it fails the reason is shown. Once joined you see the status ("Connected · 3 of 4 friends online"), and can set **your name** and **your colour** (friends see your drawings in that colour) and turn **Share my tasks** and **Share my keys** on. Both are **off** by default. **Leave squad** (after a confirm) logs this PC out of the squad network and forgets your friends' data.
+
+**Keys:** when a friend shares their keys, the doors their keys open show a dot in their colour (dimmed when you don't have the key yourself), the door's popup says "Mike has this key", and a task's key says "Sam has it" (in the task's details and on the Bring list).
 
 **In the task list:** a **Squad** box with a chip per friend: a colour dot, their name, "online" or "last seen 2 h", and two switches:
 - **✎ Draw**: show that friend's drawings on the map, in their colour, under your own. On by default. They are read-only.

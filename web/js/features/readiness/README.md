@@ -20,6 +20,12 @@ objective took).
   task checked in v2.
 - Possible = at least one of everything it still needs (`isObjectivePossible()`,
   `isPartPossible()`). Example: 2 markers and 5 marker spots → all 5 spots are possible.
+- Ticket 09: a key requirement is also met when any of its keys is on the **open map's key list**
+  (`isOnKeyList()`, `hasRequirement()`; the list comes from `features/keys/key-lists.js
+  openMapKeyList()`). On that map only, raid after raid, without touching `have`. The Bring list's
+  key line then says "On your key list ✓" (`onKeyList`) and isn't counted as missing; a key you
+  need but haven't listed stays missing as before. A key a friend has on their list shows
+  "Sam has it" on the tag and the Bring list line.
 - Ticking a marker or plant objective takes one from the bag if there is one, and remembers it in
   `used`; unticking gives back only what that tick took (`updateBagForTick()`).
 - Bag keys (`requirementKey()`): the item id, or `any:<hash>` for a set of alternatives (the same
@@ -44,5 +50,6 @@ empties `have` and `used`.
 
 **Tests:** `rules.test.js` covers markers (possible with one, used up by ticking, given back only
 when taken), single items vs outfits, adding up markers across tasks, a key once, found-in-raid
-items once, and order-free keys. The browser suite checks "tick a marker → have goes down, untick
+items once, order-free keys, and (ticket 09) keys on the key list: ready without a bag count,
+still ready after raid end, alternatives, "On your key list" on the Bring list. The browser suite checks "tick a marker → have goes down, untick
 gives it back". **Needs an in-game check:** nothing new in 04b.

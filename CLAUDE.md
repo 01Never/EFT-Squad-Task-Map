@@ -40,7 +40,7 @@ Project: **Squad Task Map, local edition.** It's a Windows desktop helper for Es
 ## Conventions
 - Follow `docs/CODE-STYLE.md`: readable over concise, rules separate from I/O, a README per feature, tests that read like the rules.
 - Pure logic in DOM-free modules with tests (`node --test` for JS, `go test` for Go). UI in `web/js/`.
-- Styling follows tarkov.dev (see existing CSS variables in `web/index.html`). Markers are fully opaque except the two cases in SPEC §7.3.
+- Styling follows tarkov.dev (see existing CSS variables in `web/index.html`). Markers are fully opaque except the two cases in SPEC §7.3, plus a third from ticket 09: doors for keys you don't have ("All locked doors", or a door only a friend's key opens) are drawn dimmed (45%).
 - Saved-state changes need a migration (SPEC §5.3, §12).
 
 ## Working with agents

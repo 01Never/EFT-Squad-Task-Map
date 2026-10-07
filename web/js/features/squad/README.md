@@ -40,7 +40,11 @@ Your choices per friend are in the saved data (below). The page never polls.
   (`friends.js: isHiddenBySquadFilter`).
 - **My share** (`buildMyShare`): all drawings (strokes cut to `{c, w, pts}`, anything the server
   would refuse left out) and, only while "Share my tasks" is on, `{ticks, pct}` for every active
-  task (`pct` = the whole task's progress). Nothing else leaves the saved data.
+  task (`pct` = the whole task's progress); only while "Share my keys" is on (ticket 09), the
+  cleaned `keyring` (`keys/rules.js shareableKeyring`). Nothing else leaves the saved data.
+- **Friends' keys** (ticket 09) are read in `features/keys` (`friendKeyList`: own-property lookups,
+  24-hex ids only): a dot on the doors they can open, "Mike has this key" in the door popup,
+  "Sam has it" on a task's key. A change in a friend's key list (`keysChanged`) redraws the page once.
 - **What changed** (`describeSquadChange`): compares two views so only that is redrawn.
 
 **Flow:**
@@ -55,6 +59,7 @@ server "squad" event → app/live-events.js → live-event.js onSquadChanged →
 Settings → Join → POST /api/squad/join (up to 90 s) → applySquadView → forced share send
 Settings → ☑ Share my tasks → PUT /api/squad/profile → forced share send (the server keeps no
   tasks while sharing is off, so it has none to add itself)
+Settings → ☑ Share my keys (ticket 09) → PUT /api/squad/profile {shareKeys} → forced share send
 Settings → Leave (confirm) → POST /api/squad/leave → friends gone from the page
 ```
 

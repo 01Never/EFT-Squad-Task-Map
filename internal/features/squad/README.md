@@ -23,9 +23,10 @@ categories, AI chats, your position. The server only ever sends what's in the sh
 
 | Rule | Function | Numbers and why |
 |---|---|---|
-| A share is `{v, player, rev, updatedAt, draw, tasks}` | `Share` | `v` = 1 (`ShareFormatVersion`); `updatedAt` in ms since 1970 |
-| `rev` goes up only when the content changes | `StampShare` | content = player (id, name, colour) + drawings + tasks; the same content again keeps rev and updatedAt |
-| Tasks are dropped when "Share my tasks" is off | `StampShare` | enforced by the server, whatever the page sends; turning it off re-stamps at once (rev + 1, `tasks: null`) |
+| A share is `{v, player, rev, updatedAt, draw, tasks, keys}` | `Share` | `v` = 1 (`ShareFormatVersion`); `updatedAt` in ms since 1970; `keys` (ticket 09) is new in the same format version: copies from before it don't send it (reads as null) and ignore it when they receive it |
+| `rev` goes up only when the content changes | `StampShare` | content = player (id, name, colour) + drawings + tasks + keys; the same content again keeps rev and updatedAt (a share stamped before ticket 09, with no keys, restamps unchanged) |
+| Tasks are dropped when "Share my tasks" is off, keys when "Share my keys" is off | `StampShare` (`Sharing{Tasks, Keys}`) | enforced by the server, whatever the page sends; turning one off re-stamps at once (rev + 1, `tasks: null` / `keys: null`) |
+| Key lists are checked like the rest (ticket 09) | `validateKeys` | `{"<map key>": ["<key item id>", …]}`: map keys as for drawings (`[A-Za-z0-9_-]{1,64}`, no JavaScript property names), ≤ 64 maps, ≤ 200 keys a map, every key 24 lower-case hex characters; anything else refuses the whole share |
 | Everything received is checked; a bad share is dropped whole and logged once | `DecodeShare`, `ValidateShare`, `ValidateParts` | ≤ 2 MB (`MaxShareBytes`, ticket's cap); player id 16 lower-case hex; name 1–32 characters (not bytes), no control characters, no bidi controls or zero-width spaces, at least one visible character, no spaces at the ends; colour `#rrggbb`; task and objective ids exactly 24 lower-case hex characters (what the real game data has: all 515 task ids and 1441 objective ids in the bundled snapshot; so `toString`, `__proto__` and the like can't get in); map keys `[A-Za-z0-9_-]{1,64}` and never a name of a JavaScript object property (`__proto__`, `constructor`, `prototype`, `toString`, `valueOf`, `hasOwnProperty`, …); ≤ 64 maps, ≤ 5000 strokes a map, 1–10000 `[x, z]` points a stroke, width 0–1000, coordinates within ±1e6, stroke colour `#rgb`/`#rrggbb`; ≤ 2000 tasks, ≤ 200 ticks each, a tick is `true` or a whole number 0–100000, `pct` 0–100 |
 | A friend's share is new when rev or updatedAt differ | `HasChanged` | not "higher": a friend who reset their data starts again at rev 1 |
 | On the tailnet a share must carry the id its node is named after | `ShareFitsPeer` | so one friend can't pose as another (the dev transport has no names) |
@@ -95,7 +96,7 @@ All bodies are JSON sent as `application/json` (415 otherwise). Times are ms sin
 {
   "me":        { "playerId": "0123456789abcdef", "name": "Mike", "color": "#4dabf7",
                  "rev": 42, "updatedAt": 1791336708099 },   // rev/updatedAt 0 until a share was sent
-  "settings":  { "shareTasks": false, "joined": true },
+  "settings":  { "shareTasks": false, "shareKeys": false, "joined": true },
   "transport": "tsnet",                                        // or "dev"
   "status":    { "state": "connected",                         // off | starting | needsLogin | connected | error
                  "text": "Connected · 2 of 3 friends online",  // show as is
@@ -106,7 +107,8 @@ All bodies are JSON sent as `application/json` (415 otherwise). Times are ms sin
       "online": true, "lastSeen": 1791336708099,
       "share": { "v": 1, "player": {…}, "rev": 7, "updatedAt": …,
                  "draw":  { "<mapKey>": [ { "c": "#ff4d4d", "w": 2.5, "pts": [[x, z], …] } ] },
-                 "tasks": null | { "<taskId>": { "ticks": { "<objId>": true | 3 }, "pct": 40 } } } }
+                 "tasks": null | { "<taskId>": { "ticks": { "<objId>": true | 3 }, "pct": 40 } },
+                 "keys":  null | { "<mapKey>": ["<key item id>", …] } } }   // ticket 09
   ]
 }
 ```
@@ -115,16 +117,18 @@ All bodies are JSON sent as `application/json` (415 otherwise). Times are ms sin
 - Friends' data is read-only. Draw friends' strokes in the friend's `color` (owner's default),
   not the strokes' own `c`.
 
-### `PUT /api/squad/share {draw, tasks}` → `{ok, rev, updatedAt, changed, tasksShared, inSquad}`
+### `PUT /api/squad/share {draw, tasks, keys}` → `{ok, rev, updatedAt, changed, tasksShared, keysShared, inSquad}`
 - `draw`: the page's `draw` (by map key, strokes `{c, w, pts}`); `tasks`: by task id
-  `{ticks, pct}`, or `null`. Any other field is ignored (the server stamps `v`, `player`, `rev`,
+  `{ticks, pct}`, or `null`; `keys` (ticket 09): the page's `keyring` (by map key, key item ids),
+  or `null`/absent. Any other field is ignored (the server stamps `v`, `player`, `rev`,
   `updatedAt`).
 - `changed: false` when the content is the same as the last share (rev unchanged).
-  `tasksShared: false` when "Share my tasks" is off: the tasks were dropped. `inSquad: false`: kept
-  for when you join; nobody gets it now.
+  `tasksShared: false` when "Share my tasks" is off: the tasks were dropped. `keysShared: false`
+  when "Share my keys" is off: the keys were dropped. `inSquad: false`: kept for when you join;
+  nobody gets it now.
 - Over 2 MB → **413**; not the shape or limits above → **400** `{ok: false, error: "The share isn't valid: …"}`.
-- Send it debounced (~1 s after a save), and again after turning "Share my tasks" on (the server
-  never keeps tasks while sharing is off, so it has none to add by itself).
+- Send it debounced (~1 s after a save), and again after turning "Share my tasks" or "Share my
+  keys" on (the server never keeps them while sharing is off, so it has none to add by itself).
 
 ### `POST /api/squad/join {authKey}` → `{ok: true, squad: <view>}`
 - Answers once the tailnet has accepted the code (up to 90 s) and the peer API listener is open (so a friend can connect the moment it returns), then the session runs. The code is
@@ -137,11 +141,11 @@ Stops the session, logs the node out of the tailnet, deletes `squad-task-map-tai
 friends' shares (the cache keeps only your own share) and sets `joined` to false. Always succeeds
 (a failed log-out is logged; the folder is deleted anyway).
 
-### `PUT /api/squad/profile {name?, color?, shareTasks?}` → `{ok: true, squad: <view>}`
+### `PUT /api/squad/profile {name?, color?, shareTasks?, shareKeys?}` → `{ok: true, squad: <view>}`
 Only the fields sent change. Name cleaned (bidi controls and zero-width characters removed, then trimmed), 1–32 characters; colour `#rrggbb` (any case, saved
 lower-case). **400** with "Your name must be 1 to 32 characters" or "Your colour must look like
 #4dabf7". Your share is re-stamped at once, so friends see the new name or colour, and lose your
-tasks as soon as sharing is turned off.
+tasks (or keys) as soon as sharing them is turned off.
 
 ### Live event `squad` (broadcast)
 `{"type": "squad", "squad": <the same view as GET /api/squad>}`, whenever the status, a friend's
@@ -167,7 +171,8 @@ SSE event ≤ 2 MB, at most one share a second taken from each friend (the newes
 
 ## Saved data / settings
 - `squad-task-map-settings.json`, block `"squad"` (unknown fields inside it are kept):
-  `playerId` (made once), `name`, `color`, `shareTasks` (default false), `joined`. Never the
+  `playerId` (made once), `name`, `color`, `shareTasks` (default false), `shareKeys` (ticket 09,
+  default false), `joined`. Never the
   invite code.
 - `squad-task-map-squad.json`: `{"v": 1, "mine": <my share> | null, "friends": {"<playerId>":
   {"lastSeen": …, "share": …}}}`. Re-checked when read; a friend that fails the checks is left out.
@@ -184,8 +189,9 @@ kept" for the page event and the cache file. Wiring: `internal/app/squad.go`; ro
 `internal/httpapi/squad.go`.
 
 ## Tests
-- `rules_test.go`: rev stamping, tasks stripped when sharing is off, validation rejects bad peer
-  data (about 35 cases), ticks, backoff schedule, caller checks (loopback, tag, browser), peer list
+- `rules_test.go`: rev stamping, tasks stripped when sharing is off, keys stripped when key
+  sharing is off (and a share from before ticket 09 restamps unchanged), validation rejects bad
+  peer data (about 45 cases, keys included), ticks, backoff schedule, caller checks (loopback, tag, browser), peer list
   rules, identity check, "new share" rule, profile rules, status line.
 - `rules_peers_test.go`: who a friend is (DNS name only, keyed by node id; `-1` names and host
   names don't count; two machines with the same host name or id → neither trusted), the `Host`
@@ -208,7 +214,9 @@ kept" for the page event and the cache file. Wiring: `internal/app/squad.go`; ro
   `STM_SQUAD_TSNET_TEST=1` (tsnet binds UDP on every interface, so Windows Firewall would ask
   about every new test binary).
 - `internal/app/squad_test.go`: never joined starts nothing; the server drops tasks the page sent
-  with sharing off (checked through the real peer API); 413/400/415 on the share route;
+  with sharing off, and keys with key sharing off (checked through the real peer API; turning
+  key sharing off again removes them); 413/400/415 on the share route (bad key ids and map keys
+  refused);
   join/leave/profile through the routes; the code isn't in the settings file; the peer API isn't
   on the page's server; a joined copy reconnects at launch.
 - **Needs the owner:** a real tailnet with 2+ PCs (setup in `docs/HANDOFF.md`): join with the
