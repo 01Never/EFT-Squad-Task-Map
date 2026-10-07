@@ -330,6 +330,61 @@ func TestLeaveDeletesTheNetworkStateAndForgetsFriends(t *testing.T) {
 	}
 }
 
+func TestLeavingGivesAFreshPlayerIDSoRejoiningIsANewMachine(t *testing.T) {
+	dir := t.TempDir()
+	addresses := freeAddresses(t, 1)
+	copy := newTestCopy(t, dir, addresses[0], nil, Settings{PlayerID: mike.ID, Name: "Mike", Color: "#4dabf7"})
+	copy.join()
+	copy.squad.SetMyShare(drawingAt(1))
+	before := copy.squad.View().Me
+
+	copy.squad.Leave(context.Background())
+
+	after := copy.squad.View().Me
+	if after.PlayerID == mike.ID || !IsValidPlayerID(after.PlayerID) {
+		t.Fatalf("player id after Leave: %q (was %q)", after.PlayerID, mike.ID)
+	}
+	if saved := copy.savedSettings().PlayerID; saved != after.PlayerID {
+		t.Errorf("saved player id %q, view says %q", saved, after.PlayerID)
+	}
+	mine, _ := readCache(filepath.Join(dir, "squad-task-map-squad.json"))
+	if mine == nil || mine.Player.ID != after.PlayerID {
+		t.Fatalf("my cached share doesn't carry the new id: %+v", mine)
+	}
+	if mine.Rev != before.Rev+1 || len(mine.Draw) == 0 {
+		t.Errorf("my share after Leave: rev %d (was %d), drawings %d; want the same drawings, rev+1", mine.Rev, before.Rev, len(mine.Draw))
+	}
+}
+
+func TestLeavingWhenNotInASquadKeepsThePlayerID(t *testing.T) {
+	dir := t.TempDir()
+	squad := New(Config{CacheFile: filepath.Join(dir, "squad.json"), StateDir: filepath.Join(dir, StateFolderName),
+		Settings: Settings{PlayerID: mike.ID}})
+	squad.Leave(context.Background())
+	if squad.Settings().PlayerID != mike.ID {
+		t.Errorf("player id changed to %q without being in a squad", squad.Settings().PlayerID)
+	}
+}
+
+func TestFriendsNotSeenFor30DaysAreDroppedWhenTheCacheIsLoaded(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "squad-task-map-squad.json")
+	now := time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
+	samShare, _ := StampShare(nil, sam, someParts(), false, now)
+	writeCache(path, nil, map[string]CachedFriend{
+		sam.ID: {LastSeen: now.Add(-31 * 24 * time.Hour).UnixMilli(), Share: samShare},
+	})
+	squad := New(Config{CacheFile: path, StateDir: filepath.Join(dir, StateFolderName),
+		Settings: Settings{PlayerID: mike.ID}, Now: func() time.Time { return now }})
+	if friends := squad.View().Friends; len(friends) != 0 {
+		t.Errorf("a friend last seen 31 days ago is still shown: %+v", friends)
+	}
+	squad.Stop() // the pruned cache is written (flushed) before the app closes
+	if _, cached := readCache(path); len(cached) != 0 {
+		t.Errorf("and still in the file: %+v", cached)
+	}
+}
+
 func TestLeaveOnlyDeletesAFolderWithTheStateFolderName(t *testing.T) {
 	dir := t.TempDir()
 	precious := filepath.Join(dir, "my-documents")

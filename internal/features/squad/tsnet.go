@@ -7,7 +7,6 @@ package squad
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -112,7 +111,10 @@ func (transport *TsnetTransport) Up(ctx context.Context, isJoining bool) error {
 	transport.server.AuthKey = "" // used once; the node key in the state folder is enough from now on
 	transport.config.AuthKey = ""
 	if err != nil {
-		return fmt.Errorf("joining the squad network: %s", transport.whyJoinFailed(err))
+		// The console keeps Tailscale's whole text; the page gets the part that matters.
+		reason := transport.whyJoinFailed(err)
+		log.Printf("squad: joining the squad network failed: %s", reason)
+		return errors.New(JoinFailureText(reason))
 	}
 	return nil
 }

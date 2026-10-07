@@ -36,7 +36,10 @@ categories, AI chats, your position. The server only ever sends what's in the sh
 | Names are shown as text | `IsValidName`, `NormalizeName` | bidi controls and zero-width spaces (U+200B, U+200E, U+200F, U+202A–U+202E, U+2060–U+2069, U+FEFF) are **removed** from the name you type (`PUT /api/squad/profile`), then it is trimmed; blank (or only zero-width joiners) is refused. The zero-width joiner and non-joiner (U+200C, U+200D) are allowed: emoji like 👨‍👩‍👧 and some Persian and Indic names need them. In a friend's share they are **refused** (the share is dropped), since a friend's copy never sends them. Markup and quotes are still accepted: **the page must insert names as text (escaped)** |
 | Reconnecting waits 1 s, 2 s, 4 s … 60 s | `RetryDelay` | ticket 05; starts over after a stream delivered a valid share |
 | Status line | `StatusText` | "Connected · 3 of 4 friends online"; "Connected · no friends seen yet"; "Connecting…"; "Signed out of the squad network: leave, then join again with an invite code"; "Squad connection failed: …"; "Not in a squad" |
-| Profile | `NormalizeName`, `NormalizeColor`, `NewPlayerID` | name cleaned (invisible characters removed, trimmed), 1–32 characters; colour lower-cased `#rrggbb`; defaults "Player" and `#4dabf7`; player id made once |
+| Profile | `NormalizeName`, `NormalizeColor`, `NewPlayerID` | name cleaned (invisible characters removed, trimmed), 1–32 characters; colour lower-cased `#rrggbb`; defaults "Player" and `#4dabf7`; player id made once, and a **new one on Leave** (below) |
+| Leaving gives a fresh identity | `Squad.Leave`, `NewPlayerID` | owner's decision: a tailnet may keep a logged-out machine listed, and a rejoin under the old name would become `stm-<id>-1`, which friends never trust. A new player id makes the next Join a brand-new `stm-<new id>` machine, so rejoining always works without touching the admin console. Your share keeps its drawings and tasks, gets the new id, and its rev **goes on** (+1). Friends see a new friend (their per-friend switches start over); the old id stays in their list, offline, until it is 30 days old. Only when you were in a squad (Leave when not joined keeps the id) |
+| Friends not seen for 30 days are dropped | `PruneStaleFriends`, `StaleFriendAge` | owner's decision; checked when the cache is loaded (start-up) and each time it is written; no timer |
+| A failed join shows only the reason | `JoinFailureText` | tsnet's "Tailscale is starting. Please wait." and "You are logged out. The last login error was:" are removed; anything saying expired becomes "this invite code has expired.", otherwise the text from "invalid key: …" on, otherwise what is left. The whole text goes to the console |
 | An invite code looks like a Tailscale auth key | `IsPlausibleAuthKey` | starts with `tskey-`, no spaces, ≤ 200 characters (Tailscale does the real check) |
 
 ## Flow
@@ -167,7 +170,7 @@ SSE event ≤ 2 MB, at most one share a second taken from each friend (the newes
 
 ## Saved data / settings
 - `squad-task-map-settings.json`, block `"squad"` (unknown fields inside it are kept):
-  `playerId` (made once), `name`, `color`, `shareTasks` (default false), `joined`. Never the
+  `playerId` (made once; a new one on Leave), `name`, `color`, `shareTasks` (default false), `joined`. Never the
   invite code.
 - `squad-task-map-squad.json`: `{"v": 1, "mine": <my share> | null, "friends": {"<playerId>":
   {"lastSeen": …, "share": …}}}`. Re-checked when read; a friend that fails the checks is left out.
@@ -214,10 +217,11 @@ kept" for the page event and the cache file. Wiring: `internal/app/squad.go`; ro
 - **A simulated tailnet for whole copies:** `cmd/faketailnet` (Tailscale's test control server,
   DERP and STUN on 127.0.0.1, with invite codes, the `tag:stm` policy, unique `-1` names, delete /
   expire, relay-only) and `tests/browser/squad-tailnet.e2e.mjs`, which joins three app binaries to
-  it through the page (`STM_SQUAD_CONTROL_URL`, `TsnetConfig.ControlURL`). What it found about
-  Leave → rejoin on a tailnet that keeps logged-out machines listed: the rejoined copy is named
-  `stm-<id>-1` and friends ignore it (and the old id) until the old machine is deleted **and** the
-  copy joins again with the plain name; a logged-out `-1` machine left listed blocks the same way.
+  it through the page (`STM_SQUAD_CONTROL_URL`, `TsnetConfig.ControlURL`). Before Leave made a
+  new player id, it found that on a tailnet that keeps logged-out machines listed a rejoined copy
+  was named `stm-<id>-1` and ignored until the old machines were deleted; now the rejoin is a new
+  `stm-<new id>` and friends see it at once (checked there).
+- **Known limits (accepted):** a `tag:stm` machine that names itself like a friend (only someone with the invite code can make one) makes friends trust **neither** it nor the real friend until it is deleted in the admin console ("trust neither" rule; a denial of service, not an impersonation). tsnet logs one `tshttpproxy: using proxy … for URL: "https://controlplane.tailscale.com/"` line at start even with `STM_SQUAD_CONTROL_URL`: a proxy lookup, not a connection.
 - **Needs the owner:** a real tailnet with 2+ PCs (setup in `docs/HANDOFF.md`): join with the
   invite code, see each other online, share live; delete a machine in the admin console and see
   "Signed out…"; idle CPU with friends connected on Windows.

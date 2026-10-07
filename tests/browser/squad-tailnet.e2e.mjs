@@ -154,6 +154,7 @@ class Player {
       await this.scenario.answered("PUT", "/api/squad/profile", () => this.page.fill("#sSquadColor", this.color));
     }
     await this.closeSettings();
+    this.id = await this.playerId(); // a new one after each Leave
   }
 
   /** One line: status and friends as the server sees them. */
@@ -268,8 +269,7 @@ test("three copies on a simulated Tailscale network", { skip: skip || false, tim
     await t.test("an expired invite code shows a clear error in Settings and leaves nothing on disk", async () => {
       const error = await cara.tryJoin(codes.expired);
       report(`expired code → "${error}" (after ${cara.joinMs} ms)`);
-      assert.match(error, /^Couldn't join the squad: /);
-      assert.match(error, /expired/, "the reason says the code expired");
+      assert.equal(error, "Couldn't join the squad: this invite code has expired.");
       await cara.shot("expired-code");
       await cara.closeSettings();
       assert.equal(fs.existsSync(path.join(cara.dataDir, "squad-task-map-tailscale")), false, "no tailscale folder");
@@ -486,56 +486,41 @@ test("three copies on a simulated Tailscale network", { skip: skip || false, tim
       }
     });
 
-    await t.test("Leave then rejoin with the same code (the stm-<id>-1 risk)", async () => {
+    await t.test("Leave then rejoin with the same code: a new identity, friends see it at once", async () => {
+      const oldId = bob.id;
+      const oldMachine = bob.machineName;
       await bob.leave();
       assert.equal(fs.existsSync(path.join(bob.dataDir, "squad-task-map-tailscale")), false, "Bob's node key is deleted");
       const afterLeave = await tailnet.listing();
       report(`Bob left → console: ${afterLeave}`);
+      assert.ok(afterLeave.includes(`${oldMachine} [tag:stm] offline logged-out`), "the fake keeps the old machine listed, logged out");
       await bob.join(codes.tagged);
+      assert.notEqual(bob.id, oldId, "Leave gave Bob a new player id");
       const afterRejoin = await tailnet.listing();
-      report(`Bob joined again → console: ${afterRejoin}`);
-      await sleep(5000);
-      const aliceSeesBob = (await alice.view()).friends.find((friend) => friend.playerId === bob.id);
-      const bobSees = (await bob.view()).status.text;
-      const clashLogged = alice.consoleOutput().includes(`two machines on the tailnet claim player ${bob.id}`);
-      report(`after rejoin: Alice shows Bob ${aliceSeesBob?.online ? "online" : "offline"}; Alice's console logs the clash: ${clashLogged}; Bob's status: "${bobSees}"`);
-      // The fake keeps a logged-out machine listed (and its name taken) until it is deleted, which
-      // is the risk the squad README names; whether real Tailscale does is for the owner's test.
-      assert.ok(afterRejoin.includes(`${bob.machineName}-1 [tag:stm] online`), "the rejoined copy is named -1");
-      assert.equal(aliceSeesBob?.online, false, "friends ignore the rejoined copy while the old machine is listed");
-      assert.ok(clashLogged, "and log the clash");
-
-      await tailnet.post(`/admin/nodes/${bob.machineName}/delete`);
-      report(`old machine deleted → console: ${await tailnet.listing()}`);
-      await sleep(5000);
-      const aliceSeesBobNow = (await alice.view()).friends.find((friend) => friend.playerId === bob.id);
-      report(`after deleting the old machine: Alice shows Bob ${aliceSeesBobNow?.online ? "online" : "offline"} (his machine keeps the name ${bob.machineName}-1, which never counts)`);
-      assert.equal(aliceSeesBobNow?.online, false, "a -1 name never counts, even alone");
-
-      // Leave and join once more: the plain name is free now, but the logged-out "-1" machine still
-      // claims the same player, so friends still trust neither.
-      await bob.leave();
-      await bob.join(codes.tagged);
-      report(`Bob left and joined a third time → console: ${await tailnet.listing()}`);
-      await sleep(5000);
-      const aliceSeesBobThird = (await alice.view()).friends.find((friend) => friend.playerId === bob.id);
-      report(`after the third join: Alice shows Bob ${aliceSeesBobThird?.online ? "online" : "offline"}`);
-      assert.equal(aliceSeesBobThird?.online, false, "a logged-out machine with the same id still blocks");
-
-      // The way back: delete every other machine of that player in the console.
-      await tailnet.post(`/admin/nodes/${bob.machineName}-1/delete`);
-      report(`"-1" machine deleted → console: ${await tailnet.listing()}`);
-      await eventually(async () => (await alice.chip(bob.id).textContent()).includes("online"), "Alice sees Bob again", 30_000);
+      report(`Bob joined again as ${bob.machineName} → console: ${afterRejoin}`);
+      assert.ok(afterRejoin.includes(`${oldMachine} [tag:stm] offline logged-out`), "the old machine is still listed");
+      assert.ok(afterRejoin.includes(`${bob.machineName} [tag:stm] online`), "the rejoin is a new stm-<id> machine, not -1");
+      assert.ok(!afterRejoin.includes("-1 ["), "no -1 name");
+      const rejoinedAt = Date.now();
+      await eventually(async () => (await alice.chip(bob.id).textContent()).includes("online"), "Alice sees Bob online, no console action", 30_000);
+      await eventually(async () => (await cara.chip(bob.id).textContent()).includes("online"), "Cara sees Bob online", 30_000);
+      report(`Alice and Cara see the rejoined Bob online after ${Date.now() - rejoinedAt} ms, with nothing done in the console`);
+      const oldEntry = (await alice.view()).friends.find((friend) => friend.playerId === oldId);
+      report(`Alice's old entry for Bob: ${oldEntry ? (oldEntry.online ? "online" : "offline") : "gone"}`);
+      assert.ok(!oldEntry || !oldEntry.online, "the old identity is offline");
+      assert.ok(!alice.consoleOutput().includes(`claim player ${bob.id}`), "no clash for the new id");
       await eventually(async () => (await bob.statusText()) === "Connected · 2 of 2 friends online", "Bob's status");
     });
 
-    await t.test("if the tailnet removes a machine when it logs out, Leave → rejoin just works", async () => {
+    await t.test("if the tailnet removes a machine when it logs out, Leave → rejoin works the same", async () => {
       await tailnet.settings({ logoutRemovesMachine: true });
+      const oldMachine = cara.machineName;
       await cara.leave();
-      report(`Cara left (log-out removes the machine) → console: ${await tailnet.listing()}`);
+      const afterLeave = await tailnet.listing();
+      report(`Cara left (log-out removes the machine) → console: ${afterLeave}`);
+      assert.ok(!afterLeave.includes(oldMachine), "the old machine is gone");
       await cara.join(codes.tagged);
-      report(`Cara joined again → console: ${await tailnet.listing()}`);
-      assert.deepEqual((await tailnet.nodes()).filter((node) => node.name.startsWith(cara.machineName)).map((node) => node.name), [cara.machineName]);
+      report(`Cara joined again as ${cara.machineName} → console: ${await tailnet.listing()}`);
       for (const other of [alice, bob]) {
         await eventually(async () => (await other.chip(cara.id).textContent()).includes("online"), `${other.name} sees Cara again`, 30_000);
       }

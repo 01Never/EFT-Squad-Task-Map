@@ -43,7 +43,7 @@ Check and note:
 6. **Offline:** close window 2 → A shows B "last seen …". Start it again → B reconnects by itself (no new Join) and its data refreshes.
 7. **Files:** each scratch folder has `squad-task-map-tailscale\` and `squad-task-map-squad.json`. Check **`%LocalAppData%\Tailscale`** and **`C:\ProgramData\Tailscale`** were **not** created by the app (note if they existed before). Search both scratch folders for the auth key text: it must not appear anywhere.
 8. **Leave** in B → B's `squad-task-map-tailscale\` is deleted, its chips are gone. In the admin console, **what happens to B's machine** (removed, or still listed as logged out)? This matters for the next check.
-9. **Rejoin** B with the same key. Does A see B again? Known risk: if B's old machine is still listed, the new one gets the name `stm-<id>-1`, and A ignores B ("trust neither", see the README) until the old machine is deleted in the console. Report exactly what happens, then delete the old machine and see if A picks B up.
+9. **Rejoin** B with the same key. Expected: B comes back as a **new** machine `stm-<new id>` (Leave gives the copy a fresh player id), and A sees B online again (as a new friend, the old entry offline) **without anything done in the admin console**. Note whether B's old machine is still listed (logged out) or gone.
 10. **Removed by the owner:** delete A's machine in the admin console → A shows "Signed out…" (or similar). Note the exact text.
 11. **Idle cost:** with both connected and nothing happening, Task Manager → Details: CPU (should round to 0) and memory (working set) of each SquadTaskMap.exe after 2 minutes. Also one copy that has **never joined** (a third scratch folder): CPU and memory, for comparison.
 
