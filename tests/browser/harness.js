@@ -286,6 +286,41 @@ export async function startRealDataMock() {
   return { base, stop };
 }
 
+/**
+ * Builds another Go program from this working tree into the run's bin folder (once per test
+ * process), e.g. `buildTool("faketailnet", "./cmd/faketailnet")`. Returns the program's path.
+ * @param {string} name
+ * @param {string} packagePath
+ */
+const builtTools = new Map();
+export function buildTool(name, packagePath) {
+  if (!builtTools.has(name)) {
+    builtTools.set(name, (async () => {
+      const { tools } = await prepareProcess();
+      const exe = path.join(tools.runDir, "bin", `stm-e2e-${name}${process.platform === "win32" ? ".exe" : ""}`);
+      await goBuild(exe, packagePath);
+      return exe;
+    })());
+  }
+  return builtTools.get(name);
+}
+
+/**
+ * Starts a helper program (with the same clean environment as the app: no STM_* settings), keeps
+ * its output, and stops it when the test process ends if the test didn't.
+ * @param {string} exe
+ * @param {string[]} args
+ * @returns {{ child: import("node:child_process").ChildProcess, output: () => string, stop: () => Promise<void> }}
+ */
+export function startToolProcess(exe, args = []) {
+  const child = spawn(exe, args, { cwd: REPO_ROOT, env: environmentWithoutAppSettings(), stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  childProcesses.add(child);
+  let output = "";
+  child.stdout.on("data", (chunk) => (output += chunk));
+  child.stderr.on("data", (chunk) => (output += chunk));
+  return { child, output: () => output, stop: () => stopProcess(child) };
+}
+
 async function mockIsAnswering(base = MOCK_BASE) {
   try {
     const response = await fetch(base + "/log", { signal: AbortSignal.timeout(1000) });

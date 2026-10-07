@@ -38,9 +38,13 @@ type TsnetConfig struct {
 	AuthKey  string // the invite code, only when joining; "" when resuming after a restart
 	Debug    bool   // print tsnet's own (verbose) log in the console (STM_SQUAD_DEBUG)
 
-	// Tests only (tsnet_test.go runs a fake tailnet): its control server, and the tags a node asks
-	// for. A real node gets tag:stm from the invite code instead.
-	controlURL    string
+	// ControlURL is the tailnet's coordination server; "" = Tailscale's own. Tests and
+	// STM_SQUAD_CONTROL_URL (cmd/faketailnet) point it at a fake tailnet. Every check on callers
+	// and shares stays the same.
+	ControlURL string
+
+	// Tests only (tsnet_test.go): the tags a node asks for. A real node gets tag:stm from the
+	// invite code instead (so does a node on cmd/faketailnet).
 	advertiseTags []string
 }
 
@@ -74,7 +78,7 @@ func NewTsnetTransport(config TsnetConfig) *TsnetTransport {
 		Hostname: Hostname(config.PlayerID),
 		UserLogf: func(string, ...any) {}, // the status line on the page says what matters
 
-		ControlURL:    config.controlURL,
+		ControlURL:    config.ControlURL,
 		AdvertiseTags: config.advertiseTags,
 	}
 	if config.Debug {

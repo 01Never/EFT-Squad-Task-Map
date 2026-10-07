@@ -280,3 +280,25 @@ func TestTheStateFolderNameMatchesTheOneLeaveMayDelete(t *testing.T) {
 		t.Errorf("storage names the tsnet folder %q, but Leave only deletes %q", filepath.Base(files.SquadNetwork), squad.StateFolderName)
 	}
 }
+
+func TestTheControlServerOverrideTakesOnlyHTTPAddresses(t *testing.T) {
+	cases := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{"not set: Tailscale's own coordination server", "", ""},
+		{"a fake tailnet on this PC is used", "http://127.0.0.1:7870", "http://127.0.0.1:7870"},
+		{"an https address is used", "https://headscale.example", "https://headscale.example"},
+		{"another scheme is ignored", "ftp://127.0.0.1:7870", ""},
+		{"text that isn't an address is ignored", "127.0.0.1:7870", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("STM_SQUAD_CONTROL_URL", tc.value)
+			if got := squadControlURL(); got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

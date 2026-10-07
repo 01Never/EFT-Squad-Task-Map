@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"time"
 
@@ -24,6 +25,10 @@ import (
 //   - STM_SQUAD_DEV_PEERS=127.0.0.1:7902,127.0.0.1:7903: the other copies' addresses.
 //
 // STM_SQUAD_DEBUG=1 prints tsnet's own log in the console.
+//
+// STM_SQUAD_CONTROL_URL=http://127.0.0.1:<port> (tests only): tsnet uses this coordination server
+// instead of Tailscale's, e.g. cmd/faketailnet. Nothing else changes: the tag:stm check, the Host
+// check, the size caps and the share checks are the same.
 
 // joinTimeout: how long Join waits for the tailnet to accept the invite code.
 const joinTimeout = 90 * time.Second
@@ -33,6 +38,10 @@ const leaveTimeout = 10 * time.Second
 
 // newSquad creates the squad feature from the saved settings. It starts nothing.
 func newSquad(app *App) *squad.Squad {
+	if controlURL := squadControlURL(); controlURL != "" {
+		log.Printf("squad: using the coordination server %s (STM_SQUAD_CONTROL_URL, for tests)",
+			controlURL)
+	}
 	saved := app.currentSettings().SquadOrEmpty()
 	return squad.New(squad.Config{
 		CacheFile:     app.files.SquadCache,
@@ -72,6 +81,21 @@ func devSquadAddress() string {
 	return listen
 }
 
+// squadControlURL is STM_SQUAD_CONTROL_URL when it's an http(s) address; otherwise "" (Tailscale's
+// own coordination server), with one console line when it was set to something else.
+func squadControlURL() string {
+	value := os.Getenv("STM_SQUAD_CONTROL_URL")
+	if value == "" {
+		return ""
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		log.Println("STM_SQUAD_CONTROL_URL ignored: it must look like http://127.0.0.1:<port>")
+		return ""
+	}
+	return value
+}
+
 func squadTransportName() string {
 	if devSquadAddress() != "" {
 		return "dev"
@@ -91,6 +115,8 @@ func (app *App) newSquadTransport(authKey string) squad.Transport {
 		PlayerID: app.squad.Settings().PlayerID,
 		AuthKey:  authKey,
 		Debug:    os.Getenv("STM_SQUAD_DEBUG") != "",
+
+		ControlURL: squadControlURL(),
 	})
 }
 
