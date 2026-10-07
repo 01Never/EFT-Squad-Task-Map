@@ -3,16 +3,16 @@
 // (PUT /api/state, atomic write + .bak). Changes are batched: one save shortly after the last one.
 import { app } from "./state.js";
 import { findElement } from "./dom.js";
+import { shouldUseKeepalive, retryDelayMs } from "./saving-rules.js";
 import { scheduleShareUpdate } from "../features/squad/share-sync.js";
 
 // Wait this long after the last change before saving, so a burst of clicks is one save.
 const SAVE_DEBOUNCE_MS = 500;
-// After a failed save, try again this much later.
-const SAVE_RETRY_MS = 1500;
 
 let saveTimer = null;
 let isSaving = false;
 let hasUnsavedChanges = false;
+let programAnsweredWithError = false;
 
 /** Mark the saved data as changed: shows "Saving…" and saves it soon. */
 export function save() {
@@ -37,9 +37,11 @@ export async function flush() {
   }
   isSaving = true;
   hasUnsavedChanges = false;
+  programAnsweredWithError = false;
   try {
-    const response = await putSavedData({ keepalive: true });
+    const response = await putSavedData(false);
     if (!response.ok) {
+      programAnsweredWithError = true;
       throw 0;
     }
     findElement("#saved").textContent = "Saved ✓";
@@ -50,33 +52,34 @@ export async function flush() {
   }
   isSaving = false;
   if (hasUnsavedChanges) {
-    saveTimer = setTimeout(flush, SAVE_RETRY_MS);
+    saveTimer = setTimeout(flush, retryDelayMs(programAnsweredWithError));
   }
 }
 
 /** Save straight away, without the indicator: used once at start-up after migrating v1 data. */
 export async function saveMigratedData() {
-  await putSavedData({});
+  await putSavedData(false);
 }
 
-/** When the page closes with unsaved changes, send them (keepalive lets the request finish). */
+/** When the page closes with unsaved changes, send them (keepalive lets the request finish, when the data is small enough). */
 export function saveUnsavedChangesOnClose() {
   addEventListener("beforeunload", () => {
     if (hasUnsavedChanges) {
-      putSavedData({ keepalive: true });
+      putSavedData(true);
     }
   });
 }
 
 /**
- * @param {{ keepalive?: boolean }} options
+ * @param {boolean} isPageClosing
  * @returns {Promise<Response>}
  */
-function putSavedData(options) {
+function putSavedData(isPageClosing) {
+  const body = JSON.stringify(app.saved);
   return fetch("/api/state", {
     method: "PUT",
     headers: { "Content-Type": "application/json" }, // the server refuses anything else (ticket 04d)
-    body: JSON.stringify(app.saved),
-    ...options,
+    body,
+    keepalive: shouldUseKeepalive(body, isPageClosing),
   });
 }
