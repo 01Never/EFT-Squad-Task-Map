@@ -74,7 +74,8 @@ Go dependencies: `github.com/fsnotify/fsnotify` (screenshots folder notification
 | `STM_SQUAD_DEV_LISTEN` | Squad dev transport (ticket 05): serve the peer API on this address on this PC (e.g. `127.0.0.1:7901`) instead of using tsnet at all. Ignored (one console line) unless it's a loopback address. |
 | `STM_SQUAD_DEV_PEERS` | With `STM_SQUAD_DEV_LISTEN`: the other copies' peer API addresses, comma-separated (`127.0.0.1:7902,127.0.0.1:7903`) |
 | `STM_SQUAD_DEBUG=1` | Print tsnet's own (verbose) log in the console |
-| `TS_CONTROL_URL` | Tailscale's own variable, read by tsnet: use another control server (only for tests and measurements, e.g. a fake tailnet). Not needed with a real tailnet. |
+| `STM_SQUAD_CONTROL_URL` | Tests only: tsnet uses this coordination server instead of Tailscale's, e.g. `cmd/faketailnet` (`http://127.0.0.1:<port>`). One console line at start when set; ignored (one line) unless it's an `http(s)://` address. Every squad check stays the same (`tag:stm` via WhoIs, the `Host` check, size caps, share validation). |
+| `TS_CONTROL_URL` | Tailscale's own variable, read by tsnet: use another control server (only for tests and measurements, e.g. a fake tailnet). Not needed with a real tailnet. `STM_SQUAD_CONTROL_URL` wins when both are set. |
 
 **One copy at a time:** the running copy writes `squad-task-map-instance.json` (port, pid) in the data folder; a second launch on the same data folder opens that copy's page and exits. Copies with different `STM_DATA_DIR`s run side by side (tests, squad dev setups).
 
@@ -209,6 +210,7 @@ Friends' copies ◄─(tailnet :7777, peer API; only when joined)─► features
 | `internal/features/squad` | Squad sharing over a private tailnet (ticket 05): your share (rev stamping, tasks dropped unless shared), the peer API on its own listener (`GET /squad/v1/share`, `/squad/v1/stream`), friends found on the IPN bus and held on SSE streams with 1 s → 60 s backoff, everything received validated, friends cached with `lastSeen`; tsnet or dev transport (picked in `internal/app/squad.go`). Starts only when joined. README has the full API for the page. |
 | `cmd/mock` | Offline stand-ins for json.tarkov.dev, OpenAI, the wiki and a fake GitHub Releases (byte-equal to v2's Bun mock for the first three). |
 | `cmd/release` | The owner's release tool: version check, tests, Windows build, signed `latest.json`. See "Publishing an update". |
+| `cmd/faketailnet` | Test-only stand-in for Tailscale (ticket 05 tests): Tailscale's own test control server, a DERP relay and STUN on 127.0.0.1, with invite codes (tagged, expired, untagged), unique `-1` names, the `tag:stm` → `tag:stm` :7777 policy, online tracking, relay-only mode, and an admin API (list, delete, expire, test nodes). App copies join it with `STM_SQUAD_CONTROL_URL`. README has the API. |
 
 ### Page (`web/`)
 Plain JavaScript modules served as-is (no bundler), organised by feature (`docs/CODE-STYLE.md` §1).
@@ -377,6 +379,12 @@ Measured idle cost with the page open (2 min, 2026-10-05): **Go 2.4.0: 0.000% of
   requests): join, share, untagged node refused, restart with the node key alone, Leave, signed
   out by the tailnet. `go test -short` skips the tsnet test, and so does Windows unless `STM_SQUAD_TSNET_TEST=1` (its UDP binding would make Windows Firewall ask about every new test binary). `internal/app/squad_test.go` covers
   the routes. Run `go test -race ./internal/features/squad ./internal/app` after squad changes.
+- `cmd/faketailnet`: its rules (invite codes, registration, unique names, policy, relay-only frame
+  filter). It is driven end to end by `tests/browser/squad-tailnet.e2e.mjs`: three app binaries
+  joined through the page on the fake tailnet (join, console, drawings, tasks, offline and back,
+  idle CPU, relay-only, intruders, expired code, deleted machine, Leave → rejoin). It mirrors
+  `docs/handoff-05-tailscale-test.md`; only real PCs show NAT traversal, the real console and
+  Windows Firewall.
 
 **Page:** `npm test` (`node --test`): every `*.test.js` next to the rules it tests: `map/projection.test.js` (tarkov.dev vectors), `app/saved-data.test.js` (v1 → v2, missing fields), and `features/<name>/rules.test.js` (parts, categories, readiness and the Bring list, name matching, drawing, extracts, find-me, raid, picker, settings, AI Categorize, sub-tasks). Shared test data loading is in `tests/support/game-data.js`. `npm run typecheck` type-checks the page.
 

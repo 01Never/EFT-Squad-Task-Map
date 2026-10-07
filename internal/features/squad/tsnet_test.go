@@ -50,7 +50,7 @@ func tsnetTransportFor(controlURL, dir, playerID, inviteCode string) *TsnetTrans
 		StateDir:      filepath.Join(dir, StateFolderName),
 		PlayerID:      playerID,
 		AuthKey:       inviteCode,
-		controlURL:    controlURL,
+		ControlURL:    controlURL,
 		advertiseTags: []string{SquadTag},
 	})
 }

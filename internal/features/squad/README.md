@@ -211,6 +211,13 @@ kept" for the page event and the cache file. Wiring: `internal/app/squad.go`; ro
   with sharing off (checked through the real peer API); 413/400/415 on the share route;
   join/leave/profile through the routes; the code isn't in the settings file; the peer API isn't
   on the page's server; a joined copy reconnects at launch.
+- **A simulated tailnet for whole copies:** `cmd/faketailnet` (Tailscale's test control server,
+  DERP and STUN on 127.0.0.1, with invite codes, the `tag:stm` policy, unique `-1` names, delete /
+  expire, relay-only) and `tests/browser/squad-tailnet.e2e.mjs`, which joins three app binaries to
+  it through the page (`STM_SQUAD_CONTROL_URL`, `TsnetConfig.ControlURL`). What it found about
+  Leave → rejoin on a tailnet that keeps logged-out machines listed: the rejoined copy is named
+  `stm-<id>-1` and friends ignore it (and the old id) until the old machine is deleted **and** the
+  copy joins again with the plain name; a logged-out `-1` machine left listed blocks the same way.
 - **Needs the owner:** a real tailnet with 2+ PCs (setup in `docs/HANDOFF.md`): join with the
   invite code, see each other online, share live; delete a machine in the admin console and see
   "Signed out…"; idle CPU with friends connected on Windows.
