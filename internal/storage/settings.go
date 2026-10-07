@@ -38,6 +38,7 @@ type SquadSettings struct {
 	Name       string `json:"name,omitempty"`       // shown to friends, 1 to 32 characters
 	Color      string `json:"color,omitempty"`      // "#rrggbb"
 	ShareTasks bool   `json:"shareTasks,omitempty"` // default off
+	ShareKeys  bool   `json:"shareKeys,omitempty"`  // ticket 09, default off
 	Joined     bool   `json:"joined,omitempty"`     // in a squad: start the squad network at launch
 
 	// Fields this version doesn't know about inside "squad", kept like the top-level ones.
@@ -45,7 +46,8 @@ type SquadSettings struct {
 }
 
 var knownSquadSettingsFields = map[string]bool{
-	"playerId": true, "name": true, "color": true, "shareTasks": true, "joined": true,
+	"playerId": true, "name": true, "color": true, "shareTasks": true, "shareKeys": true,
+	"joined": true,
 }
 
 // UnmarshalJSON reads the known squad fields and keeps the rest untouched.

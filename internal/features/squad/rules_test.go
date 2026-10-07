@@ -24,7 +24,7 @@ func someParts() ShareParts {
 }
 
 func TestRevStamping(t *testing.T) {
-	first, _ := StampShare(nil, mike, someParts(), true, noon)
+	first, _ := StampShare(nil, mike, someParts(), Sharing{Tasks: true}, noon)
 	movedLine := someParts()
 	movedLine.Draw["customs"][0].Points = [][]float64{{11, 20}, {30, 40}}
 	renamed := mike
@@ -47,7 +47,7 @@ func TestRevStamping(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			later := noon.Add(time.Minute)
-			got, changed := StampShare(tc.previous, tc.player, tc.parts, true, later)
+			got, changed := StampShare(tc.previous, tc.player, tc.parts, Sharing{Tasks: true}, later)
 			if got.Rev != tc.wantRev || changed != tc.wantChanged {
 				t.Errorf("rev %d changed %v, want rev %d changed %v", got.Rev, changed, tc.wantRev, tc.wantChanged)
 			}
@@ -77,7 +77,7 @@ func TestTasksAreStrippedWhenSharingIsOff(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			share, _ := StampShare(nil, mike, someParts(), tc.shareTasks, noon)
+			share, _ := StampShare(nil, mike, someParts(), Sharing{Tasks: tc.shareTasks}, noon)
 			if len(share.Tasks) != tc.wantTaskCount {
 				t.Errorf("%d tasks, want %d", len(share.Tasks), tc.wantTaskCount)
 			}
@@ -90,10 +90,58 @@ func TestTasksAreStrippedWhenSharingIsOff(t *testing.T) {
 	}
 
 	t.Run("turning sharing off raises the rev, so friends drop the tasks at once", func(t *testing.T) {
-		shared, _ := StampShare(nil, mike, someParts(), true, noon)
-		hidden, changed := StampShare(&shared, mike, someParts(), false, noon.Add(time.Second))
+		shared, _ := StampShare(nil, mike, someParts(), Sharing{Tasks: true}, noon)
+		hidden, changed := StampShare(&shared, mike, someParts(), Sharing{}, noon.Add(time.Second))
 		if !changed || hidden.Rev != 2 || hidden.Tasks != nil {
 			t.Errorf("changed %v rev %d tasks %v", changed, hidden.Rev, hidden.Tasks)
+		}
+	})
+}
+
+func TestKeysAreStrippedWhenKeySharingIsOff(t *testing.T) {
+	withKeys := someParts()
+	withKeys.Keys = map[string][]string{"customs": {"5780cf7f2459777de4559322"}}
+	cases := []struct {
+		name         string
+		sharing      Sharing
+		wantKeyMaps  int
+		wantNullKeys bool
+		wantTasks    bool
+	}{
+		{"key sharing on keeps the keys", Sharing{Keys: true}, 1, false, false},
+		{"key sharing off drops the keys, whatever the page sent", Sharing{Tasks: true}, 0, true, true},
+		{"both on keeps both", Sharing{Tasks: true, Keys: true}, 1, false, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			share, _ := StampShare(nil, mike, withKeys, tc.sharing, noon)
+			if len(share.Keys) != tc.wantKeyMaps || (share.Tasks != nil) != tc.wantTasks {
+				t.Errorf("keys %v tasks %v", share.Keys, share.Tasks)
+			}
+			encoded, _ := json.Marshal(share)
+			hasNull := strings.Contains(string(encoded), `"keys":null`)
+			if hasNull != tc.wantNullKeys {
+				t.Errorf("JSON %s: keys null = %v, want %v", encoded, hasNull, tc.wantNullKeys)
+			}
+		})
+	}
+
+	t.Run("a new key raises the rev, the same keys again don't", func(t *testing.T) {
+		first, _ := StampShare(nil, mike, withKeys, Sharing{Keys: true}, noon)
+		same, sameChanged := StampShare(&first, mike, withKeys, Sharing{Keys: true}, noon.Add(time.Second))
+		more := someParts()
+		more.Keys = map[string][]string{"customs": {"5780cf7f2459777de4559322", "5913915886f774123603c392"}}
+		next, nextChanged := StampShare(&first, mike, more, Sharing{Keys: true}, noon.Add(time.Second))
+		if sameChanged || same.Rev != 1 || !nextChanged || next.Rev != 2 {
+			t.Errorf("same: changed %v rev %d; more: changed %v rev %d", sameChanged, same.Rev, nextChanged, next.Rev)
+		}
+	})
+
+	t.Run("a share from before ticket 09 (no keys) restamps without a new rev", func(t *testing.T) {
+		old, _ := StampShare(nil, mike, someParts(), Sharing{Tasks: true}, noon)
+		again, changed := StampShare(&old, mike, someParts(), Sharing{Tasks: true, Keys: true}, noon.Add(time.Second))
+		if changed || again.Rev != 1 {
+			t.Errorf("changed %v rev %d", changed, again.Rev)
 		}
 	})
 }
@@ -128,6 +176,17 @@ func TestValidationRejectsBadPeerData(t *testing.T) {
 	}
 	oneTaskID := func(id string) map[string]any {
 		return map[string]any{"tasks": map[string]any{id: map[string]any{"ticks": map[string]any{}, "pct": 0}}}
+	}
+	keysOn := func(mapKey string, keyIDs ...string) map[string]any {
+		return map[string]any{"keys": map[string]any{mapKey: keyIDs}}
+	}
+	manyKeys := make([]string, maxKeysPerMap+1)
+	for i := range manyKeys {
+		manyKeys[i] = "5780cf7f2459777de4559322"
+	}
+	manyMaps := map[string]any{}
+	for i := 0; i <= maxKeyMaps; i++ {
+		manyMaps["map"+strings.Repeat("x", i%10)+string(rune('a'+i%26))+string(rune('a'+i/26))] = []string{}
 	}
 	hugeName := strings.Repeat("x", MaxNameRunes+1)
 	cases := []struct {
@@ -170,6 +229,16 @@ func TestValidationRejectsBadPeerData(t *testing.T) {
 		{"a name of only spaces is dropped", validShareJSON(withPlayer(sam.ID, "   ", sam.Color)), false},
 		{"a 32-character name of 3-byte characters is accepted (characters, not bytes)", validShareJSON(withPlayer(sam.ID, strings.Repeat("\u4e2d", 32), sam.Color)), true},
 		{"a share over 2 MB is dropped", append(validShareJSON(nil), make([]byte, MaxShareBytes)...), false},
+		{"keys may be null (key sharing off)", validShareJSON(map[string]any{"keys": nil}), true},
+		{"a key list is accepted", validShareJSON(keysOn("customs", "5780cf7f2459777de4559322")), true},
+		{"keys that aren't by map are dropped", validShareJSON(map[string]any{"keys": []any{"5780cf7f2459777de4559322"}}), false},
+		{"a key id that isn't 24 lower-case hex is dropped", validShareJSON(keysOn("customs", "toString")), false},
+		{"a key id in upper-case hex is dropped", validShareJSON(keysOn("customs", "5780CF7F2459777DE4559322")), false},
+		{"a key that isn't text is dropped", validShareJSON(map[string]any{"keys": map[string]any{"customs": []any{7}}}), false},
+		{"a key list on a map key named __proto__ is dropped", validShareJSON(keysOn("__proto__", "5780cf7f2459777de4559322")), false},
+		{"a key list on a map key with odd characters is dropped", validShareJSON(keysOn("<b>", "5780cf7f2459777de4559322")), false},
+		{"201 keys on one map are dropped", validShareJSON(keysOn("customs", manyKeys...)), false},
+		{"key lists for 65 maps are dropped", validShareJSON(map[string]any{"keys": manyMaps}), false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

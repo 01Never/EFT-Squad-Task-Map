@@ -19,6 +19,7 @@ type SquadProfileChange struct {
 	Name       *string
 	Color      *string
 	ShareTasks *bool
+	ShareKeys  *bool // ticket 09
 }
 
 var (
@@ -33,7 +34,8 @@ func (server *Server) squadView(writer http.ResponseWriter, _ *http.Request) {
 	writeJSON(writer, http.StatusOK, server.backend.SquadView())
 }
 
-// setSquadShare: PUT /api/squad/share {draw, tasks} → {ok, rev, updatedAt, changed, tasksShared, inSquad}.
+// setSquadShare: PUT /api/squad/share {draw, tasks, keys} → {ok, rev, updatedAt, changed,
+// tasksShared, keysShared, inSquad}.
 // Over 2 MB → 413; not the right shape → 400 with the reason.
 func (server *Server) setSquadShare(writer http.ResponseWriter, request *http.Request) {
 	data, err := io.ReadAll(io.LimitReader(request.Body, squad.MaxShareBytes+1))
@@ -81,14 +83,15 @@ func (server *Server) leaveSquad(writer http.ResponseWriter, request *http.Reque
 	writeJSON(writer, http.StatusOK, map[string]any{"ok": true, "squad": view})
 }
 
-// setSquadProfile: PUT /api/squad/profile {name?, color?, shareTasks?} → {ok, squad}; 400 with the
-// reason for a bad name or colour.
+// setSquadProfile: PUT /api/squad/profile {name?, color?, shareTasks?, shareKeys?} → {ok, squad};
+// 400 with the reason for a bad name or colour.
 func (server *Server) setSquadProfile(writer http.ResponseWriter, request *http.Request) {
 	body := readBody(request)
 	change := SquadProfileChange{
 		Name:       stringField(body, "name"),
 		Color:      stringField(body, "color"),
 		ShareTasks: boolField(body, "shareTasks"),
+		ShareKeys:  boolField(body, "shareKeys"),
 	}
 	view, err := server.backend.SetSquadProfile(change)
 	if err != nil {

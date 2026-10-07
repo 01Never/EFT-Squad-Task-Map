@@ -43,6 +43,7 @@ func newSquad(app *App) *squad.Squad {
 			Name:       saved.Name,
 			Color:      saved.Color,
 			ShareTasks: saved.ShareTasks,
+			ShareKeys:  saved.ShareKeys,
 			Joined:     saved.Joined,
 		},
 		SaveSettings: app.saveSquadSettings,
@@ -103,6 +104,7 @@ func (app *App) saveSquadSettings(settings squad.Settings) {
 	block.Name = settings.Name
 	block.Color = settings.Color
 	block.ShareTasks = settings.ShareTasks
+	block.ShareKeys = settings.ShareKeys
 	block.Joined = settings.Joined
 	app.settings.Squad = &block
 	saved := app.settings
@@ -122,7 +124,7 @@ func (app *App) onSquadChanged() {
 // SquadView is GET /api/squad.
 func (app *App) SquadView() any { return app.squad.View() }
 
-// SetSquadShare stores the page's drawings and tasks as my share.
+// SetSquadShare stores the page's drawings, tasks and keys as my share.
 func (app *App) SetSquadShare(parts squad.ShareParts) (any, error) {
 	return app.squad.SetMyShare(parts)
 }
@@ -152,10 +154,12 @@ func (app *App) LeaveSquad(ctx context.Context) any {
 	return app.squad.View()
 }
 
-// SetSquadProfile changes the fields that were sent (name, colour, "Share my tasks").
+// SetSquadProfile changes the fields that were sent (name, colour, "Share my tasks", "Share my
+// keys").
 func (app *App) SetSquadProfile(change httpapi.SquadProfileChange) (any, error) {
 	current := app.squad.Settings()
-	name, color, shareTasks := current.Name, current.Color, current.ShareTasks
+	name, color := current.Name, current.Color
+	sharing := squad.Sharing{Tasks: current.ShareTasks, Keys: current.ShareKeys}
 	if change.Name != nil {
 		name = *change.Name
 	}
@@ -163,9 +167,12 @@ func (app *App) SetSquadProfile(change httpapi.SquadProfileChange) (any, error) 
 		color = *change.Color
 	}
 	if change.ShareTasks != nil {
-		shareTasks = *change.ShareTasks
+		sharing.Tasks = *change.ShareTasks
 	}
-	if err := app.squad.SetProfile(name, color, shareTasks); err != nil {
+	if change.ShareKeys != nil {
+		sharing.Keys = *change.ShareKeys
+	}
+	if err := app.squad.SetProfile(name, color, sharing); err != nil {
 		return nil, err
 	}
 	return app.squad.View(), nil

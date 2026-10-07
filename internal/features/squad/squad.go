@@ -35,6 +35,7 @@ type Settings struct {
 	Name       string
 	Color      string
 	ShareTasks bool
+	ShareKeys  bool // ticket 09: "Share my keys"
 	Joined     bool
 }
 
@@ -152,10 +153,11 @@ type ShareResult struct {
 	UpdatedAt   int64 `json:"updatedAt"`
 	Changed     bool  `json:"changed"`     // false when the content was the same as before
 	TasksShared bool  `json:"tasksShared"` // false: "Share my tasks" is off, so tasks were dropped
+	KeysShared  bool  `json:"keysShared"`  // false: "Share my keys" is off, so keys were dropped
 	InSquad     bool  `json:"inSquad"`     // false: kept for when you join, nobody gets it now
 }
 
-// SetMyShare takes the page's drawings and tasks, stamps them (StampShare) and, when they changed,
+// SetMyShare takes the page's drawings, tasks and keys, stamps them (StampShare) and, when they changed,
 // saves them and sends them to friends' open streams.
 func (squad *Squad) SetMyShare(parts ShareParts) (ShareResult, error) {
 	if err := ValidateParts(parts); err != nil {
@@ -170,7 +172,8 @@ func (squad *Squad) SetMyShare(parts ShareParts) (ShareResult, error) {
 	}
 	result := ShareResult{
 		Rev: next.Rev, UpdatedAt: next.UpdatedAt, Changed: changed,
-		TasksShared: squad.settings.ShareTasks, InSquad: squad.settings.Joined,
+		TasksShared: squad.settings.ShareTasks, KeysShared: squad.settings.ShareKeys,
+		InSquad: squad.settings.Joined,
 	}
 	squad.mutex.Unlock()
 	if changed {
@@ -179,10 +182,11 @@ func (squad *Squad) SetMyShare(parts ShareParts) (ShareResult, error) {
 	return result, nil
 }
 
-// SetProfile changes name, colour and "Share my tasks". The share is stamped again at once, so
-// friends see the new name, and tasks disappear from it as soon as sharing is turned off. (Turning
-// it on shares tasks from the page's next PUT /api/squad/share.)
-func (squad *Squad) SetProfile(name, color string, shareTasks bool) error {
+// SetProfile changes name, colour, "Share my tasks" and "Share my keys". The share is stamped
+// again at once, so friends see the new name, and tasks (or keys) disappear from it as soon as
+// their sharing is turned off. (Turning it on shares them from the page's next
+// PUT /api/squad/share.)
+func (squad *Squad) SetProfile(name, color string, sharing Sharing) error {
 	cleanName, isValidName := NormalizeName(name)
 	if !isValidName {
 		return fmt.Errorf("Your name must be 1 to %d characters", MaxNameRunes)
@@ -192,7 +196,8 @@ func (squad *Squad) SetProfile(name, color string, shareTasks bool) error {
 		return errors.New("Your colour must look like #4dabf7")
 	}
 	squad.mutex.Lock()
-	squad.settings.Name, squad.settings.Color, squad.settings.ShareTasks = cleanName, cleanColor, shareTasks
+	squad.settings.Name, squad.settings.Color = cleanName, cleanColor
+	squad.settings.ShareTasks, squad.settings.ShareKeys = sharing.Tasks, sharing.Keys
 	settings := squad.settings
 	squad.restampMineLocked()
 	squad.mutex.Unlock()
@@ -201,13 +206,14 @@ func (squad *Squad) SetProfile(name, color string, shareTasks bool) error {
 	return nil
 }
 
-// restampMineLocked stamps my share again with the current profile (keeping its drawings and
-// tasks; tasks are dropped when sharing is off), saves it if it changed, and publishes it.
+// restampMineLocked stamps my share again with the current profile (keeping its drawings, tasks
+// and keys; tasks and keys are dropped when their sharing is off), saves it if it changed, and
+// publishes it.
 func (squad *Squad) restampMineLocked() {
 	if squad.mine == nil {
 		return
 	}
-	parts := ShareParts{Draw: squad.mine.Draw, Tasks: squad.mine.Tasks}
+	parts := ShareParts{Draw: squad.mine.Draw, Tasks: squad.mine.Tasks, Keys: squad.mine.Keys}
 	next, changed := squad.stampLocked(parts)
 	squad.mine = &next
 	if changed {
@@ -216,10 +222,11 @@ func (squad *Squad) restampMineLocked() {
 	squad.publishMineLocked()
 }
 
-// stampLocked applies StampShare with the current profile, task-sharing choice and time.
+// stampLocked applies StampShare with the current profile, sharing choices and time.
 func (squad *Squad) stampLocked(parts ShareParts) (Share, bool) {
 	now := squad.config.Now()
-	return StampShare(squad.mine, squad.playerLocked(), parts, squad.settings.ShareTasks, now)
+	sharing := Sharing{Tasks: squad.settings.ShareTasks, Keys: squad.settings.ShareKeys}
+	return StampShare(squad.mine, squad.playerLocked(), parts, sharing, now)
 }
 
 func (squad *Squad) publishMineLocked() {
@@ -334,6 +341,7 @@ type MeView struct {
 // SettingsView is the squad settings the page can change (name and colour are in MeView).
 type SettingsView struct {
 	ShareTasks bool `json:"shareTasks"`
+	ShareKeys  bool `json:"shareKeys"` // ticket 09
 	Joined     bool `json:"joined"`
 }
 
@@ -362,8 +370,12 @@ func (squad *Squad) View() View {
 	defer squad.mutex.Unlock()
 	settings := squad.settings
 	view := View{
-		Me:        MeView{PlayerID: settings.PlayerID, Name: settings.Name, Color: settings.Color},
-		Settings:  SettingsView{ShareTasks: squad.settings.ShareTasks, Joined: squad.settings.Joined},
+		Me: MeView{PlayerID: settings.PlayerID, Name: settings.Name, Color: settings.Color},
+		Settings: SettingsView{
+			ShareTasks: settings.ShareTasks,
+			ShareKeys:  settings.ShareKeys,
+			Joined:     settings.Joined,
+		},
 		Transport: squad.config.TransportName,
 		Friends:   []FriendView{},
 	}

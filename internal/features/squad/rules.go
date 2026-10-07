@@ -49,6 +49,10 @@ const (
 	maxPercent          = 100
 	maxStrokeColorBytes = 7 // "#rrggbb"
 
+	// Key lists (ticket 09): far above real use (the busiest map has about 60 keys with a lock).
+	maxKeyMaps    = 64
+	maxKeysPerMap = 200
+
 	// DefaultName and DefaultColor are your profile until you change it (ticket's example colour).
 	DefaultName  = "Player"
 	DefaultColor = "#4dabf7"
@@ -102,8 +106,8 @@ var (
 
 // ---------------------------------------------------------------- the share
 
-// Share is what one player shows the squad ("my share"). The page builds Draw and Tasks from its
-// saved data; the server stamps the rest.
+// Share is what one player shows the squad ("my share"). The page builds Draw, Tasks and Keys
+// from its saved data; the server stamps the rest.
 type Share struct {
 	Version   int                     `json:"v"`
 	Player    Player                  `json:"player"`
@@ -111,6 +115,16 @@ type Share struct {
 	UpdatedAt int64                   `json:"updatedAt"` // when the content last changed, ms since 1970
 	Draw      map[string][]Stroke     `json:"draw"`      // by map key, the same shape as the page's draw
 	Tasks     map[string]TaskProgress `json:"tasks"`     // by task id; null when "Share my tasks" is off
+	// Keys is the player's key list per map (ticket 09): map key → key item ids. Null when
+	// "Share my keys" is off. Copies from before ticket 09 never send it (it reads as null).
+	Keys map[string][]string `json:"keys"`
+}
+
+// Sharing is what the player chose to share besides drawings (Settings → Squad). The server
+// enforces it: whatever the page sends, a part that isn't shared never leaves this copy.
+type Sharing struct {
+	Tasks bool // "Share my tasks"
+	Keys  bool // "Share my keys" (ticket 09)
 }
 
 // Player is who a share belongs to.
@@ -166,26 +180,32 @@ func (tick *Tick) UnmarshalJSON(data []byte) error {
 type ShareParts struct {
 	Draw  map[string][]Stroke     `json:"draw"`
 	Tasks map[string]TaskProgress `json:"tasks"`
+	Keys  map[string][]string     `json:"keys"` // ticket 09; null or absent when not shared
 }
 
 // StampShare makes my next share from the page's parts. Tasks are dropped when "Share my tasks"
-// is off (the server enforces this, not only the page). rev goes up by one and updatedAt is set
-// only when the content (player, drawings, tasks) differs from the previous share; otherwise the
-// previous share is returned unchanged, with changed = false.
+// is off, and keys when "Share my keys" is off (the server enforces this, not only the page). rev
+// goes up by one and updatedAt is set only when the content (player, drawings, tasks, keys)
+// differs from the previous share; otherwise the previous share is returned unchanged, with
+// changed = false.
 func StampShare(
-	previous *Share, player Player, parts ShareParts, shareTasks bool, now time.Time,
+	previous *Share, player Player, parts ShareParts, sharing Sharing, now time.Time,
 ) (Share, bool) {
 	next := Share{
 		Version: ShareFormatVersion,
 		Player:  player,
 		Draw:    parts.Draw,
 		Tasks:   parts.Tasks,
+		Keys:    parts.Keys,
 	}
 	if next.Draw == nil {
 		next.Draw = map[string][]Stroke{}
 	}
-	if !shareTasks {
+	if !sharing.Tasks {
 		next.Tasks = nil
+	}
+	if !sharing.Keys {
+		next.Keys = nil
 	}
 	if previous == nil {
 		next.Rev = 1
@@ -200,10 +220,10 @@ func StampShare(
 	return next, true
 }
 
-// hasSameContent compares what a friend sees: player, drawings and tasks.
+// hasSameContent compares what a friend sees: player, drawings, tasks and keys.
 func hasSameContent(a, b Share) bool {
-	contentA, errA := json.Marshal([]any{a.Player, a.Draw, a.Tasks})
-	contentB, errB := json.Marshal([]any{b.Player, b.Draw, b.Tasks})
+	contentA, errA := json.Marshal([]any{a.Player, a.Draw, a.Tasks, a.Keys})
+	contentB, errB := json.Marshal([]any{b.Player, b.Draw, b.Tasks, b.Keys})
 	return errA == nil && errB == nil && bytes.Equal(contentA, contentB)
 }
 
@@ -248,7 +268,7 @@ func ValidateShare(share Share) error {
 	if share.Rev < 1 || share.UpdatedAt < 0 {
 		return errors.New("share has no valid rev or updatedAt")
 	}
-	return ValidateParts(ShareParts{Draw: share.Draw, Tasks: share.Tasks})
+	return ValidateParts(ShareParts{Draw: share.Draw, Tasks: share.Tasks, Keys: share.Keys})
 }
 
 // ValidatePlayer: a valid player id, a name of 1 to 32 characters and a "#rrggbb" colour.
@@ -265,7 +285,7 @@ func ValidatePlayer(player Player) error {
 	return nil
 }
 
-// ValidateParts checks the drawings and tasks of a share (the page's parts or a friend's).
+// ValidateParts checks the drawings, tasks and keys of a share (the page's parts or a friend's).
 func ValidateParts(parts ShareParts) error {
 	if len(parts.Draw) > maxMaps {
 		return fmt.Errorf("drawings on %d maps, over the %d limit", len(parts.Draw), maxMaps)
@@ -287,6 +307,28 @@ func ValidateParts(parts ShareParts) error {
 		}
 		if err := validateTaskProgress(progress); err != nil {
 			return fmt.Errorf("task %s: %w", taskID, err)
+		}
+	}
+	return validateKeys(parts.Keys)
+}
+
+// validateKeys checks key lists (ticket 09): map keys as for drawings, at most 64 maps and 200
+// keys a map, every key a game item id (24 lower-case hex characters).
+func validateKeys(keys map[string][]string) error {
+	if len(keys) > maxKeyMaps {
+		return fmt.Errorf("key lists for %d maps, over the %d limit", len(keys), maxKeyMaps)
+	}
+	for mapKey, keyIDs := range keys {
+		if !isValidKey(mapKey) {
+			return fmt.Errorf("map key %q isn't a plain short word", mapKey)
+		}
+		if len(keyIDs) > maxKeysPerMap {
+			return fmt.Errorf("%d keys on %s, over the %d limit", len(keyIDs), mapKey, maxKeysPerMap)
+		}
+		for _, keyID := range keyIDs {
+			if !gameIDPattern.MatchString(keyID) {
+				return fmt.Errorf("key id %q isn't a game id (24 hex characters)", keyID)
+			}
 		}
 	}
 	return nil

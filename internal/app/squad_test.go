@@ -137,6 +137,45 @@ func TestTheServerDropsTasksWhenSharingIsOffEvenIfThePageSendsThem(t *testing.T)
 	}
 }
 
+const shareWithKeys = `{"draw":{},"tasks":null,` +
+	`"keys":{"customs":["5780cf7f2459777de4559322","5913915886f774123603c392"]}}`
+
+func TestTheServerDropsKeysWhenKeySharingIsOffEvenIfThePageSendsThem(t *testing.T) {
+	rig, listen := newSquadRigWithDevListener(t)
+
+	status, answer := rig.send("PUT", "/api/squad/share", shareWithKeys)
+	if status != http.StatusOK || answer["keysShared"] != false {
+		t.Fatalf("PUT /api/squad/share: %d %v", status, answer)
+	}
+	status, _ = rig.send("POST", "/api/squad/join", `{"authKey":"tskey-auth-dev"}`)
+	if status != http.StatusOK {
+		t.Fatalf("join: %d", status)
+	}
+	if keys := fetchPeerShare(t, listen)["keys"]; keys != nil {
+		t.Errorf("a friend gets keys %v; key sharing is off", keys)
+	}
+
+	status, profile := rig.send("PUT", "/api/squad/profile", `{"shareKeys":true}`)
+	settings, _ := profile["squad"].(map[string]any)["settings"].(map[string]any)
+	if status != http.StatusOK || settings["shareKeys"] != true || settings["shareTasks"] != false {
+		t.Fatalf("profile: %d %v", status, profile)
+	}
+	rig.send("PUT", "/api/squad/share", shareWithKeys)
+	keys, _ := fetchPeerShare(t, listen)["keys"].(map[string]any)
+	if customs, _ := keys["customs"].([]any); len(customs) != 2 {
+		t.Errorf("with key sharing on a friend gets keys %v", keys)
+	}
+	saved := storage.ReadSettings(rig.files.Settings).SquadOrEmpty()
+	if !saved.ShareKeys || saved.ShareTasks {
+		t.Errorf("settings file has shareKeys %v shareTasks %v", saved.ShareKeys, saved.ShareTasks)
+	}
+
+	rig.send("PUT", "/api/squad/profile", `{"shareKeys":false}`)
+	if keys := fetchPeerShare(t, listen)["keys"]; keys != nil {
+		t.Errorf("turning key sharing off left keys %v with friends", keys)
+	}
+}
+
 // fetchPeerShare asks the peer API (the separate listener) for the share, as a friend would.
 func fetchPeerShare(t *testing.T, listen string) map[string]any {
 	t.Helper()
@@ -164,6 +203,8 @@ func TestTheShareRouteRefusesWhatItCantTake(t *testing.T) {
 		{"a bad stroke is refused with the reason", "application/json", `{"draw":{"customs":[{"c":"red","w":2,"pts":[[1,2]]}]}}`, http.StatusBadRequest},
 		{"a body not sent as JSON is refused", "text/plain", shareWithTasks, http.StatusUnsupportedMediaType},
 		{"an empty share (nothing drawn) is fine", "application/json", `{"draw":{},"tasks":null}`, http.StatusOK},
+		{"a key that isn't a game id is refused", "application/json", `{"draw":{},"keys":{"customs":["toString"]}}`, http.StatusBadRequest},
+		{"a key list on a map key named __proto__ is refused", "application/json", `{"draw":{},"keys":{"__proto__":[]}}`, http.StatusBadRequest},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
