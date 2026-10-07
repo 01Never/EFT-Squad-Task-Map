@@ -329,7 +329,7 @@ export function tickTarget(objective) {
  * @param {Record<string, true | number>} ticks
  */
 export function tickCount(objective, ticks) {
-  const saved = ticks[objective.id];
+  const saved = Object.hasOwn(ticks, objective.id) ? ticks[objective.id] : undefined;
   if (saved === true) return tickTarget(objective);
   return typeof saved === "number" ? Math.max(0, Math.min(saved, tickTarget(objective))) : 0;
 }
@@ -387,7 +387,7 @@ export function partProgressPercent(part, ticks) {
  * @param {Record<string, true | number>} ticks
  */
 export function savedTickCount(objective, ticks) {
-  const saved = ticks[objective.id];
+  const saved = Object.hasOwn(ticks, objective.id) ? ticks[objective.id] : undefined;
   if (saved === true) return tickTarget(objective);
   return typeof saved === "number" ? saved : 0;
 }

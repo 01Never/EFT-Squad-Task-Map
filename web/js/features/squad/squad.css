@@ -3,19 +3,20 @@
    that passed the strict #rrggbb check (rules.js: safeFriendColor). Nothing here animates. */
 
 /* the chips: one row per friend, a colour dot, the name and status, and two toggles */
-.squad-chips{display:grid;gap:6px}
-.squad-chip{display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid #3a3a3d;border-left:4px solid var(--friend,var(--muted));background:rgb(255 255 255 / .03)}
+.squad-chips{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
+.squad-chip{min-width:0;display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid #3a3a3d;border-left:4px solid var(--friend,var(--muted));background:rgb(255 255 255 / .03)}
 .squad-dot{flex:none;width:12px;height:12px;border-radius:50%;background:var(--friend,var(--muted));border:1px solid #000}
 .squad-who{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
-.squad-name{color:#fff;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.squad-name{unicode-bidi:isolate;color:#fff;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .squad-state{font-size:12.5px;color:var(--muted)}
 .squad-chip.online .squad-state{color:#7fd67f}
-.squad-toggle{background:transparent;border:1px solid var(--gold-two);color:var(--muted);height:26px;padding:0 8px;cursor:pointer;font-weight:700;font-size:13px;white-space:nowrap}
+.squad-toggle{flex:none;background:transparent;border:1px solid var(--gold-two);color:var(--muted);height:26px;padding:0 8px;cursor:pointer;font-weight:700;font-size:13px;white-space:nowrap}
 .squad-toggle[aria-pressed="true"]{background:var(--gold-two);color:#000}
 .squad-toggle.dim{opacity:.55}
 .sec.squad .tools{margin-top:8px}
 
 /* "Also: Mike, Sam" under a task row's name */
+.squad-name,.trow .also bdi,.pop .squad-also bdi,.pop .squad-progress bdi,.squad-grouphead bdi{unicode-bidi:isolate}
 .trow .also{display:block;font-size:13px;color:var(--accent)}
 .pop .squad-also{color:var(--accent);margin:0 0 2px}
 .pop .squad-progress{margin:0 0 6px}

@@ -178,6 +178,9 @@ async function saveProfile(changes) {
     const answer = await callApi("/api/squad/profile", { method: "PUT", body: changes });
     errorText = "";
     applySquadView(answer.squad);
+    // the server may have cleaned the name (invisible characters): show what it kept
+    const nameBox = findElement("#sSquadName");
+    if (changes.name !== undefined && nameBox instanceof HTMLInputElement) nameBox.value = answer.squad.me.name;
     return true;
   } catch (error) {
     errorText = String(error.message || error);

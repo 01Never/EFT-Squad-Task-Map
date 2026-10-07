@@ -26,6 +26,7 @@ import {
   shareFingerprint,
   shouldSendShareAtStart,
   describeSquadChange,
+  progressPieces,
 } from "./rules.js";
 
 // ---------------------------------------------------------------- fixtures
@@ -35,9 +36,9 @@ function objective(id, extra = {}) {
 }
 
 // Each test task has its own id: the page remembers a task's parts by id.
-const killScavs = { id: "task-kills", name: "Kill Scavs", trader: "Prapor", map: "customs", objs: [objective("obj-kills", { type: "shoot", d: "Eliminate Scavs", n: 5, targets: ["Any"] })] };
-const visitTwoPlaces = { id: "task-visit", name: "Visit two places", trader: "Skier", map: "customs", objs: [objective("obj-a"), objective("obj-b")] };
-const onlyOnWoods = { id: "task-woods", name: "Woods only", trader: "Jaeger", map: "woods", objs: [objective("obj-w", { zones: [{ m: "woods", x: 0, z: 0 }], maps: ["woods"] })] };
+const killScavs = { id: "aaaaaaaaaaaaaaaaaaaa0001", name: "Kill Scavs", trader: "Prapor", map: "customs", objs: [objective("bbbbbbbbbbbbbbbbbbbb0001", { type: "shoot", d: "Eliminate Scavs", n: 5, targets: ["Any"] })] };
+const visitTwoPlaces = { id: "aaaaaaaaaaaaaaaaaaaa0002", name: "Visit two places", trader: "Skier", map: "customs", objs: [objective("bbbbbbbbbbbbbbbbbbbb000a"), objective("bbbbbbbbbbbbbbbbbbbb000b")] };
+const onlyOnWoods = { id: "aaaaaaaaaaaaaaaaaaaa0003", name: "Woods only", trader: "Jaeger", map: "woods", objs: [objective("bbbbbbbbbbbbbbbbbbbb000c", { zones: [{ m: "woods", x: 0, z: 0 }], maps: ["woods"] })] };
 const taskById = { [killScavs.id]: killScavs, [visitTwoPlaces.id]: visitTwoPlaces, [onlyOnWoods.id]: onlyOnWoods };
 
 const NOW = Date.UTC(2026, 9, 7, 12, 0, 0);
@@ -69,7 +70,7 @@ test("a friend's colour is used only when it is exactly #rrggbb", () => {
 test("a friend's name is cut to 32 characters, loses control characters and is never empty", () => {
   assert.equal(friendDisplayName("  Mike\u0007 "), "Mike");
   assert.equal(friendDisplayName("x".repeat(80)).length, 32);
-  assert.equal(friendDisplayName(""), "Friend");
+  assert.equal(friendDisplayName(""), "(no name)");
   assert.equal(friendDisplayName(42), "Friend");
   // Markup stays text here; it is escaped where it is drawn.
   assert.equal(friendDisplayName("<b>Mike</b>"), "<b>Mike</b>");
@@ -143,17 +144,17 @@ test("'Also: Mike, Sam' names the shown friends who have the task", () => {
 test("a friend's progress on a part: a count for one objective, objectives done for several, a tick when finished", () => {
   const [killsPart] = partsOfTask(killScavs);
   const [visitPart] = partsOfTask(visitTwoPlaces);
-  assert.deepEqual(friendPartProgress(killsPart, { "obj-kills": 2 }), { isDone: false, text: "2/5" });
+  assert.deepEqual(friendPartProgress(killsPart, { "bbbbbbbbbbbbbbbbbbbb0001": 2 }), { isDone: false, text: "2/5" });
   assert.deepEqual(friendPartProgress(killsPart, {}), { isDone: false, text: "0/5" });
-  assert.deepEqual(friendPartProgress(killsPart, { "obj-kills": 5 }), { isDone: true, text: "✓" });
-  assert.deepEqual(friendPartProgress(visitPart, { "obj-a": true }), { isDone: false, text: "1/2" });
-  assert.deepEqual(friendPartProgress(visitPart, { "obj-a": true, "obj-b": true }), { isDone: true, text: "✓" });
+  assert.deepEqual(friendPartProgress(killsPart, { "bbbbbbbbbbbbbbbbbbbb0001": 5 }), { isDone: true, text: "✓" });
+  assert.deepEqual(friendPartProgress(visitPart, { "bbbbbbbbbbbbbbbbbbbb000a": true }), { isDone: false, text: "1/2" });
+  assert.deepEqual(friendPartProgress(visitPart, { "bbbbbbbbbbbbbbbbbbbb000a": true, "bbbbbbbbbbbbbbbbbbbb000b": true }), { isDone: true, text: "✓" });
 });
 
 test("the popup line lists each friend with their progress: 'Mike 2/5 · Sam ✓'", () => {
   const [killsPart] = partsOfTask(killScavs);
-  const mike = friendSharing("mike", "Mike", { [killScavs.id]: { ticks: { "obj-kills": 2 }, pct: 40 } });
-  const sam = friendSharing("sam", "Sam", { [killScavs.id]: { ticks: { "obj-kills": 5 }, pct: 100 } });
+  const mike = friendSharing("mike", "Mike", { [killScavs.id]: { ticks: { "bbbbbbbbbbbbbbbbbbbb0001": 2 }, pct: 40 } });
+  const sam = friendSharing("sam", "Sam", { [killScavs.id]: { ticks: { "bbbbbbbbbbbbbbbbbbbb0001": 5 }, pct: 100 } });
   assert.equal(progressSummaryText(killsPart, killScavs.id, [mike, sam]), "Mike 2/5 · Sam ✓");
 });
 
@@ -161,7 +162,7 @@ test("friends' other tasks: theirs, not on your list, with something on this map
   const saved = savedWithActive(killScavs);
   const mike = friendSharing("mike", "Mike", {
     [killScavs.id]: { ticks: {}, pct: 0 }, // you have it too: not "other"
-    [visitTwoPlaces.id]: { ticks: { "obj-a": true }, pct: 50 },
+    [visitTwoPlaces.id]: { ticks: { "bbbbbbbbbbbbbbbbbbbb000a": true }, pct: 50 },
     [onlyOnWoods.id]: { ticks: {}, pct: 0 }, // not on Customs
     "task-unknown-to-your-game-data": { ticks: {}, pct: 0 },
   });
@@ -174,7 +175,7 @@ test("friends' other tasks: theirs, not on your list, with something on this map
 test("a friend's finished part leaves the map; their open part stays", () => {
   const [visitPart] = partsOfTask(visitTwoPlaces);
   assert.deepEqual(openPartsOnMap(visitTwoPlaces, {}, "customs"), [visitPart]);
-  assert.deepEqual(openPartsOnMap(visitTwoPlaces, { "obj-a": true, "obj-b": true }, "customs"), []);
+  assert.deepEqual(openPartsOnMap(visitTwoPlaces, { "bbbbbbbbbbbbbbbbbbbb000a": true, "bbbbbbbbbbbbbbbbbbbb000b": true }, "customs"), []);
   assert.deepEqual(openPartsOnMap(onlyOnWoods, {}, "customs"), []);
 });
 
@@ -197,11 +198,11 @@ test("my share holds my active tasks with their ticks and progress when sharing 
   const saved = savedWithActive(killScavs, visitTwoPlaces);
   saved.tasks[onlyOnWoods.id] = { active: false };
   saved.tasks["task-not-in-game-data"] = { active: true };
-  saved.ticks = { "obj-kills": 2, "obj-a": true, "obj-w": true, "not-an-objective-of-these": true };
+  saved.ticks = { "bbbbbbbbbbbbbbbbbbbb0001": 2, "bbbbbbbbbbbbbbbbbbbb000a": true, "bbbbbbbbbbbbbbbbbbbb000c": true, "not-an-objective-of-these": true };
   const share = buildMyShare(saved, taskById, true);
   assert.deepEqual(share.tasks, {
-    [killScavs.id]: { ticks: { "obj-kills": 2 }, pct: 40 },
-    [visitTwoPlaces.id]: { ticks: { "obj-a": true }, pct: 50 },
+    [killScavs.id]: { ticks: { "bbbbbbbbbbbbbbbbbbbb0001": 2 }, pct: 40 },
+    [visitTwoPlaces.id]: { ticks: { "bbbbbbbbbbbbbbbbbbbb000a": true }, pct: 50 },
   });
 });
 
@@ -246,7 +247,7 @@ test("the same content gives the same fingerprint, so an unchanged share is not 
   const saved = savedWithActive(killScavs);
   const first = shareFingerprint(buildMyShare(saved, taskById, true));
   assert.equal(shareFingerprint(buildMyShare(saved, taskById, true)), first);
-  saved.ticks["obj-kills"] = 1;
+  saved.ticks["bbbbbbbbbbbbbbbbbbbb0001"] = 1;
   assert.notEqual(shareFingerprint(buildMyShare(saved, taskById, true)), first);
   assert.notEqual(shareFingerprint(buildMyShare(saved, taskById, false)), first, "turning sharing off is a change");
 });
@@ -338,4 +339,101 @@ test("the status line and my own profile are 'settings'; the first view changes 
   const first = describeSquadChange(null, viewOf([friend("mike", "Mike")]), "customs");
   assert.deepEqual([first.chipsChanged, first.settingsChanged, first.drawingsChanged], [true, true, ["mike"]]);
   assert.deepEqual(describeSquadChange(null, viewOf([friend("mike", "Mike")]), null).drawingsChanged, [], "no map open, no lines to draw");
+});
+
+// ---------------------------------------------------------------- names that try to reorder or hide
+
+test("a name loses direction overrides and zero-width characters, and is cut by characters", () => {
+  assert.equal(friendDisplayName("‮evil‬ Mike​⁦x⁩﻿"), "evil Mikex");
+  assert.equal(friendDisplayName("‮​⁠ ﻿"), "(no name)");
+  const emoji = "😀".repeat(40);
+  assert.equal(friendDisplayName(emoji), "😀".repeat(32), "32 characters, not 32 UTF-16 units");
+  assert.equal(friendDisplayName("W".repeat(32)), "W".repeat(32));
+});
+
+// ---------------------------------------------------------------- keys that are names on Object.prototype
+
+const PROTOTYPE_KEYS = ["toString", "valueOf", "hasOwnProperty", "__proto__", "constructor"];
+
+test("a friend's task ids named like Object.prototype members are ignored, not crashed on", () => {
+  const saved = savedWithActive(killScavs);
+  const [killsPart] = partsOfTask(killScavs);
+  for (const key of PROTOTYPE_KEYS) {
+    // JSON.parse makes "__proto__" a real own key, as a share coming off the wire does
+    const tasks = JSON.parse(`{"${key}":{"ticks":{"${key}":3},"pct":10},"${visitTwoPlaces.id}":{"ticks":{"bbbbbbbbbbbbbbbbbbbb000a":true},"pct":50}}`);
+    const mike = friend("mike", "Mike", { share: { rev: 1, updatedAt: 1, draw: {}, tasks } });
+    const found = friendsOwnTasksOnMap(mike, saved, taskById, "customs");
+    assert.deepEqual(found.map((one) => one.task.id), [visitTwoPlaces.id], `${key}: only the real task`);
+    assert.deepEqual(friendsAlsoDoing(killScavs.id, [mike]), [], `${key}: does not have Kill Scavs`);
+    assert.equal(progressSummaryText(killsPart, killScavs.id, [mike]), "Mike 0/5", `${key}: no progress on Kill Scavs`);
+  }
+});
+
+test("asking for a task id like 'toString' finds nothing when the friend has no such task", () => {
+  const mike = friendSharing("mike", "Mike", { [killScavs.id]: { ticks: {}, pct: 0 } });
+  const [killsPart] = partsOfTask(killScavs);
+  for (const key of PROTOTYPE_KEYS) {
+    assert.deepEqual(friendsAlsoDoing(key, [mike]), [], key);
+    assert.equal(progressSummaryText(killsPart, key, [mike]), "Mike 0/5", key);
+  }
+});
+
+test("a friend's task entries that are not objects are skipped", () => {
+  const sam = friendSharing("sam", "Sam", { [visitTwoPlaces.id]: null, [killScavs.id]: 5 });
+  const found = friendsOwnTasksOnMap(sam, freshState(), taskById, "customs");
+  assert.deepEqual(found.map((one) => one.task.id).sort(), [killScavs.id, visitTwoPlaces.id].sort());
+});
+
+test("the game's task lookup, even a plain object, does not answer for 'toString'", () => {
+  const sam = friendSharing("sam", "Sam", JSON.parse('{"toString":{},"constructor":{},"valueOf":null}'));
+  assert.deepEqual(friendsOwnTasksOnMap(sam, freshState(), taskById, "customs"), []);
+});
+
+test("objective ids named like Object.prototype members count as no progress", () => {
+  for (const key of PROTOTYPE_KEYS) {
+    const task = { id: "task-odd-" + key, name: "Odd", trader: "Prapor", map: "customs", objs: [objective(key, { type: "shoot", n: 5, targets: ["Any"] })] };
+    const [part] = partsOfTask(task);
+    assert.equal(friendPartProgress(part, {}).text, "0/5", `${key}: empty ticks`);
+    assert.equal(friendPartProgress(part, JSON.parse(`{"${key}":2}`)).text, "2/5", `${key}: a real tick still counts`);
+  }
+});
+
+test("a friend's choices are read and saved safely for ids like '__proto__' and 'constructor'", () => {
+  for (const key of PROTOTYPE_KEYS) {
+    const saved = freshState();
+    assert.deepEqual(friendPrefsOf(saved, key), { drawings: true, tasks: false }, `${key}: defaults`);
+    setFriendPref(saved, key, "tasks", true);
+    assert.equal(friendPrefsOf(saved, key).tasks, true, `${key}: remembered`);
+    assert.equal(Object.getPrototypeOf(saved.squad.friends), Object.prototype, `${key}: prototype untouched`);
+  }
+});
+
+test("drawings under map keys like 'toString' don't break the share or the change check", () => {
+  const stroke = { c: "#ff0000", w: 2, pts: [[0, 0], [1, 1]] };
+  for (const key of PROTOTYPE_KEYS) {
+    const saved = freshState();
+    saved.draw = JSON.parse(`{"${key}":[${JSON.stringify(stroke)}],"customs":[${JSON.stringify(stroke)}]}`);
+    assert.ok(Object.hasOwn(buildMyShare(saved, taskById, false).draw, "customs"));
+    const before = viewOf([friend("mike", "Mike")]);
+    const after = viewOf([friend("mike", "Mike", { share: { rev: 2, updatedAt: 2, draw: {}, tasks: null } })]);
+    assert.deepEqual(describeSquadChange(before, after, key).drawingsChanged, [], `${key}: nothing drawn, no change`);
+  }
+});
+
+test("progress pieces give each name and progress separately", () => {
+  const [killsPart] = partsOfTask(killScavs);
+  const mike = friendSharing("mike", "Mike", { [killScavs.id]: { ticks: { "bbbbbbbbbbbbbbbbbbbb0001": 2 }, pct: 40 } });
+  assert.deepEqual(progressPieces(killsPart, killScavs.id, [mike]), [{ name: "Mike", text: "2/5" }]);
+});
+
+test("my share carries only the game's own ids (24 lowercase hex characters)", () => {
+  const odd = { id: "toString", name: "Odd", trader: "Prapor", map: "customs", objs: [objective("bbbbbbbbbbbbbbbbbbbb000d"), objective("not-hex")] };
+  const saved = savedWithActive(odd);
+  saved.ticks = { bbbbbbbbbbbbbbbbbbbb000d: true, "not-hex": true };
+  assert.deepEqual(buildMyShare(saved, { toString: odd }, true).tasks, {}, "a task with an odd id is left out");
+  const task = { ...odd, id: "aaaaaaaaaaaaaaaaaaaa0009" };
+  const saved2 = savedWithActive(task);
+  saved2.ticks = saved.ticks;
+  const shared = buildMyShare(saved2, { [task.id]: task }, true).tasks;
+  assert.deepEqual(Object.keys(shared[task.id].ticks), ["bbbbbbbbbbbbbbbbbbbb000d"], "an odd objective id is left out");
 });
