@@ -211,6 +211,12 @@ test("selecting a row highlights it and flashes its markers; a marker click sele
 
     await page.keyboard.press("Escape");
     assert.deepEqual(await selection(), { rows: [], rings: 0, popup: null }, "Esc deselects");
+    assert.equal(await page.locator("#panel .tbody").count(), 0, "Esc also closes the row it had opened");
+    await page.click(`#panel .task[data-part="${part}"] .trow`);
+    assert.deepEqual((await selection()).rows, [part], "the next click on that row selects it again");
+    await page.click("#pop .x");
+    assert.deepEqual(await selection(), { rows: [], rings: 0, popup: null }, "the popup's × deselects");
+    assert.equal(await page.locator("#panel .tbody").count(), 0, "the popup's × closes the row too");
 
     // Click a marker on the map.
     const markerPoint = await page.evaluate(() => {
@@ -235,10 +241,9 @@ test("selecting a row highlights it and flashes its markers; a marker click sele
     await page.mouse.click(empty.x, empty.y);
     assert.deepEqual(await selection(), { rows: [], rings: 0, popup: null }, "an empty-map click deselects");
 
-    // Deselecting leaves the last row open. Clicking a closed row opens and selects it; clicking it
-    // again closes it and deselects.
-    const openRow = await page.$eval("#panel .task:has(.tbody)", (row) => row.dataset.part);
-    const otherRow = [part, ballet.id + ":*"].find((candidate) => candidate !== openRow);
+    // Deselecting closes the row it had opened, so the next click on that row selects it again.
+    assert.equal(await page.locator("#panel .tbody").count(), 0, "an empty-map click closes the row");
+    const otherRow = part;
     await page.click(`#panel .task[data-part="${otherRow}"] .trow`);
     assert.deepEqual((await selection()).rows, [otherRow]);
     await page.click(`#panel .task[data-part="${otherRow}"] .trow`);
@@ -288,6 +293,23 @@ test("Hide gives the map the whole window and keeps the view; ◂ Tasks brings t
   });
 });
 
+/** The two Settings checkboxes are normal squares at the left of the first line of their label (they were slivers). */
+async function assertSettingsCheckboxesLookNormal(page) {
+  for (const id of ["sFollow", "sCenter"]) {
+    const box = await page.locator("#" + id).boundingBox();
+    const label = await page.locator(`label:has(#${id})`).boundingBox();
+    assert.ok(box.width >= 16 && box.height >= 16 && Math.abs(box.width - box.height) < 1, `#${id} is a normal square checkbox, not a sliver (${box.width}x${box.height})`);
+    assert.ok(box.x - label.x < 12, `#${id} sits at the left of its label`);
+    const textLeft = await page.evaluate((checkboxId) => {
+      const text = [...document.getElementById(checkboxId).parentElement.childNodes].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      return Math.min(...[...range.getClientRects()].map((rect) => rect.left));
+    }, id);
+    assert.ok(textLeft >= box.x + box.width - 1, `#${id}'s text starts to the right of the box, not under it`);
+  }
+}
+
 test("Settings saves Follow my position and Center on me, and the toolbar follows", async (t) => {
   await withScenario(t, { state: stateWithTasks([dandies.name]) }, async (s) => {
     const page = s.page;
@@ -300,6 +322,10 @@ test("Settings saves Follow my position and Center on me, and the toolbar follow
     assert.equal(await page.inputValue("#sMode"), "regular");
     assert.equal(await page.isChecked("#sFollow"), true, "Follow my position is on by default");
     assert.equal(await page.isChecked("#sCenter"), false, "Center on me is off by default");
+    await assertSettingsCheckboxesLookNormal(page);
+    await page.locator("label:has(#sCenter)").click({ position: { x: 150, y: 8 } }); // the label text toggles it too
+    assert.equal(await page.isChecked("#sCenter"), true, "clicking the label text ticks the box");
+    await page.uncheck("#sCenter");
     const taskCount = (await s.api("/api/data")).tasks.length;
     assert.match(await page.textContent(".modal"), new RegExp(`PvP · ${taskCount} tasks · downloaded just now`));
     assert.match(await page.textContent(".modal"), /No key yet/);
@@ -348,5 +374,9 @@ test("at phone width the list sits under the map, Hide isn't offered, and Find m
     assert.equal(await page.locator(".findme-ring").count(), 0, "no pulse for a position from before");
     await page.tap("#bfindme");
     assert.equal(await page.locator(".findme-ring").count(), 3, "Find me pulses");
+
+    await page.tap("#settings");
+    await page.waitForSelector(".modal #sSave");
+    await assertSettingsCheckboxesLookNormal(page);
   });
 });

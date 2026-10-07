@@ -232,7 +232,7 @@ Log task events count only when the log's `Session mode` matches the game-mode s
 **Selection (2.0.1):**
 - Clicking a marker selects the part: its row gets a white outline and scrolls to the centre, and the popup opens.
 - Clicking a row selects it and zooms to its spots.
-- The selected markers flash for as long as the part is selected. Esc, an empty-map click or the popup × deselects.
+- The selected markers flash for as long as the part is selected. Esc, an empty-map click or the popup × deselects and closes the row it had opened (04e), so the next click on that row selects it again.
 
 **Hide list (2.0.1):** `S.panelHidden`; Hide ▸ in the panel header and ◂ Tasks on the map. A `ResizeObserver` → `keepView()` keeps centre and zoom on any size change. Hiding isn't offered under 860 px, where the list sits under the map.
 
@@ -355,6 +355,7 @@ Verified on the owner's PC since 2.3.0: folder detection (registry → `E:\Games
 
 ## 11. Known gaps and quirks (not bugs the owner has reported; ask before changing behavior)
 
+- **"Switch data" loads the game data twice (ticket 04e, open):** the server sends two `data` events for a mode switch without fresh saved data: `SetMode` (built-in snapshot, `fetchedAt` null) and then the finished download (`internal/gamedata/store.go`). The page reloads for each, so one click makes two `GET /api/data`. Both events carry a real change; one reload needs a decision on showing the other mode's tasks until the download ends.
 - **Phantom tasks (reported by squadmates, not diagnosed):** tasks show that the player doesn't have. Suspects, from reading the code: (1) the v1 → v2 migration activates the whole v1 manual list, including tasks finished since; (2) `raid.ModeMatches()` accepts every log task event while the session mode is unknown, which is the case whenever the app starts after the game; (3) several open tabs each save the whole state, so a stale tab can restore a removed task; (4) a scan of a trader's available-tasks page, or a fuzzy match to the wrong name. The owner chose not to diagnose for now; a full scan now clears them. Each task entry's `source` and `addedAt` show which path added it.
 - **Scan ignores the Reasoning setting:** `taskscan.Scan.Read` always sends `effort: "low"` for gpt-5/gpt-6/o-series models. SPEC §8 says to reuse the setting, defaulting to low.
 - **Don't split vs moved parts:** a manual move stored on `<id>:<action>` doesn't apply once the task is unsplit (`<id>:*`); it falls back to the precedence default.
