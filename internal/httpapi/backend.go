@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"squadtaskmap/internal/features/aicategorize"
+	"squadtaskmap/internal/features/squad"
 	"squadtaskmap/internal/features/taskscan"
 	"squadtaskmap/internal/features/updates"
 	"squadtaskmap/internal/gamedata"
@@ -56,6 +57,18 @@ type Backend interface {
 	// Updates is "Check for updates": check, download, cancel, install. Nothing in it runs
 	// unless a route below asks for it.
 	Updates() *updates.Updater
+
+	// SquadView is GET /api/squad: you, your squad settings, the connection status and friends.
+	SquadView() any
+	// SetSquadShare stores the page's drawings and tasks as your share (tasks are dropped when
+	// "Share my tasks" is off) and returns its rev.
+	SetSquadShare(parts squad.ShareParts) (any, error)
+	// JoinSquad joins with an invite code (never saved) and returns the squad view.
+	JoinSquad(ctx context.Context, authKey string) (any, error)
+	// LeaveSquad logs out, deletes the squad network's state and friends' cache.
+	LeaveSquad(ctx context.Context) any
+	// SetSquadProfile changes name, colour and "Share my tasks".
+	SetSquadProfile(change SquadProfileChange) (any, error)
 }
 
 // SettingsChange holds the settings fields a PUT /api/settings sent; nil means "not sent".

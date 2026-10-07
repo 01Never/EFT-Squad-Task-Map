@@ -71,6 +71,13 @@ func NewServer(backend Backend, static *staticFiles) *Server {
 		{"POST /api/updates/cancel", server.cancelUpdateDownload},
 		{"POST /api/updates/apply", server.applyUpdate},
 		{"POST /api/updates/seen", server.updateNoticeSeen},
+
+		// Squad (ticket 05; see squad.go). Friends use the separate peer API, never these.
+		{"GET /api/squad", server.squadView},
+		{"PUT /api/squad/share", jsonBody(server.setSquadShare)},
+		{"POST /api/squad/join", jsonBody(server.joinSquad)},
+		{"POST /api/squad/leave", server.leaveSquad},
+		{"PUT /api/squad/profile", jsonBody(server.setSquadProfile)},
 	}
 	for _, route := range routes {
 		server.mux.HandleFunc(route.pattern, route.handler)

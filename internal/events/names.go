@@ -21,4 +21,5 @@ const (
 	Keybind   = "keybind"   // broadcast: whether a screenshot key is bound in the game
 	Data      = "data"      // broadcast: the game data changed (new download, mode switch)
 	Updates   = "updates"   // broadcast: the update state changed (check result, download progress, install)
+	Squad     = "squad"     // broadcast: the squad view changed (status, a friend's share, online, profile)
 )
