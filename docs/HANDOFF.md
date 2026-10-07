@@ -101,13 +101,13 @@ the HTTP API: `internal/features/updates/README.md`; the tool: `cmd/release/READ
 
 **Each release**
 1. Bump the version in `internal/app/run.go`, `package.json` and `winres/winres.json` (then
-   `go-winres make --arch amd64 --out rsrc`); write `notes.md` (what's new, plain text, one bullet
+   `go-winres make --arch amd64 --out rsrc`); write `docs/release-notes/X.Y.Z.md` (what's new, plain text, one bullet
    per line).
-2. `go run ./cmd/release -version X.Y.Z -notes notes.md`. It checks the three versions match and
+2. `go run ./cmd/release -version X.Y.Z -notes docs/release-notes/X.Y.Z.md`. It checks the three versions match and
    that your key is the app's key, runs `go test ./...` and `npm test`, builds
    `dist/SquadTaskMap.exe`, and writes the signed `dist/latest.json`.
 3. Publish on GitHub, with the command it prints:
-   `gh release create vX.Y.Z dist/SquadTaskMap.exe dist/latest.json --title "X.Y.Z" --notes-file notes.md`
+   `gh release create vX.Y.Z dist/SquadTaskMap.exe dist/latest.json --title "X.Y.Z" --notes-file docs/release-notes/X.Y.Z.md`
    or by hand: GitHub → Releases → Draft a new release → tag `vX.Y.Z` → attach **both** files →
    Publish (not as a pre-release: "latest" skips drafts and pre-releases, which is also how you
    stage a release nobody is offered yet).
