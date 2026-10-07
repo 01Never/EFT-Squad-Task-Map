@@ -191,6 +191,40 @@ func TestSettingsKeepUnknownFieldsThroughASave(t *testing.T) {
 	}
 }
 
+func TestTheSquadBlockKeepsUnknownFieldsThroughASave(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "squad-task-map-settings.json")
+	writeText(t, path, `{"gameMode":"pve","squad":{"playerId":"0123456789abcdef","name":"Mike","futureSquadSetting":7}}`)
+	settings := ReadSettings(path)
+	squad := settings.SquadOrEmpty()
+	if squad.PlayerID != "0123456789abcdef" || squad.Name != "Mike" || squad.ShareTasks || squad.Joined {
+		t.Fatalf("read %+v", squad)
+	}
+	squad.Joined = true
+	settings.Squad = &squad
+	if err := WriteSettings(path, settings); err != nil {
+		t.Fatal(err)
+	}
+	var saved map[string]any
+	if err := json.Unmarshal([]byte(readText(t, path)), &saved); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]any{"gameMode": "pve", "squad": map[string]any{
+		"playerId": "0123456789abcdef", "name": "Mike", "joined": true, "futureSquadSetting": 7.0,
+	}}
+	if gotJSON, wantJSON := mustJSON(saved), mustJSON(want); gotJSON != wantJSON {
+		t.Errorf("saved %s, want %s", gotJSON, wantJSON)
+	}
+}
+
+func TestSettingsWithoutASquadBlockReadAsNotInASquad(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "squad-task-map-settings.json")
+	writeText(t, path, `{"gameMode":"pve"}`)
+	squad := ReadSettings(path).SquadOrEmpty()
+	if squad.Joined || squad.ShareTasks || squad.PlayerID != "" {
+		t.Errorf("read %+v, want the empty defaults", squad)
+	}
+}
+
 func TestTarkovTrackerFieldsAreDroppedAndTheFileRewritten(t *testing.T) {
 	cases := []struct {
 		name        string

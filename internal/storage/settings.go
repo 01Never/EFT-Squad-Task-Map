@@ -19,8 +19,72 @@ type Settings struct {
 	FollowPosition  *bool  `json:"followPosition,omitempty"`  // switch to the raid's map on a new position; default on
 	AutoCenter      *bool  `json:"autoCenter,omitempty"`      // ticket 02: centre on each new position; default off
 
+	// Squad (ticket 05): your player id, name, colour, "Share my tasks", and whether you joined.
+	// Never the invite code. nil until the squad feature first saves it.
+	Squad *SquadSettings `json:"squad,omitempty"`
+
 	// Fields this version doesn't know about, kept so an older or newer version's settings survive a save.
 	extra map[string]json.RawMessage
+}
+
+// SquadSettings is the "squad" block of the settings file (ticket 05).
+type SquadSettings struct {
+	PlayerID   string `json:"playerId,omitempty"`   // random, made once (16 hex characters)
+	Name       string `json:"name,omitempty"`       // shown to friends, 1 to 32 characters
+	Color      string `json:"color,omitempty"`      // "#rrggbb"
+	ShareTasks bool   `json:"shareTasks,omitempty"` // default off
+	Joined     bool   `json:"joined,omitempty"`     // in a squad: start the squad network at launch
+
+	// Fields this version doesn't know about inside "squad", kept like the top-level ones.
+	extra map[string]json.RawMessage
+}
+
+var knownSquadSettingsFields = map[string]bool{
+	"playerId": true, "name": true, "color": true, "shareTasks": true, "joined": true,
+}
+
+// UnmarshalJSON reads the known squad fields and keeps the rest untouched.
+func (s *SquadSettings) UnmarshalJSON(data []byte) error {
+	type plain SquadSettings
+	if err := json.Unmarshal(data, (*plain)(s)); err != nil {
+		return err
+	}
+	var all map[string]json.RawMessage
+	if err := json.Unmarshal(data, &all); err != nil {
+		return err
+	}
+	s.extra = map[string]json.RawMessage{}
+	for key, value := range all {
+		if !knownSquadSettingsFields[key] {
+			s.extra[key] = value
+		}
+	}
+	return nil
+}
+
+// MarshalJSON writes the known squad fields plus anything kept from the file.
+func (s SquadSettings) MarshalJSON() ([]byte, error) {
+	type plain SquadSettings
+	known, err := json.Marshal(plain(s))
+	if err != nil {
+		return nil, err
+	}
+	merged := map[string]json.RawMessage{}
+	if err := json.Unmarshal(known, &merged); err != nil {
+		return nil, err
+	}
+	for key, value := range s.extra {
+		merged[key] = value
+	}
+	return json.Marshal(merged)
+}
+
+// SquadOrEmpty is the squad block, or an empty one when the file has none.
+func (s Settings) SquadOrEmpty() SquadSettings {
+	if s.Squad == nil {
+		return SquadSettings{}
+	}
+	return *s.Squad
 }
 
 // GameModeOrDefault is the game mode, "regular" when unset.
@@ -39,7 +103,7 @@ func (s Settings) IsAutoCenterOn() bool { return s.AutoCenter != nil && *s.AutoC
 
 var knownSettingsFields = map[string]bool{
 	"openaiKey": true, "openaiModel": true, "openaiEffort": true, "gameMode": true, "logsPath": true,
-	"screenshotsPath": true, "followPosition": true, "autoCenter": true,
+	"screenshotsPath": true, "followPosition": true, "autoCenter": true, "squad": true,
 }
 
 // UnmarshalJSON reads the known fields and keeps the rest untouched.

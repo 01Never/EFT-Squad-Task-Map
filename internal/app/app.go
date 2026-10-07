@@ -5,6 +5,7 @@
 //	Screenshots ──(file notifications)► screenshots ─┤                      ┌─► page (SSE events)
 //	json.tarkov.dev ──(hourly check)──► gamedata ───┼─► app (this package) ─┤
 //	OpenAI ◄──(scan, categorize)────── taskscan / aicategorize ─┘           └─◄ page (HTTP API)
+//	Friends ◄─(tailnet peer API, only when joined)─► squad ─► app (squad.go) ─► page ("squad" event)
 package app
 
 import (
@@ -15,6 +16,7 @@ import (
 	"squadtaskmap/internal/features/gamelog"
 	"squadtaskmap/internal/features/gps"
 	"squadtaskmap/internal/features/raid"
+	"squadtaskmap/internal/features/squad"
 	"squadtaskmap/internal/features/taskscan"
 	"squadtaskmap/internal/features/updates"
 	"squadtaskmap/internal/gamedata"
@@ -43,6 +45,7 @@ type App struct {
 	jobs        *aicategorize.Jobs
 	ai          *openai.Client
 	updates     *updates.Updater
+	squad       *squad.Squad // ticket 05: started only when the player is in a squad (squad.go)
 
 	// raidAndPosition keeps a raid end and a new position from interleaving: the log and the
 	// screenshots folder are watched on different goroutines, and a position must never arrive
@@ -80,6 +83,7 @@ func newApp(version, updatedFrom string, files storage.Files, builtInGameData fu
 	app.screenshots = screenshots.NewWatcher(gps.IsImageFile, app.onScreenshot)
 	app.scan = taskscan.New(app.screenshots, app.ai, app.onCaptureListChanged)
 	app.updates = newUpdater(app, updatedFrom, userAgent)
+	app.squad = newSquad(app)
 	return app
 }
 

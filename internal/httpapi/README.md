@@ -25,11 +25,14 @@ and `Guard` makes sure only the app's own page in the browser can use it).
     tests, a second copy checking for the first) the request passes. This blocks cross-site
     "simple" POSTs, which a browser sends without asking first.
   - **JSON-body routes** (`jsonBody` in the route table: events/ack, state, settings, ai/key,
-    ai/categorize, scan/remove, scan/read, scan/confirm, updates/download) take a body only as
+    ai/categorize, scan/remove, scan/read, scan/confirm, updates/download, squad/share,
+    squad/join, squad/profile) take a body only as
     `application/json` (a charset is fine), or `415`. A request with no body and no Content-Type
     passes and reads as `{}`. So a form or `text/plain` POST can't reach them even from a
     browser that leaves out `Origin`.
-  - Ticket 05's squad listener gets its own list and rules instead of loosening these.
+  - Ticket 05's peer API (what friends' copies ask for) is **not on this server**: it's a
+    separate listener with its own caller check, in `internal/features/squad` (`peerapi.go`).
+    None of these rules was loosened for it.
 - Request bodies over `maxRequestBody` = 32 MB are refused (the biggest real one is a scan
   screenshot of a few MB).
 - An unknown path, or a known path with the wrong method, gets 404 "Not found" (as v2).
@@ -70,11 +73,19 @@ and `Guard` makes sure only the app's own page in the browser can use it).
 | `POST /api/updates/cancel` | stop or discard the download | |
 | `POST /api/updates/apply` | install the verified download and restart | this copy closes right after the answer |
 | `POST /api/updates/seen` | dismiss "Updated to X" | |
+| `GET /api/squad` | the squad view: you, squad settings, status line, friends with their last shares | same shape as the `squad` event |
+| `PUT /api/squad/share {draw, tasks}` | your share → `{ok, rev, updatedAt, changed, tasksShared, inSquad}` | over 2 MB → 413; wrong shape → 400 with the reason; tasks dropped while "Share my tasks" is off |
+| `POST /api/squad/join {authKey}` | join with an invite code → `{ok, squad}` | answers once the tailnet accepted it (≤ 90 s); 400 not a `tskey-…` code, 409 already in a squad, 502 the join failed; the code is never saved |
+| `POST /api/squad/leave` | leave → `{ok, squad}` | logs out, deletes `squad-task-map-tailscale/`, forgets friends |
+| `PUT /api/squad/profile {name?, color?, shareTasks?}` | change your profile → `{ok, squad}` | name 1–32 characters, colour `#rrggbb`; 400 with the reason |
 
 The update routes' requests, answers, error codes and events are written out in
 `internal/features/updates/README.md`. Nothing contacts GitHub unless one of them is called.
+The squad routes, the `squad` event and the peer API are written out in
+`internal/features/squad/README.md`.
 
-**Files:** `guard.go` (the Host, Origin and JSON-body checks), `routes.go` (route table and handlers), `updates.go` (the update routes), `backend.go` (the `Backend` interface and
+**Files:** `guard.go` (the Host, Origin and JSON-body checks), `routes.go` (route table and handlers), `updates.go` (the update routes), `squad.go` (the squad
+routes), `backend.go` (the `Backend` interface and
 `SettingsChange`), `helpers.go` (JSON in and out, JavaScript-style text and limits), `static.go`
 (page, modules, map art, fonts).
 
@@ -84,5 +95,7 @@ Origin, or a cross-site/same-site `Sec-Fetch-Site`, → 403 on state-changing re
 pass); `text/plain`, form or untyped bodies → 415; refused requests never reach the route.
 `internal/app/guard_test.go`: the hosts use the bound port, a second launch still finds the
 running copy, and a cross-site POST to `/api/updates/check` gets 403 without asking GitHub.
+`internal/app/squad_test.go`: the squad routes (413/400/415 on the share, join/leave/profile
+answers, the peer API's paths are 404 on this server).
 `static_test.go`: explicit content types, `*.test.js` and non-JS files under `/js/` refused, ETag and 304, fonts from `assets/fonts.json`, unknown paths "Not found", the state round trip, the request size limit and acks (with a small fake `Backend`). The routes were also compared with v2's Bun server in the ticket 04 parity
 run.
