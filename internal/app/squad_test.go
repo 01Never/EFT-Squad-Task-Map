@@ -57,7 +57,7 @@ func (rig *squadRig) send(method, path, body string) (int, map[string]any) {
 }
 
 const shareWithTasks = `{"draw":{"customs":[{"c":"#ff4d4d","w":2,"pts":[[1,2],[3,4]]}]},` +
-	`"tasks":{"657315ddab5a49b71f098853":{"ticks":{"a1":true,"b2":3},"pct":40}}}`
+	`"tasks":{"657315ddab5a49b71f098853":{"ticks":{"65732ac3c67dcd96adffa3c7":true,"65732ac3c67dcd96adffa3c8":3},"pct":40}}}`
 
 func freeLoopbackAddress(t *testing.T) string {
 	t.Helper()

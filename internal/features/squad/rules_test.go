@@ -13,7 +13,7 @@ var (
 	sam      = Player{ID: "fedcba9876543210", Name: "Sam", Color: "#ff922b"}
 	noon     = time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
 	oneLine  = Stroke{Color: "#ff4d4d", Width: 2.5, Points: [][]float64{{10, 20}, {30, 40}}}
-	twoTicks = TaskProgress{Ticks: map[string]Tick{"objectiveA": {IsDone: true}, "objectiveB": {Count: 3}}, Percent: 40}
+	twoTicks = TaskProgress{Ticks: map[string]Tick{"65732ac3c67dcd96adffa3c7": {IsDone: true}, "65732ac3c67dcd96adffa3c8": {Count: 3}}, Percent: 40}
 )
 
 func someParts() ShareParts {
@@ -106,7 +106,7 @@ func validShareJSON(replace map[string]any) []byte {
 		"rev":       7,
 		"updatedAt": noon.UnixMilli(),
 		"draw":      map[string]any{"customs": []any{map[string]any{"c": "#ff4d4d", "w": 2, "pts": []any{[]any{1, 2}, []any{3, 4}}}}},
-		"tasks":     map[string]any{"657315ddab5a49b71f098853": map[string]any{"ticks": map[string]any{"a1": true, "b2": 3}, "pct": 40}},
+		"tasks":     map[string]any{"657315ddab5a49b71f098853": map[string]any{"ticks": map[string]any{"65732ac3c67dcd96adffa3c7": true, "65732ac3c67dcd96adffa3c8": 3}, "pct": 40}},
 	}
 	for key, value := range replace {
 		share[key] = value
@@ -125,6 +125,9 @@ func TestValidationRejectsBadPeerData(t *testing.T) {
 	}
 	oneTask := func(progress any) map[string]any {
 		return map[string]any{"tasks": map[string]any{"657315ddab5a49b71f098853": progress}}
+	}
+	oneTaskID := func(id string) map[string]any {
+		return map[string]any{"tasks": map[string]any{id: map[string]any{"ticks": map[string]any{}, "pct": 0}}}
 	}
 	hugeName := strings.Repeat("x", MaxNameRunes+1)
 	cases := []struct {
@@ -150,10 +153,22 @@ func TestValidationRejectsBadPeerData(t *testing.T) {
 		{"a stroke without points is dropped", validShareJSON(oneStroke(map[string]any{"c": "#fff", "w": 1, "pts": []any{}})), false},
 		{"a stroke colour that isn't a colour is dropped", validShareJSON(oneStroke(map[string]any{"c": "url(x)", "w": 1, "pts": []any{[]any{1, 2}}})), false},
 		{"a stroke of width 0 is dropped", validShareJSON(oneStroke(map[string]any{"c": "#fff", "w": 0, "pts": []any{[]any{1, 2}}})), false},
-		{"a tick that is false is dropped", validShareJSON(oneTask(map[string]any{"ticks": map[string]any{"a1": false}, "pct": 0})), false},
-		{"a tick that is text is dropped", validShareJSON(oneTask(map[string]any{"ticks": map[string]any{"a1": "3"}, "pct": 0})), false},
-		{"a negative tick count is dropped", validShareJSON(oneTask(map[string]any{"ticks": map[string]any{"a1": -1}, "pct": 0})), false},
+		{"a tick that is false is dropped", validShareJSON(oneTask(map[string]any{"ticks": map[string]any{"65732ac3c67dcd96adffa3c7": false}, "pct": 0})), false},
+		{"a tick that is text is dropped", validShareJSON(oneTask(map[string]any{"ticks": map[string]any{"65732ac3c67dcd96adffa3c7": "3"}, "pct": 0})), false},
+		{"a negative tick count is dropped", validShareJSON(oneTask(map[string]any{"ticks": map[string]any{"65732ac3c67dcd96adffa3c7": -1}, "pct": 0})), false},
 		{"pct over 100 is dropped", validShareJSON(oneTask(map[string]any{"ticks": map[string]any{}, "pct": 101})), false},
+		{"a task id that isn't 24 lower-case hex is dropped", validShareJSON(map[string]any{"tasks": map[string]any{"task-1": map[string]any{"ticks": map[string]any{}, "pct": 0}}}), false},
+		{"a task id in upper-case hex is dropped", validShareJSON(oneTaskID("657315DDAB5A49B71F098853")), false},
+		{"a task id named toString is dropped", validShareJSON(oneTaskID("toString")), false},
+		{"a task id named hasOwnProperty is dropped", validShareJSON(oneTaskID("hasOwnProperty")), false},
+		{"an objective id that isn't hex is dropped", validShareJSON(oneTask(map[string]any{"ticks": map[string]any{"valueOf": true}, "pct": 0})), false},
+		{"an objective id of 23 hex characters is dropped", validShareJSON(oneTask(map[string]any{"ticks": map[string]any{"65732ac3c67dcd96adffa3c": true}, "pct": 0})), false},
+		{"a name with a right-to-left override is dropped", validShareJSON(withPlayer(sam.ID, "Sam\u202eevil", sam.Color)), false},
+		{"a name with a zero-width space is dropped", validShareJSON(withPlayer(sam.ID, "Sa\u200bm", sam.Color)), false},
+		{"a name with a byte order mark is dropped", validShareJSON(withPlayer(sam.ID, "\ufeffSam", sam.Color)), false},
+		{"a name with a bidi isolate is dropped", validShareJSON(withPlayer(sam.ID, "Sa\u2066m", sam.Color)), false},
+		{"a name of only spaces is dropped", validShareJSON(withPlayer(sam.ID, "   ", sam.Color)), false},
+		{"a 32-character name of 3-byte characters is accepted (characters, not bytes)", validShareJSON(withPlayer(sam.ID, strings.Repeat("\u4e2d", 32), sam.Color)), true},
 		{"a share over 2 MB is dropped", append(validShareJSON(nil), make([]byte, MaxShareBytes)...), false},
 	}
 	for _, tc := range cases {
@@ -307,6 +322,10 @@ func TestProfileRules(t *testing.T) {
 		{"a name is trimmed", func() bool { name, ok := NormalizeName("  Mike "); return ok && name == "Mike" }, true},
 		{"a blank name is refused", func() bool { _, ok := NormalizeName("   "); return ok }, false},
 		{"a 32-character name with accents is fine", func() bool { _, ok := NormalizeName(strings.Repeat("é", 32)); return ok }, true},
+		{"invisible characters are removed from a name", func() bool { name, ok := NormalizeName("\u202eSa\u200bm\ufeff"); return ok && name == "Sam" }, true},
+		{"a name of only invisible characters is refused", func() bool { _, ok := NormalizeName("\u200b \u202e\u2060"); return ok }, false},
+		{"a name of 33 characters is refused after cleaning", func() bool { _, ok := NormalizeName(strings.Repeat("x", 32) + "\u200b" + "x"); return ok }, false},
+		{"32 invisible characters around a 32-character name are fine", func() bool { _, ok := NormalizeName(strings.Repeat("\u200b", 40) + strings.Repeat("x", 32)); return ok }, true},
 		{"a colour is lower-cased", func() bool { color, ok := NormalizeColor("#4DABF7"); return ok && color == "#4dabf7" }, true},
 		{"a three-digit colour is refused", func() bool { _, ok := NormalizeColor("#fff"); return ok }, false},
 		{"a new player id has the right shape", func() bool { return IsValidPlayerID(NewPlayerID()) }, true},
