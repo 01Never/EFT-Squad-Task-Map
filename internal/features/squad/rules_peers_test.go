@@ -98,12 +98,12 @@ func TestThePeerAPIOnlyAnswersItsOwnAddressAsHost(t *testing.T) {
 func TestKeysThatMeanSomethingToJavaScriptAreRefused(t *testing.T) {
 	stroke := []any{map[string]any{"c": "#fff", "w": 1, "pts": []any{[]any{1, 2}}}}
 	emptyTask := map[string]any{"ticks": map[string]any{}, "pct": 0}
-	for _, key := range []string{"__proto__", "constructor", "prototype"} {
+	for _, key := range []string{"__proto__", "constructor", "prototype", "toString", "valueOf", "hasOwnProperty"} {
 		cases := map[string][]byte{
 			"as a map key": validShareJSON(map[string]any{"draw": map[string]any{key: stroke}}),
 			"as a task id": validShareJSON(map[string]any{"tasks": map[string]any{key: emptyTask}}),
 			"as an objective id": validShareJSON(map[string]any{"tasks": map[string]any{
-				"t1": map[string]any{"ticks": map[string]any{key: true}, "pct": 0},
+				"657315ddab5a49b71f098853": map[string]any{"ticks": map[string]any{key: true}, "pct": 0},
 			}}),
 		}
 		for where, data := range cases {
@@ -114,22 +114,24 @@ func TestKeysThatMeanSomethingToJavaScriptAreRefused(t *testing.T) {
 	}
 }
 
-// Names are shown to friends as text. These are accepted on purpose: the page must always insert
-// a friend's name as text (escaped), never as HTML, and keep it inside its own element (bidi
-// isolation) so a right-to-left override can't flip the text around it.
-func TestUnusualNamesAreAcceptedAndThePageMustEscapeThem(t *testing.T) {
+// Names are shown to friends as text, so the page must still insert them as text (escaped). Markup
+// and quotes are fine; bidi controls and zero-width characters are refused in a friend's share
+// (and removed from the name I type), so they can't flip or hide text around the name.
+func TestOnlyPlainVisibleNamesAreAcceptedFromFriends(t *testing.T) {
 	cases := []struct {
 		name   string
 		player string
+		want   bool
 	}{
-		{"markup", `<img src=x onerror=alert(1)>`},
-		{"a right-to-left override", "Sam‮evil"},
-		{"a zero-width space", "Sa​m"},
-		{"quotes and ampersands", `"Sam" & 'Co'`},
+		{"markup (the page escapes it)", `<img src=x onerror=alert(1)>`, true},
+		{"quotes and ampersands", `"Sam" & 'Co'`, true},
+		{"a right-to-left override", "Sam\u202eevil", false},
+		{"a zero-width space", "Sa\u200bm", false},
 	}
 	for _, tc := range cases {
-		if _, err := DecodeShare(validShareJSON(withPlayer(sam.ID, tc.player, sam.Color))); err != nil {
-			t.Errorf("a name with %s was refused (%v); it is accepted on purpose", tc.name, err)
+		_, err := DecodeShare(validShareJSON(withPlayer(sam.ID, tc.player, sam.Color)))
+		if (err == nil) != tc.want {
+			t.Errorf("a name with %s: error %v, accepted should be %v", tc.name, err, tc.want)
 		}
 	}
 }

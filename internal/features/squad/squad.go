@@ -418,7 +418,11 @@ func (squad *Squad) Join(ctx context.Context, transport Transport) error {
 	settings := squad.settings
 	squad.mutex.Unlock()
 	squad.config.SaveSettings(settings)
-	squad.startSession(transport, true)
+	current := squad.startSession(transport, true)
+	select {
+	case <-current.listening:
+	case <-ctx.Done():
+	}
 	return nil
 }
 
@@ -528,6 +532,10 @@ type session struct {
 	cancel    context.CancelFunc
 	links     *friendLinks
 	running   sync.WaitGroup
+	// listening is closed once the peer API listener is open, or the session gave up trying
+	// (Join waits for it, so friends can reach us as soon as Join returns).
+	listening     chan struct{}
+	listeningOnce sync.Once
 
 	mutex     sync.Mutex
 	server    *http.Server
@@ -535,9 +543,9 @@ type session struct {
 }
 
 // startSession starts the session's goroutine (lifecycle is held by the caller).
-func (squad *Squad) startSession(transport Transport, isAlreadyUp bool) {
+func (squad *Squad) startSession(transport Transport, isAlreadyUp bool) *session {
 	ctx, cancel := context.WithCancel(context.Background())
-	current := &session{transport: transport, cancel: cancel}
+	current := &session{transport: transport, cancel: cancel, listening: make(chan struct{})}
 	current.links = newFriendLinks(transport.Client(), friendEvents{
 		onShare:        squad.onFriendShare,
 		onStreamClosed: squad.onFriendStreamClosed,
@@ -551,8 +559,10 @@ func (squad *Squad) startSession(transport Transport, isAlreadyUp bool) {
 	// Goroutine: the session, started by Join or Resume; ends when stop() cancels ctx.
 	go func() {
 		defer current.running.Done()
+		defer current.markListening() // however runSession ends, nobody waits forever
 		squad.runSession(ctx, current, isAlreadyUp)
 	}()
+	return current
 }
 
 // runSession brings the transport up, serves the peer API and follows the peer list until ctx ends.
@@ -568,6 +578,7 @@ func (squad *Squad) runSession(ctx context.Context, current *session, isAlreadyU
 		}
 	}
 	listener, err := current.transport.Listen()
+	current.markListening()
 	if err != nil {
 		squad.setState(current, StateError, "listening for friends: "+err.Error())
 		return
@@ -590,6 +601,11 @@ func (squad *Squad) runSession(ctx context.Context, current *session, isAlreadyU
 		func(peers []PeerAddress) { current.links.reconcile(ctx, peers) },
 		func(state, problem string) { squad.setState(current, state, problem) },
 	)
+}
+
+// markListening tells whoever waits that the listener is open (or won't be).
+func (current *session) markListening() {
+	current.listeningOnce.Do(func() { close(current.listening) })
 }
 
 // attachServer keeps the server so stop() can close it; false if the session already stopped.

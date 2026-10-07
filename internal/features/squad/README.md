@@ -26,17 +26,17 @@ categories, AI chats, your position. The server only ever sends what's in the sh
 | A share is `{v, player, rev, updatedAt, draw, tasks}` | `Share` | `v` = 1 (`ShareFormatVersion`); `updatedAt` in ms since 1970 |
 | `rev` goes up only when the content changes | `StampShare` | content = player (id, name, colour) + drawings + tasks; the same content again keeps rev and updatedAt |
 | Tasks are dropped when "Share my tasks" is off | `StampShare` | enforced by the server, whatever the page sends; turning it off re-stamps at once (rev + 1, `tasks: null`) |
-| Everything received is checked; a bad share is dropped whole and logged once | `DecodeShare`, `ValidateShare`, `ValidateParts` | ≤ 2 MB (`MaxShareBytes`, ticket's cap); player id 16 lower-case hex; name 1–32 characters, no control characters, no spaces at the ends; colour `#rrggbb`; map/task/objective ids `[A-Za-z0-9_-]{1,64}` and never `__proto__`, `constructor` or `prototype` (so the page needn't guard against them); ≤ 64 maps, ≤ 5000 strokes a map, 1–10000 `[x, z]` points a stroke, width 0–1000, coordinates within ±1e6, stroke colour `#rgb`/`#rrggbb`; ≤ 2000 tasks, ≤ 200 ticks each, a tick is `true` or a whole number 0–100000, `pct` 0–100 |
+| Everything received is checked; a bad share is dropped whole and logged once | `DecodeShare`, `ValidateShare`, `ValidateParts` | ≤ 2 MB (`MaxShareBytes`, ticket's cap); player id 16 lower-case hex; name 1–32 characters (not bytes), no control characters, no bidi controls or zero-width characters, no spaces at the ends; colour `#rrggbb`; task and objective ids exactly 24 lower-case hex characters (what the real game data has: all 515 task ids and 1441 objective ids in the bundled snapshot; so `toString`, `__proto__` and the like can't get in); map keys `[A-Za-z0-9_-]{1,64}` and never a name of a JavaScript object property (`__proto__`, `constructor`, `prototype`, `toString`, `valueOf`, `hasOwnProperty`, …); ≤ 64 maps, ≤ 5000 strokes a map, 1–10000 `[x, z]` points a stroke, width 0–1000, coordinates within ±1e6, stroke colour `#rgb`/`#rrggbb`; ≤ 2000 tasks, ≤ 200 ticks each, a tick is `true` or a whole number 0–100000, `pct` 0–100 |
 | A friend's share is new when rev or updatedAt differ | `HasChanged` | not "higher": a friend who reset their data starts again at rev 1 |
 | On the tailnet a share must carry the id its node is named after | `ShareFitsPeer` | so one friend can't pose as another (the dev transport has no names) |
 | Friends are the online `tag:stm` nodes whose MagicDNS name is exactly `stm-<player id>` | `SquadPeers` | the id comes **only from the DNS name's first part**, which the tailnet keeps unique (a clash becomes `stm-<id>-1`, which doesn't count), never from the host name, which each node picks itself; connections are keyed by the node's stable id; when two machines claim one id (`stm-<id>` and `stm-<id>-1`, online or not), **neither** is trusted and one console line says to delete the old machine; IPv4 address preferred; yourself left out |
 | The peer API answers only squad nodes, at its own address | `IsOwnHost`, `HasSquadTag` (tsnet, via `WhoIs`), `IsLoopbackCaller` (dev), `IsBrowserRequest` | the `Host` must be our own address as an IP literal with the port (else 421): a page on a rebinding domain sends its own name, even on a same-origin fetch with no browser headers; any request with `Origin` or `Sec-Fetch-Site` → 403 |
 | One friend can't flood you | `MinShareInterval`, `ChangeInterval` | at most one share a second is taken from each friend: newer ones replace the waiting one, so the last one sent always wins; the page's `squad` event and the cache file are updated at most once a second (the first change at once). QA's flood (rev+1 in a loop) made 32k page events in 10 s before |
 | One caller can't hold every stream | `StreamsPerCaller` | ≤ 2 open streams per tailnet machine (by stable node id), 16 in all; dev: 5 per caller, since every copy on this PC calls from 127.0.0.1 |
-| Names are shown as text | `IsValidName` | markup, right-to-left overrides and zero-width characters are accepted on purpose: **the page must insert names as text (escaped) and bidi-isolated** |
+| Names are shown as text | `IsValidName`, `NormalizeName` | bidi controls and zero-width characters (U+200B–U+200F, U+202A–U+202E, U+2060–U+2069, U+FEFF) are **removed** from the name you type (`PUT /api/squad/profile`), then it is trimmed; blank is refused. In a friend's share they are **refused** (the share is dropped), since a friend's copy never sends them. Markup and quotes are still accepted: **the page must insert names as text (escaped)** |
 | Reconnecting waits 1 s, 2 s, 4 s … 60 s | `RetryDelay` | ticket 05; starts over after a stream delivered a valid share |
 | Status line | `StatusText` | "Connected · 3 of 4 friends online"; "Connected · no friends seen yet"; "Connecting…"; "Signed out of the squad network: leave, then join again with an invite code"; "Squad connection failed: …"; "Not in a squad" |
-| Profile | `NormalizeName`, `NormalizeColor`, `NewPlayerID` | name trimmed, 1–32 characters; colour lower-cased `#rrggbb`; defaults "Player" and `#4dabf7`; player id made once |
+| Profile | `NormalizeName`, `NormalizeColor`, `NewPlayerID` | name cleaned (invisible characters removed, trimmed), 1–32 characters; colour lower-cased `#rrggbb`; defaults "Player" and `#4dabf7`; player id made once |
 | An invite code looks like a Tailscale auth key | `IsPlausibleAuthKey` | starts with `tskey-`, no spaces, ≤ 200 characters (Tailscale does the real check) |
 
 ## Flow
@@ -127,7 +127,7 @@ All bodies are JSON sent as `application/json` (415 otherwise). Times are ms sin
   never keeps tasks while sharing is off, so it has none to add by itself).
 
 ### `POST /api/squad/join {authKey}` → `{ok: true, squad: <view>}`
-- Answers once the tailnet has accepted the code (up to 90 s), then the session runs. The code is
+- Answers once the tailnet has accepted the code (up to 90 s) and the peer API listener is open (so a friend can connect the moment it returns), then the session runs. The code is
   used once and never saved; the node key in `squad-task-map-tailscale/` is enough from then on.
 - **400** "That isn't an invite code. It starts with tskey-"; **409** "Already in a squad. Leave it
   first to join another"; **502** "Couldn't join the squad: …" (Tailscale's reason; nothing kept).
@@ -138,7 +138,7 @@ friends' shares (the cache keeps only your own share) and sets `joined` to false
 (a failed log-out is logged; the folder is deleted anyway).
 
 ### `PUT /api/squad/profile {name?, color?, shareTasks?}` → `{ok: true, squad: <view>}`
-Only the fields sent change. Name trimmed, 1–32 characters; colour `#rrggbb` (any case, saved
+Only the fields sent change. Name cleaned (bidi controls and zero-width characters removed, then trimmed), 1–32 characters; colour `#rrggbb` (any case, saved
 lower-case). **400** with "Your name must be 1 to 32 characters" or "Your colour must look like
 #4dabf7". Your share is re-stamped at once, so friends see the new name or colour, and lose your
 tasks as soon as sharing is turned off.
@@ -185,12 +185,12 @@ kept" for the page event and the cache file. Wiring: `internal/app/squad.go`; ro
 
 ## Tests
 - `rules_test.go`: rev stamping, tasks stripped when sharing is off, validation rejects bad peer
-  data (23 cases), ticks, backoff schedule, caller checks (loopback, tag, browser), peer list
+  data (about 35 cases), ticks, backoff schedule, caller checks (loopback, tag, browser), peer list
   rules, identity check, "new share" rule, profile rules, status line.
 - `rules_peers_test.go`: who a friend is (DNS name only, keyed by node id; `-1` names and host
   names don't count; two machines with the same host name or id → neither trusted), the `Host`
-  check, `__proto__`/`constructor`/`prototype` refused, and names with markup, RTL override or
-  zero-width characters accepted on purpose (the page escapes them).
+  check, `__proto__`/`constructor`/`prototype`/`toString`… refused, and names with markup accepted (the page
+  escapes them) but RTL override, zero-width characters and bidi isolates refused; ids that aren't 24 hex characters refused.
 - `squad_test.go`: **three copies on the dev transport** (A's share reaches B and C; an update
   propagates; B's tasks aren't sent; C goes offline and A keeps C's share with `lastSeen`, also in
   the cache file; C comes back and refreshes), cache read/write, rev kept across a restart,
