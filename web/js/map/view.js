@@ -6,6 +6,7 @@ import { app } from "../app/state.js";
 import { placeSelectionFlash } from "./selection-flash.js";
 import { placeFindMeOverlays } from "../features/find-me/map-layer.js";
 import { redrawLootWhenViewSettles } from "../features/loot/map-layer.js";
+import { redrawKeyDoorsWhenViewSettles } from "../features/keys/map-layer.js";
 
 /** @import { ViewBox } from "../app/state.js" */
 
@@ -55,6 +56,7 @@ export function applyView() {
   placeSelectionFlash();
   placeFindMeOverlays();
   redrawLootWhenViewSettles();
+  redrawKeyDoorsWhenViewSettles();
 }
 
 /**

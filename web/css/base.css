@@ -11,6 +11,8 @@
   --muted:#8f8d80; --glass:rgb(18 18 18 / .88); --glass-border:rgb(210 175 120 / .18); --panel:rgb(0 0 0 / .55);
   /* Your position on the map (features/find-me). A colour no category, extract kind or selection ring uses. */
   --player:#ff3fd2;
+  /* Doors your keys open (features/keys, ticket 09). Also a colour nothing else uses. */
+  --keys:#748ffc;
   /* The ring around the selected task: its row's outline and the flashing rings on its markers. */
   --selection-ring:#fff;
   /* "You're missing something": the "!" badges, missing-item tags and short Bring list lines. */

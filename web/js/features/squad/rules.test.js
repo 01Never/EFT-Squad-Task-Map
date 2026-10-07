@@ -217,6 +217,16 @@ test("my share never carries anything but drawings and tasks", () => {
   }
 });
 
+test("my share carries my key lists only while Share my keys is on (ticket 09), cleaned", () => {
+  const saved = freshState();
+  saved.keyring = { customs: ["5780cf7f2459777de4559322", "toString"], constructor: ["5780cf7f2459777de4559322"] };
+  assert.equal(buildMyShare(saved, taskById, false).keys, null);
+  assert.equal(buildMyShare(saved, taskById, true, false).keys, null);
+  assert.deepEqual(buildMyShare(saved, taskById, false, true).keys, { customs: ["5780cf7f2459777de4559322"] });
+  const withoutKeyring = freshState();
+  assert.deepEqual(buildMyShare(withoutKeyring, taskById, false, true).keys, {});
+});
+
 test("a stroke the server would refuse is left out, and the rest is still sent", () => {
   const saved = freshState();
   saved.draw = {
@@ -285,7 +295,17 @@ test("a friend's new drawing on the open map redraws only that friend's lines", 
     settingsChanged: false,
     drawingsChanged: ["mike"],
     tasksChanged: [],
+    keysChanged: [],
   });
+});
+
+test("a friend's new key list is a key change (ticket 09), and nothing else", () => {
+  const before = viewOf([withDrawing("mike", [stroke()], 1)]);
+  const after = viewOf([withDrawing("mike", [stroke()], 2)]);
+  after.friends[0].share.keys = { customs: ["5780cf7f2459777de4559322"] };
+  const change = describeSquadChange(before, after, "customs");
+  assert.deepEqual(change.keysChanged, ["mike"]);
+  assert.deepEqual([change.drawingsChanged, change.tasksChanged, change.chipsChanged], [[], [], false]);
 });
 
 test("a drawing on another map changes nothing on this one", () => {

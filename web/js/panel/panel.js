@@ -44,6 +44,18 @@ import {
   onLootSectionToggled,
 } from "../features/loot/panel.js";
 import {
+  KEYS_SECTION_ACTIONS,
+  renderKeysSection,
+  onKeysSectionToggled,
+  onKeySearchInput,
+  onKeySearchEnter,
+  onAllKeysChanged,
+  onKeyResultClicked,
+  onKeyRemoveClicked,
+  onKeyNameClicked,
+  onCopyFromChanged,
+} from "../features/keys/panel.js";
+import {
   renderAiCategorizeBox,
   onAiCategorizeClicked,
   onAiCategorizeKeyDown,
@@ -71,6 +83,7 @@ const TASKS_TAB_SECTIONS = [
   renderAiCategorizeBox, // 🤖 AI Categorize (features/ai-categorize)
   renderExtractsSection, // Extracts & labels (features/extracts)
   renderLootSection, // Loot, closed until opened (features/loot)
+  renderKeysSection, // My keys, closed until opened (features/keys)
   renderCategoryLists, // the categories and their task rows (features/tasks)
   renderNewCategoryBox, // + Category (features/tasks)
   renderFriendsTasksSection, // friends' tasks you don't have, read-only (features/squad)
@@ -149,6 +162,7 @@ const PANEL_ACTIONS = {
   ...BRING_LIST_ACTIONS,
   ...EXTRACTS_SECTION_ACTIONS,
   ...LOOT_SECTION_ACTIONS,
+  ...KEYS_SECTION_ACTIONS,
   ...SUB_TASK_ACTIONS,
   ...SQUAD_SECTION_ACTIONS,
 };
@@ -161,6 +175,9 @@ const PANEL_BUTTONS_BY_ATTRIBUTE = [
   ["data-tab", onTabClicked],
   ["data-ext", onKindChipClicked],
   ["data-loot", onLootChipClicked],
+  ["data-key-add", onKeyResultClicked],
+  ["data-key-remove", onKeyRemoveClicked],
+  ["data-key-fly", onKeyNameClicked],
   ["data-shape", onShapeClicked],
   ["data-goto", onOtherPartClicked],
   ["data-tick", onCounterButtonClicked],
@@ -206,7 +223,7 @@ function onPanelClicked(event) {
 
 /**
  * A field changed: tick boxes, Move to, Don't split, bag counts, a pin's floor, a category's
- * colour, Add a task, the AI scope.
+ * colour, Add a task, the AI scope, My keys' "all keys" and "Copy from".
  * @param {Event} event
  */
 function onPanelChanged(event) {
@@ -219,15 +236,18 @@ function onPanelChanged(event) {
   if (field.hasAttribute("data-catcolor")) return onCategoryColorChanged(field);
   if (field.id === "addtask") addTaskByName(field.value);
   if (field.id === "aiscope") onAiScopeChanged(/** @type {any} */ (field));
+  if (field.id === "keyall") onAllKeysChanged(field);
+  if (field.hasAttribute("data-keys-copy")) onCopyFromChanged(/** @type {any} */ (field));
 }
 
 /**
- * Typing: a category's name is saved as you type.
+ * Typing: a category's name is saved as you type; My keys' search finds keys as you type.
  * @param {Event} event
  */
 function onPanelInput(event) {
   const field = /** @type {HTMLInputElement} */ (event.target);
   if (field.hasAttribute("data-catname")) onCategoryNameInput(field);
+  if (field.id === "keysearch") onKeySearchInput(field);
 }
 
 /**
@@ -242,11 +262,12 @@ function onPanelKeyDown(event) {
   if (field.dataset.addsub !== undefined) onAddBoxEnter(field);
   if (field.id === "newcat") findElement("#panel").querySelector('[data-act="newcat"]').click();
   if (field.id === "addtask") addTaskByName(field.value);
+  if (field.id === "keysearch") onKeySearchEnter();
 }
 
 /**
- * A "Done (n)" list or the Loot section opened or closed (the toggle event doesn't bubble, so this
- * listens while it travels down).
+ * A "Done (n)" list, the Loot or My keys section opened or closed (the toggle event doesn't
+ * bubble, so this listens while it travels down).
  * @param {Event} event
  */
 function onPanelToggle(event) {
@@ -254,6 +275,7 @@ function onPanelToggle(event) {
   const doneList = target.closest && target.closest("[data-done]");
   if (doneList) onDoneListToggled(/** @type {HTMLDetailsElement} */ (doneList));
   if (target.matches && target.matches("[data-loot-section]")) onLootSectionToggled(/** @type {HTMLDetailsElement} */ (target));
+  if (target.matches && target.matches("[data-keys-section]")) onKeysSectionToggled(/** @type {HTMLDetailsElement} */ (target));
 }
 
 /** Wire up the panel. Called once per opened map (the panel element is new each time). */

@@ -25,7 +25,7 @@
  * @property {boolean} available false while the game data has no loot (the built-in snapshot)
  * @property {LootContainerSpot[]} containers
  * @property {LooseLootSpot[]} loose
- * @property {object[]} locks locked doors and trunks; shown by ticket 09, not here
+ * @property {import("../keys/rules.js").Lock[]} locks locked doors and trunks; shown by ticket 09 (features/keys), not here
  * @property {Record<string, string>} lootTypes container type → display name
  * @property {Record<string, string>} items item id → name
  */

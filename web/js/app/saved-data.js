@@ -5,6 +5,7 @@
 import { DEFAULT_CATEGORIES } from "../features/tasks/categories.js";
 import { DEFAULT_SHOWN_EXTRACT_KINDS } from "../features/extracts/rules.js";
 import { cleanLootChoices } from "../features/loot/rules.js";
+import { cleanKeyring } from "../features/keys/rules.js";
 
 /** @import { SavedState, TaskEntry, Category, MapPrefs } from "./types.js" */
 
@@ -55,7 +56,8 @@ export function blankTaskEntry(addedAt = Date.now()) {
 
 /**
  * Make sure every field exists (older or hand-edited files): missing top-level fields get their
- * default, the Unsorted category is always there, every task entry and map's prefs are complete.
+ * default, the Unsorted category is always there, every task entry and map's prefs are complete,
+ * and saved key lists (ticket 09) are cleaned.
  * Changes and returns the same object.
  * @param {SavedState} saved
  * @returns {SavedState}
@@ -83,6 +85,10 @@ export function fillMissingFields(saved) {
     // older files load unchanged. A damaged value keeps only the chips that are on.
     if (mapPrefs.loot !== undefined) mapPrefs.loot = cleanLootChoices(mapPrefs.loot);
   }
+  // Key lists (ticket 09) are absent until you add a key, like `squad`: absent means no keys, so
+  // older files load and save back unchanged (no version change). A damaged value keeps only the
+  // valid map keys and key ids.
+  if (saved.keyring !== undefined) saved.keyring = cleanKeyring(saved.keyring);
   return saved;
 }
 

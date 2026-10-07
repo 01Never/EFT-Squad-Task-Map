@@ -90,6 +90,7 @@ function renderJoined(view) {
     <label class="frow"><span>Your name</span><input type="text" id="sSquadName" maxlength="32" value="${escapeHtml(view.me.name)}"></label>
     <label class="frow"><span>Your colour</span><input type="color" id="sSquadColor" value="${color}"></label>
     <label class="chk frow"><input type="checkbox" id="sSquadShareTasks" ${view.settings.shareTasks ? "checked" : ""}> Share my tasks (your active tasks and how far you are; friends choose whether to show them)</label>
+    <label class="chk frow"><input type="checkbox" id="sSquadShareKeys" ${view.settings.shareKeys ? "checked" : ""}> Share my keys (your key list per map: friends see which doors you can open)</label>
     <div class="row sq-row"><button class="btn sm danger" id="sSquadLeave">Leave squad</button></div>
     ${renderError()}`;
 }
@@ -120,12 +121,13 @@ function onSectionClicked(event) {
   if (button.id === "sSquadLeave") onLeaveClicked();
 }
 
-/** Your name, your colour or "Share my tasks" changed: tell the program. */
+/** Your name, your colour, "Share my tasks" or "Share my keys" changed: tell the program. */
 function onSectionChanged(event) {
   const field = /** @type {HTMLInputElement} */ (event.target);
   if (field.id === "sSquadName") saveProfile({ name: field.value });
   if (field.id === "sSquadColor") saveProfile({ color: field.value });
   if (field.id === "sSquadShareTasks") onShareTasksChanged(field.checked);
+  if (field.id === "sSquadShareKeys") onShareKeysChanged(field.checked);
 }
 
 /** Join: the program asks the tailnet to accept the code, which can take up to 90 seconds. */
@@ -170,7 +172,7 @@ async function onLeaveClicked() {
 /**
  * Save a profile change. A refused value (e.g. an empty name) is shown as the server says it, and
  * the box goes back to what is saved.
- * @param {{ name?: string, color?: string, shareTasks?: boolean }} changes
+ * @param {{ name?: string, color?: string, shareTasks?: boolean, shareKeys?: boolean }} changes
  * @returns {Promise<boolean>} whether it was saved
  */
 async function saveProfile(changes) {
@@ -196,5 +198,15 @@ async function saveProfile(changes) {
  */
 async function onShareTasksChanged(isOn) {
   const wasSaved = await saveProfile({ shareTasks: isOn });
+  if (wasSaved && isOn) await sendShare(true);
+}
+
+/**
+ * "Share my keys" (ticket 09): saved, then my share is sent again (the server keeps no keys while
+ * sharing them is off).
+ * @param {boolean} isOn
+ */
+async function onShareKeysChanged(isOn) {
+  const wasSaved = await saveProfile({ shareKeys: isOn });
   if (wasSaved && isOn) await sendShare(true);
 }

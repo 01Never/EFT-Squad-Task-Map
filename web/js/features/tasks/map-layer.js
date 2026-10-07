@@ -11,6 +11,7 @@ import { renderSelectionFlash } from "../../map/selection-flash.js";
 import { isObjectiveDone, isObjectiveOnMap, placesNamedByExtractObjective } from "./rules.js";
 import { partsOnMap, isShownOnMap } from "./task-list.js";
 import { isObjectivePossible } from "../readiness/rules.js";
+import { openMapKeyList } from "../keys/key-lists.js";
 import { subTaskMarkerItems } from "../sub-tasks/map-layer.js";
 import { squadColorsForTask } from "../squad/friends.js";
 import { markerIconItem, itemIconUrl, showsItemIcons } from "../icons/rules.js";
@@ -128,6 +129,7 @@ export function renderTaskMarkers() {
 function partMarkerItems() {
   const mapView = app.mapView;
   const bag = app.saved.have;
+  const keyList = openMapKeyList(); // ticket 09: keys on this map's list count as had
   const withIcons = showsItemIcons(app.saved);
   const items = [];
   const firstShownRowByTask = new Map();
@@ -137,7 +139,7 @@ function partMarkerItems() {
     if (!firstShownRowByTask.has(task.id)) firstShownRowByTask.set(task.id, row);
     const squadColors = squadColorsForTask(task.id);
     for (const spot of spotsOfPart(task, part)) {
-      const isReady = isObjectivePossible(spot.o, bag);
+      const isReady = isObjectivePossible(spot.o, bag, keyList);
       if (spot.ol) drawZone(spot.ol, cat.color, isReady);
       const iconItem = iconItemOfSpot(spot, withIcons);
       items.push({ ...spot, task, part, icon: cat.icon, color: cat.color, squadColors, iconItem, ready: isReady, split: part.split });

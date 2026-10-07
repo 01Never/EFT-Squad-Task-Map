@@ -14,6 +14,7 @@ import {
   tickTarget,
   isObjectiveDone,
 } from "../tasks/rules.js";
+import { shareableKeyring } from "../keys/rules.js";
 
 /** @import { SavedState, Task, Part, Stroke, SquadView, SquadFriend, MyShare, FriendPrefs } from "../../app/types.js" */
 
@@ -326,18 +327,21 @@ function wholeTaskPercent(task, ticks) {
 // ---------------------------------------------------------------- my share
 
 /**
- * What you send your friends (PUT /api/squad/share): all your drawings and, when "Share my tasks"
- * is on, `{ticks, pct}` for each active task. Nothing else leaves your saved data. Anything the
- * server would refuse is left out, so one odd stroke never blocks the whole share.
+ * What you send your friends (PUT /api/squad/share): all your drawings; when "Share my tasks" is
+ * on, `{ticks, pct}` for each active task; when "Share my keys" is on (ticket 09), your key list
+ * per map. Nothing else leaves your saved data. Anything the server would refuse is left out, so
+ * one odd stroke never blocks the whole share.
  * @param {SavedState} saved
  * @param {Record<string, Task>} taskById
  * @param {boolean} shareTasks
+ * @param {boolean} [shareKeys]
  * @returns {MyShare}
  */
-export function buildMyShare(saved, taskById, shareTasks) {
+export function buildMyShare(saved, taskById, shareTasks, shareKeys = false) {
   return {
     draw: shareableDrawings(saved.draw),
     tasks: shareTasks ? shareableTasks(saved, taskById) : null,
+    keys: shareKeys ? shareableKeyring(saved) : null,
   };
 }
 
@@ -453,6 +457,7 @@ export function shouldSendShareAtStart(view) {
  * @property {boolean} settingsChanged the status line, or your own profile / settings
  * @property {string[]} drawingsChanged friends whose strokes on the open map (or colour) changed
  * @property {string[]} tasksChanged friends whose shared tasks, name or colour changed
+ * @property {string[]} [keysChanged] friends whose shared key lists changed (ticket 09)
  */
 
 /**
@@ -465,7 +470,7 @@ export function shouldSendShareAtStart(view) {
  */
 export function describeSquadChange(before, after, mapKey) {
   if (!before) return everythingChanged(after, mapKey);
-  const change = { chipsChanged: false, settingsChanged: false, drawingsChanged: [], tasksChanged: [] };
+  const change = { chipsChanged: false, settingsChanged: false, drawingsChanged: [], tasksChanged: [], keysChanged: [] };
   const own = (view) => JSON.stringify([view.status, view.me, view.settings]);
   change.settingsChanged = own(before) !== own(after);
   const friendsBefore = new Map(before.friends.map((friend) => [friend.playerId, friend]));
@@ -484,7 +489,7 @@ export function describeSquadChange(before, after, mapKey) {
  */
 function everythingChanged(after, mapKey) {
   const ids = after.friends.map((friend) => friend.playerId);
-  return { chipsChanged: true, settingsChanged: true, drawingsChanged: mapKey ? ids : [], tasksChanged: ids };
+  return { chipsChanged: true, settingsChanged: true, drawingsChanged: mapKey ? ids : [], tasksChanged: ids, keysChanged: ids };
 }
 
 /**
@@ -500,6 +505,7 @@ function compareFriend(change, before, after, mapKey) {
     change.chipsChanged = true;
     if (mapKey) change.drawingsChanged.push(playerId);
     change.tasksChanged.push(playerId);
+    change.keysChanged.push(playerId);
     return;
   }
   const hasNewLook = before.name !== after.name || before.color !== after.color;
@@ -518,6 +524,9 @@ function compareFriend(change, before, after, mapKey) {
     const tasksAfter = JSON.stringify(after.share?.tasks || null);
     if (tasksBefore !== tasksAfter) change.tasksChanged.push(playerId);
   }
+  const keysBefore = JSON.stringify(before.share?.keys || null);
+  const keysAfter = JSON.stringify(after.share?.keys || null);
+  if (keysBefore !== keysAfter) change.keysChanged.push(playerId);
 }
 
 /**

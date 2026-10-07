@@ -25,6 +25,7 @@
  * @property {SVGGElement} extracts
  * @property {SVGGElement} closestExtract
  * @property {SVGGElement} loot
+ * @property {SVGGElement} keyDoors
  * @property {SVGGElement} friendTasks
  * @property {SVGGElement} taskMarkers
  * @property {SVGGElement} player
@@ -96,6 +97,7 @@
  * @property {(() => void) | null} [afterGesture]
  * @property {Record<string, MarkerItem>} [markerItemByKey]
  * @property {import("../features/loot/map-layer.js").LootOnMap} [loot] the loot spots drawn (features/loot)
+ * @property {import("../features/keys/map-layer.js").DoorsOnMap | null} [keyDoors] the key doors drawn (features/keys)
  * @property {StrokeInProgress | null} strokeInProgress
  */
 
@@ -145,4 +147,12 @@ export const app = {
   lootSectionOpen: false,
   /** True once item icons (ticket 07's /icons/ route) turned out to be missing: draw signs instead. */
   lootIconsMissing: false,
+  /** Whether the panel's My keys section is open (features/keys). Closed when the page loads. */
+  keysSectionOpen: false,
+  /** What's typed in My keys' "Add key" search (features/keys). */
+  keySearchText: "",
+  /** The search's "all keys" switch: also keys that open nothing on this map (features/keys). */
+  keySearchAll: false,
+  /** "All locked doors": doors for keys you don't have show dimmed (features/keys; this session only). */
+  allDoorsShown: false,
 };

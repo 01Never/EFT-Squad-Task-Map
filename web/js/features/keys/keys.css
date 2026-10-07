@@ -1,0 +1,51 @@
+/* My keys (ticket 09): the panel's "My keys" section (a heading you open, the list, the search,
+   the tools) and the door popup, top right of the map like the loot popup (one closes the other).
+   The door markers are SVG pictures drawn in map-layer.js. */
+.keys-sec summary{cursor:pointer;list-style:none}
+.keys-sec summary::-webkit-details-marker{display:none}
+.keys-sec summary h4{display:inline-flex;gap:6px;align-items:center;margin:0}
+.keys-sec summary h4::before{content:"▸";font-size:12px}
+.keys-sec[open] summary h4::before{content:"▾"}
+.keys-sec[open] summary{margin-bottom:7px}
+.keys-sec summary .n{font-weight:400;text-transform:none;letter-spacing:0;color:var(--gold-one)}
+
+.keylist{list-style:none;margin:0 0 8px;padding:0}
+.key-row{display:flex;align-items:center;gap:7px;padding:4px 0;border-bottom:1px solid rgb(255 255 255 / .06)}
+.key-row img,.key-result img{width:28px;height:28px;flex:none;object-fit:contain;background:var(--black-light);border:1px solid var(--keys)}
+.key-row .noimg,.key-result .noimg{width:28px;height:28px;flex:none;display:grid;place-items:center;border:1px solid var(--keys)}
+.key-row .key-name{background:none;border:0;padding:0;color:#fff;cursor:pointer;text-align:left;flex:0 1 auto;min-width:0}
+.key-row .key-name:hover{color:var(--accent)}
+.key-row .key-opens{flex:1;color:var(--muted);font-size:13.5px;min-width:0}
+.key-add{display:flex;gap:8px;align-items:center;margin:4px 0}
+.key-add input[type=search]{flex:1;min-width:0}
+.key-add .chk{display:inline-flex;gap:5px;align-items:center;white-space:nowrap;font-size:14px}
+.key-results{display:flex;flex-direction:column;gap:2px;margin:4px 0 6px}
+.key-result{display:flex;align-items:center;gap:7px;background:var(--black-light);border:1px solid transparent;padding:3px 6px;cursor:pointer;text-align:left}
+.key-result:hover{border-color:var(--keys)}
+.key-result:disabled{opacity:.55;cursor:default}
+.key-result .key-name{color:#fff;flex:0 1 auto}
+.key-result .key-opens{color:var(--muted);font-size:13px;margin-left:auto;white-space:nowrap}
+.key-result.nothing-here .key-opens{color:var(--not-ready)}
+.key-tools{margin-top:6px;align-items:center}
+.key-tools select{height:28px;padding:0 6px;border-width:1px}
+
+/* "Sam has it" on key tags and Bring list lines, and "On your key list ✓" */
+.friendkey{color:var(--keys)}
+.bl .onlist{color:var(--keys);font-size:13.5px;white-space:nowrap}
+
+.keypop{position:absolute;right:10px;top:10px;width:min(320px,calc(100% - 20px));max-height:55%;overflow:auto;background:rgb(0 0 0 / .85);border:1px solid var(--glass-border);border-left:4px solid var(--keys);padding:8px 12px;z-index:4;font-size:14.5px}
+.keypop[hidden]{display:none}
+.keypop h3{margin:0;font-size:18px;color:#fff;padding-right:24px;display:flex;align-items:center;gap:8px}
+.keypop h3 img{width:32px;height:32px;object-fit:contain;background:var(--black-light);border:1px solid var(--keys)}
+.keypop h4{margin:8px 0 2px;font-size:14px;color:var(--gold-one);text-transform:uppercase;letter-spacing:.5px}
+.keypop .m{color:var(--muted);font-size:13.5px;margin:2px 0 4px}
+.keypop p{margin:2px 0}
+.keypop .kp-mine{color:var(--keys);font-weight:700}
+.keypop .kp-friend{display:flex;align-items:center;gap:6px}
+.keypop .kp-dot{width:9px;height:9px;border-radius:50%;border:1px solid #000;flex:none}
+.keypop .x{position:absolute;right:6px;top:2px;background:none;border:0;color:var(--muted);font-size:22px;cursor:pointer}
+.keypop ul{margin:0;padding-left:18px} .keypop li{margin:2px 0} .keypop li.more{color:var(--muted);list-style:none}
+
+@media (max-width:860px){
+  .keypop{top:auto;bottom:10px;left:10px;right:auto}
+}

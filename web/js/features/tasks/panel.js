@@ -14,6 +14,7 @@ import { taskEntry, partsOf, partsOnMap, categoryOf, activateTask } from "./task
 import { selectPartFromList, clearSelectionAndOpenRow } from "./selection.js";
 import { renderObjectiveLine, onTickCounterClicked } from "./objective-line.js";
 import { isPartPossible, countKeysNeeded } from "../readiness/rules.js";
+import { openMapKeyList } from "../keys/key-lists.js";
 import { renderSubTasksBox } from "../sub-tasks/panel.js";
 import { renderAlsoOnRow } from "../squad/panel.js";
 
@@ -39,7 +40,7 @@ export function renderTaskRow(row) {
 function renderRowButton(row) {
   const { task, part, cat } = row;
   const saved = app.saved;
-  const isReady = row.done || isPartPossible(part, saved.ticks, saved.have);
+  const isReady = row.done || isPartPossible(part, saved.ticks, saved.have, openMapKeyList());
   const keysNeeded = countKeysNeeded(task, part, app.mapView.key);
   const notReadyBadge = !isReady ? '<span class="bang" title="You don\'t have everything this needs">!</span>' : "";
   const keysBadge = keysNeeded ? `<span class="kb" title="Keys needed">🔑 ${keysNeeded}</span>` : "";

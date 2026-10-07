@@ -10,6 +10,7 @@ import { isObjectiveDone, usesCounter, tickCount, tickTarget } from "./rules.js"
 import { setTick } from "./task-list.js";
 import { isObjectivePossible } from "../readiness/rules.js";
 import { renderRequirementTags } from "../readiness/panel.js";
+import { openMapKeyList } from "../keys/key-lists.js";
 
 /** @import { Objective } from "../../app/types.js" */
 
@@ -48,7 +49,7 @@ function renderObjectiveTags(objective, isDone) {
     objective.time ? ` <span class="tag">🕑 ${objective.time[0]}:00–${objective.time[1]}:00</span>` : "",
     renderPossibleSpotsTag(objective),
     objective.gear && objective.gear.notWearing ? ' <span class="tag">no armor/gear restriction</span>' : "",
-    !isDone && !isObjectivePossible(objective, app.saved.have) ? ' <span class="tag miss">! missing items</span>' : "",
+    !isDone && !isObjectivePossible(objective, app.saved.have, openMapKeyList()) ? ' <span class="tag miss">! missing items</span>' : "",
   ];
   return tags.join("");
 }

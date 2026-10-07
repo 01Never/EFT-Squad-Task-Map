@@ -245,6 +245,8 @@ export {};
  * @property {boolean} [showScanBanner]
  * @property {number} [migratedFrom]
  * @property {SquadChoices} [squad] your choices about friends (2.7.0); absent until you change one
+ * @property {Record<string, string[]>} [keyring] your key list per map: map key → key item ids
+ *   (features/keys, ticket 09); absent until you add a key; not reset at raid end
  */
 
 /**
@@ -401,6 +403,7 @@ export {};
  * @property {number} updatedAt
  * @property {Record<string, Stroke[]>} [draw] by map key
  * @property {Record<string, { ticks?: Record<string, true | number>, pct?: number }> | null} [tasks]
+ * @property {Record<string, string[]> | null} [keys] key lists by map (ticket 09); null when not shared
  */
 
 /**
@@ -416,7 +419,7 @@ export {};
 /**
  * @typedef {object} SquadView The answer of GET /api/squad and the body of the `squad` event.
  * @property {{ playerId: string, name: string, color: string, rev: number, updatedAt: number }} me
- * @property {{ shareTasks: boolean, joined: boolean }} settings
+ * @property {{ shareTasks: boolean, shareKeys?: boolean, joined: boolean }} settings
  * @property {string} transport "tsnet" or "dev"
  * @property {{ state: string, text: string, friendsOnline: number, friendsKnown: number, problem: string }} status
  * @property {SquadFriend[]} friends
@@ -426,4 +429,5 @@ export {};
  * @typedef {object} MyShare What the page sends with PUT /api/squad/share.
  * @property {Record<string, Stroke[]>} draw
  * @property {Record<string, { ticks: Record<string, true | number>, pct: number }> | null} tasks
+ * @property {Record<string, string[]> | null} keys key lists by map, only with "Share my keys" (ticket 09)
  */

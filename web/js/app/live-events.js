@@ -24,6 +24,7 @@ import { onCaptureChanged } from "../features/scan/panel.js";
 import { onUpdatesChanged, onStreamConnected } from "../features/updates/panel.js";
 import { onSquadChanged } from "../features/squad/live-event.js";
 import { onExtractsRead } from "../features/extracts/live-event.js";
+import { remindKeysAtRaidStart } from "../features/keys/live-event.js";
 
 /**
  * @import { LiveEvent, TaskEvent, RaidEndEvent, RaidStartEvent, RaidMapEvent, GpsEvent,
@@ -132,8 +133,8 @@ function onRaidEnded(event) {
 }
 
 /**
- * A raid started: a fresh trail, "● In raid" in the top bar, and the raid's map opens with
- * "Follow my position" on.
+ * A raid started: a fresh trail, "● In raid" in the top bar, the raid's map opens with
+ * "Follow my position" on, and "Bring your 5 keys for Customs" when you have keys for it.
  * @param {RaidStartEvent} event
  */
 function onRaidStarted(event) {
@@ -141,6 +142,7 @@ function onRaidStarted(event) {
   app.status.raid = { ...app.status.raid, active: true, map: event.map };
   renderNav();
   switchToMapIfFollowing(event.map);
+  remindKeysAtRaidStart(event.map);
 }
 
 /**

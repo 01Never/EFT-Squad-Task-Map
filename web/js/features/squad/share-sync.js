@@ -25,15 +25,16 @@ export function scheduleShareUpdate() {
 }
 
 /**
- * Send my share now. Used right after joining and after "Share my tasks" is switched on (the
- * server never keeps tasks while sharing is off, so it has none to add by itself), and at
+ * Send my share now. Used right after joining and after "Share my tasks" or "Share my keys" is
+ * switched on (the server never keeps them while sharing is off, so it has none to add), and at
  * start-up when the server has never had a share from me.
  * @param {boolean} isForced send even if the content is the same as the last one sent
  */
 export async function sendShare(isForced) {
   clearTimeout(sendTimer);
   if (!app.saved || !app.squad || !app.squad.settings.joined) return;
-  const share = buildMyShare(app.saved, app.taskById, app.squad.settings.shareTasks);
+  const settings = app.squad.settings;
+  const share = buildMyShare(app.saved, app.taskById, settings.shareTasks, !!settings.shareKeys);
   const fingerprint = shareFingerprint(share);
   if (!isForced && fingerprint === lastSentFingerprint) return;
   try {

@@ -8,8 +8,9 @@ import { save } from "../../app/saving.js";
 import { renderMapPage } from "../../map/map-page.js";
 import { isObjectiveOnMap } from "../tasks/rules.js";
 import { partsOnMap, isShownOnMap, activeOffMapTasks } from "../tasks/task-list.js";
-import { bringList, countMissing, requirementsOf, hasAtLeastOne, stepBagCount, setBagCount } from "./rules.js";
+import { bringList, countMissing, requirementsOf, hasRequirement, isOnKeyList, stepBagCount, setBagCount } from "./rules.js";
 import { isItemId, itemIconUrl } from "../icons/rules.js";
+import { openMapKeyList, friendsHaveKeyText } from "../keys/key-lists.js";
 
 /** @import { Objective, Task } from "../../app/types.js" */
 /** @import { BringEntry } from "./rules.js" */
@@ -43,7 +44,7 @@ export function bringListForShownParts() {
     ...shownRows.map((row) => /** @type {[string, Task]} */ ([row.task.id, row.task])),
     ...activeOffMapTasks().map((task) => /** @type {[string, Task]} */ ([task.id, task])),
   ]);
-  return bringList(entries, saved.ticks, saved.have, [...firTasks.values()]);
+  return bringList(entries, saved.ticks, saved.have, [...firTasks.values()], openMapKeyList());
 }
 
 /**
@@ -63,7 +64,7 @@ export function renderBringList() {
   const bring = bringListForShownParts();
   return `<div class="bring">
     <div class="bhead"><span>${renderBringSummary(bring)}</span><button class="btn sm line" data-act="resethave">Reset counts</button></div>
-    <p class="bnote">Set how many of each you're carrying. A task shows <b>!</b> and fades on the map when you have none of something it needs. Counts reset after each raid; placing a marker or item (ticking it) takes one off.</p>
+    <p class="bnote">Set how many of each you're carrying. A task shows <b>!</b> and fades on the map when you have none of something it needs. Counts reset after each raid; placing a marker or item (ticking it) takes one off. Keys on this map's key list (My keys) count as had.</p>
     ${renderBringSection("Keys", bring.keys)}${renderBringSection("Items to place", bring.place)}${renderBringSection("Gear to wear / use", bring.gear)}${renderBringSection("Find in raid", bring.fir, "For hand-ins — includes your tasks that aren't tied to a map.", false)}
     ${app.saved.pinnedOnly ? '<p class="bnote">Showing pinned tasks only.</p>' : ""}</div>`;
 }
@@ -91,14 +92,16 @@ function renderBringSection(title, lines, note, withBagCount = true) {
 }
 
 /**
- * One line: picture, name, which tasks need it, how many, and your bag count (− n +).
+ * One line: picture, name, which tasks need it, how many, and your bag count (− n +). A key on
+ * the map's key list says "On your key list ✓" instead of a count (ticket 09).
  * @param {BringEntry} line
  * @param {boolean} withBagCount
  */
 function renderBringLine(line, withBagCount) {
-  const isShort = line.have < 1 && withBagCount;
+  const isShort = line.have < 1 && withBagCount && !line.onKeyList;
+  const count = line.onKeyList ? `<span class="onlist" title="Keys on My keys count as had on this map">On your key list ✓</span>` : renderBagCount(line);
   return `<div class="bl${isShort ? " short" : ""}" data-key="${escapeHtml(line.key)}">${renderItemPicture(line)}<div class="bn"><b>${escapeHtml(line.name)}</b><span class="bt">${renderNeededBy(line)}</span></div>
-    <span class="need">need ${line.need}</span>${withBagCount ? renderBagCount(line) : ""}</div>`;
+    <span class="need">need ${line.need}</span>${withBagCount ? count : ""}</div>`;
 }
 
 /** The item's picture when it's one item, else an emoji for its kind. */
@@ -116,7 +119,17 @@ function renderNeededBy(line) {
   const foundInRaid = line.fir ? "found in raid · " : "";
   const showsCounts = line.kind === "place" || line.kind === "fir";
   const tasks = line.by.map(([taskName, count]) => `${escapeHtml(taskName)}${count > 1 || showsCounts ? " " + count : ""}`);
-  return label + foundInRaid + tasks.join(", ");
+  return label + foundInRaid + tasks.join(", ") + renderFriendsWithKey(line);
+}
+
+/**
+ * " · Sam has it" on a key line when a friend has one of its keys on this map (ticket 09).
+ * @param {BringEntry} line
+ */
+function renderFriendsWithKey(line) {
+  if (line.kind !== "key") return "";
+  const text = friendsHaveKeyText(line.items.map((item) => item.id));
+  return text ? ` · <span class="friendkey">${escapeHtml(text)}</span>` : "";
 }
 
 /** The bag count: − [n] +. */
@@ -127,21 +140,36 @@ function renderBagCount(line) {
 // ---------------------------------------------------------------- requirement tags
 
 /**
- * The tags of what an objective needs (" 🔑 Key name", " 🎒 Marker ×2"…), yellow when you have none.
+ * The tags of what an objective needs (" 🔑 Key name", " 🎒 Marker ×2"…), yellow when you have
+ * none. A key on the open map's key list counts as had; a key a friend has says "Sam has it".
  * @param {Objective} objective
  */
 export function renderRequirementTags(objective) {
   const bag = app.saved.have;
+  const keyList = openMapKeyList();
   return requirementsOf(objective)
     .map((requirement) => {
-      const isInBag = hasAtLeastOne(bag, requirement.key);
+      const isHad = hasRequirement(requirement, bag, keyList);
       const tagClass = requirement.kind === "key" || requirement.kind === "gear" ? requirement.kind : "place";
-      const title = `${escapeHtml(requirement.label)}${isInBag ? "" : " — not in your bag"}`;
+      const title = escapeHtml(requirement.label) + requirementTitleNote(requirement, isHad, keyList);
       const icon = TAG_ICON_BY_KIND[tagClass];
       const count = requirement.kind === "place" && requirement.need > 1 ? " ×" + requirement.need : "";
-      return ` <span class="tag ${tagClass}${isInBag ? "" : " miss"}" title="${title}">${icon}${escapeHtml(tagItemsName(requirement.items))}${count}</span>`;
+      const friends = requirement.kind === "key" ? friendsHaveKeyText(requirement.items.map((item) => item.id)) : "";
+      const friendsText = friends ? ` · <span class="friendkey">${escapeHtml(friends)}</span>` : "";
+      return ` <span class="tag ${tagClass}${isHad ? "" : " miss"}" title="${title}">${icon}${escapeHtml(tagItemsName(requirement.items))}${count}${friendsText}</span>`;
     })
     .join("");
+}
+
+/**
+ * What a tag's tooltip adds after the label: "on your key list", "not in your bag", or nothing.
+ * @param {import("./rules.js").Requirement} requirement
+ * @param {boolean} isHad
+ * @param {Set<string>} keyList
+ */
+function requirementTitleNote(requirement, isHad, keyList) {
+  if (isOnKeyList(requirement, keyList)) return " — on your key list";
+  return isHad ? "" : " — not in your bag";
 }
 
 /** "A", "A or B or C", or "A or 4 others". */

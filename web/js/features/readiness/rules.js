@@ -25,8 +25,14 @@ import { isObjectiveDone, isObjectiveOnMap, tickCount, tickTarget } from "../tas
  * @property {Item[]} items
  * @property {number} need
  * @property {number} have
+ * @property {boolean} [onKeyList] a key line: a key on this map's key list will do (ticket 09)
  * @property {[string, number][]} by [task name, count] pairs
  */
+
+// Ticket 09: keys on the open map's key list count as had, raid after raid. Callers that don't
+// pass a key list get this empty one.
+/** @type {Set<string>} */
+const NO_KEY_LIST = new Set();
 
 // "mark" objectives without their own marker item use the MS2000 marker.
 const MS2000_MARKER = { id: "5991b51486f77447b112d44f", name: "MS2000 Marker" };
@@ -159,12 +165,35 @@ export function hasAtLeastOne(bag, key) {
 }
 
 /**
- * An objective is possible when you carry at least one of everything it needs.
+ * Whether a key requirement is met by your key list (ticket 09): any of its keys is on the list.
+ * Keys on the open map's list count as had there, raid after raid, without touching the bag.
+ * @param {{ kind: string, items: Item[] }} requirement a requirement or a Bring list line
+ * @param {Set<string>} keyList
+ */
+export function isOnKeyList(requirement, keyList) {
+  if (requirement.kind !== "key" || !keyList.size) return false;
+  return requirement.items.some((item) => keyList.has(item.id));
+}
+
+/**
+ * Whether you have what a requirement asks for: at least one in the bag, or (keys) on your key list.
+ * @param {Requirement} requirement
+ * @param {Record<string, number>} bag
+ * @param {Set<string>} [keyList] the open map's key list
+ */
+export function hasRequirement(requirement, bag, keyList = NO_KEY_LIST) {
+  return hasAtLeastOne(bag, requirement.key) || isOnKeyList(requirement, keyList);
+}
+
+/**
+ * An objective is possible when you carry at least one of everything it needs (a key on the map's
+ * key list counts as carried).
  * @param {Objective} objective
  * @param {Record<string, number>} bag
+ * @param {Set<string>} [keyList] the open map's key list
  */
-export function isObjectivePossible(objective, bag) {
-  return requirementsOf(objective).every((requirement) => hasAtLeastOne(bag, requirement.key));
+export function isObjectivePossible(objective, bag, keyList = NO_KEY_LIST) {
+  return requirementsOf(objective).every((requirement) => hasRequirement(requirement, bag, keyList));
 }
 
 /**
@@ -173,10 +202,11 @@ export function isObjectivePossible(objective, bag) {
  * @param {Part} part
  * @param {Record<string, true | number>} ticks
  * @param {Record<string, number>} bag
+ * @param {Set<string>} [keyList] the open map's key list
  */
-export function isPartPossible(part, ticks, bag) {
+export function isPartPossible(part, ticks, bag, keyList = NO_KEY_LIST) {
   const remaining = part.objs.filter((objective) => !isObjectiveDone(objective, ticks));
-  return remaining.every((objective) => isObjectivePossible(objective, bag));
+  return remaining.every((objective) => isObjectivePossible(objective, bag, keyList));
 }
 
 /**
@@ -286,14 +316,16 @@ function itemsLabel(items) {
  * - keys, items to place and gear for the given objectives (not done ones). Keys and gear need 1;
  *   items to place add up the remaining count of every objective.
  * - found-in-raid items for hand-ins of `firTasks` (finds, plus hand-ins with no matching find).
- * Lines with nothing left to bring are left out; `have` is the bag count.
+ * Lines with nothing left to bring are left out; `have` is the bag count. A key line whose key is
+ * on the map's key list says so (`onKeyList`) and isn't missing.
  * @param {{ task: Task, o: Objective }[]} entries the shown objectives
  * @param {Record<string, true | number>} ticks
  * @param {Record<string, number>} bag
  * @param {Task[]} [firTasks]
+ * @param {Set<string>} [keyList] the open map's key list
  * @returns {{ keys: BringEntry[], place: BringEntry[], gear: BringEntry[], fir: BringEntry[] }}
  */
-export function bringList(entries, ticks, bag, firTasks = []) {
+export function bringList(entries, ticks, bag, firTasks = [], keyList = NO_KEY_LIST) {
   const sections = gearKeysAndPlaceLines(entries, ticks);
   const foundInRaid = foundInRaidLines(firTasks, ticks);
   /** @param {Map<string, any>} lines */
@@ -302,8 +334,9 @@ export function bringList(entries, ticks, bag, firTasks = []) {
       .filter((line) => line.need > 0)
       .map((line) => ({ ...line, have: bag[line.key] || 0, by: [...line.by.entries()] }))
       .sort((first, second) => first.name.localeCompare(second.name));
+  const keyLines = finished(sections.key).map((line) => ({ ...line, onKeyList: isOnKeyList(line, keyList) }));
   return {
-    keys: finished(sections.key),
+    keys: keyLines,
     place: finished(sections.place),
     gear: finished(sections.gear),
     fir: finished(foundInRaid),
@@ -361,11 +394,11 @@ function foundInRaidLines(firTasks, ticks) {
 
 /**
  * How many keys, items to place and gear you have none of (found-in-raid items are for hand-ins
- * and don't count): the number on the Bring list tab.
+ * and don't count; keys on your key list are had): the number on the Bring list tab.
  * @param {{ keys: BringEntry[], place: BringEntry[], gear: BringEntry[] }} bring
  */
 export function countMissing(bring) {
-  return [...bring.keys, ...bring.place, ...bring.gear].filter((line) => line.have < 1).length;
+  return [...bring.keys, ...bring.place, ...bring.gear].filter((line) => line.have < 1 && !line.onKeyList).length;
 }
 
 /** A Bring list line before counting (field order as v2 had it: key, kind, label or fir, name…). */

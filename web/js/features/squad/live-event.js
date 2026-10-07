@@ -33,7 +33,9 @@ export function applySquadView(view) {
   if (change.settingsChanged) refreshSquadSettings();
   if (!app.mapView) return;
   const joinedChanged = !before || before.settings.joined !== view.settings.joined;
-  const needsWholePage = joinedChanged || change.tasksChanged.some(isShowingTasksOf);
+  // A friend's key list changes their dots on doors and "Sam has it" on tasks (ticket 09).
+  const keysChanged = !!change.keysChanged && change.keysChanged.length > 0;
+  const needsWholePage = joinedChanged || keysChanged || change.tasksChanged.some(isShowingTasksOf);
   if (needsWholePage) {
     renderMapPage();
     return;
