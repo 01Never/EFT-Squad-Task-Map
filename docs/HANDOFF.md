@@ -87,7 +87,8 @@ GitHub Releases. The app never checks by itself. It trusts a release only if its
 signed with the owner's Ed25519 key, so a tampered release or account can't push code. Details and
 the HTTP API: `internal/features/updates/README.md`; the tool: `cmd/release/README.md`.
 
-**Once: make the signing key**
+**Once: make the signing key** (done 2026-10-06 for 2.6.1; the key is in
+`%AppData%\SquadTaskMap\release-private-key.txt` on the owner's PC. Keep these steps for a new key)
 1. `go run ./cmd/release -init-keys`. It writes the **private key** to
    `%AppData%\SquadTaskMap\release-private-key.txt` (or `-key-out <path>`) and prints the public key.
 2. **Back the private key up** (password manager or a USB stick). Never put it in the repo, in

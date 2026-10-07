@@ -119,7 +119,7 @@ func TestTheKeyMustBeTheOneBuiltIntoTheApp(t *testing.T) {
 		wantFail string // "" means accepted
 	}{
 		{"the app has the matching public key", updates.EncodeKey(publicKey), ""},
-		{"the app still has the placeholder", updates.EmbeddedPublicKey, "no public key yet"},
+		{"the app still has the placeholder", "TODO-paste-the-public-key-printed-by-cmd-release-init-keys", "no public key yet"},
 		{"the app has another owner's key", updates.EncodeKey(otherPublicKey), "doesn't match the public key built into the app"},
 	}
 	for _, test := range tests {

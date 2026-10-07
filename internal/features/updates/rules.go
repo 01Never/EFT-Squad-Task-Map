@@ -25,11 +25,9 @@ const DefaultBaseURL = "https://github.com/" + GitHubRepo
 
 // EmbeddedPublicKey is the Ed25519 public key (base64, 32 bytes) that update manifests must be
 // signed with. The matching private key stays on the owner's PC (see docs/HANDOFF.md,
-// "Publishing an update").
-//
-// TODO(owner): paste the key printed by `go run ./cmd/release -init-keys`.
-// Until then this is a placeholder, and every check ends with "no-public-key".
-const EmbeddedPublicKey = "TODO-paste-the-public-key-printed-by-cmd-release-init-keys"
+// "Publishing an update"). Made with `go run ./cmd/release -init-keys` on 2026-10-06; changing it
+// makes every installed copy reject updates until the squad downloads a new copy by hand.
+const EmbeddedPublicKey = "4n5mrgn4T7aTmQpL3Wd0Vens/ZUuJGzZ1CyrCSxC4F0="
 
 // Hosts the app may fetch from, over HTTPS only. A GitHub release asset URL answers with a
 // redirect to one of the download hosts, so those are allowed too. Anything else is refused.

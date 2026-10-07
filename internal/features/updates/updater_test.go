@@ -186,7 +186,7 @@ func TestACopyWithoutAnOwnerKeyRefusesToCheckAndAsksGitHubForNothing(t *testing.
 	r.publish("2.6.0", fakeExe(1000))
 	r.publicKey = nil // the placeholder: PublicKey text is not a key
 	r.build(r.paths.Current)
-	r.updater.config.PublicKey = EmbeddedPublicKey
+	r.updater.config.PublicKey = placeholderPublicKey
 
 	_, err := r.check()
 	if errorCode(err) != CodeNoPublicKey {

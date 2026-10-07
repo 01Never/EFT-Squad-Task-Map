@@ -90,7 +90,7 @@ func TestOnlyWellFormedPublicKeysAreAccepted(t *testing.T) {
 	if _, err := ParsePublicKey(publicKeyText(publicKey)); err != nil {
 		t.Fatalf("a real key must parse: %v", err)
 	}
-	for _, bad := range []string{"", EmbeddedPublicKey, "AAAA", "not base64!"} {
+	for _, bad := range []string{"", placeholderPublicKey, "AAAA", "not base64!"} {
 		if _, err := ParsePublicKey(bad); err == nil {
 			t.Errorf("%q must not parse as a public key", bad)
 		}

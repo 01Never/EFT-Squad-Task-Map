@@ -27,6 +27,10 @@ func testKeys(t *testing.T) (ed25519.PublicKey, ed25519.PrivateKey) {
 	return publicKey, privateKey
 }
 
+// placeholderPublicKey is what EmbeddedPublicKey held before the owner made the real key:
+// text that isn't a key, as in a copy built without one.
+const placeholderPublicKey = "TODO-paste-the-public-key-printed-by-cmd-release-init-keys"
+
 func publicKeyText(publicKey ed25519.PublicKey) string {
 	return base64.StdEncoding.EncodeToString(publicKey)
 }
