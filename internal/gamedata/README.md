@@ -25,6 +25,15 @@ is left untranslated, and the payload is about 1.8 MB.
 - JavaScript details the port keeps on purpose: tasks and maps come out in the files' key order;
   outlines are rounded like JavaScript's `toFixed(2)`; "is this set?" follows JavaScript truthiness
   (`jsvalues.go`).
+- **Loot spots (ticket 08, `loot.go`):** containers, loose loot and locks per map, from the same
+  `{mode}/maps` file (container names from `maps_en`, item and key names from `items_en`). They
+  aren't in `/api/data` (all maps together would add 1.58 MB, +87%, to its 1.82 MB); the page
+  loads one map at a time from `/api/loot/<map>` (`Store.LootJSON`, encoded once per map and data
+  change; 23–275 KB a map). They're kept in the saved copy next to the main data (`loot` field); a
+  copy saved before ticket 08 has none and is downloaded again once at start. The built-in
+  snapshot has no loot (`available: false`). Map variants keep the plain map's spots, plus door
+  outlines only the variant has (same key, within 0.5 m). Shapes and data notes:
+  `web/js/features/loot/README.md`.
 - The game log names maps by scene path or nameId; `MapFromScene` / `MapFromNameID` match those
   against the data, with fallback tables (`SceneToMap`, `NameIDToMap`).
 
@@ -35,9 +44,13 @@ is left untranslated, and the payload is about 1.8 MB.
 **Saved data / settings:** owns `squad-task-map-gamedata-<mode>.json`; reads the `gameMode` setting
 (through the app).
 
-**Files:** `types.go` (the page's format), `convert.go` (json.tarkov.dev → page),
+**Files:** `types.go` (the page's format), `convert.go` (json.tarkov.dev → page), `loot.go` (loot
+spots and their per-map answer),
 `snapshot.go` (built-in snapshot → page, log map-name tables), `jsvalues.go` (JavaScript-style value
 rules and in-order JSON reading), `store.go` (cache, refresh, lookups).
 
 **Tests:** `convert_test.go`: JSON-equal to the v2 goldens for three inputs; JavaScript `toFixed`
-rounding. The hourly refresh and the fallbacks are checked end to end against `cmd/mock`.
+rounding. `loot_test.go`: a trimmed real sample (`testdata/jsontarkovdev/loot-sample-maps.json.gz`)
+case by case, counts per type against the source for Customs, Interchange and Streets, the golden
+`testdata/golden/loot-real.json.gz` (`STM_UPDATE_GOLDEN=1` rewrites it), the per-map answer, the
+store's map-key check and cache. The hourly refresh and the fallbacks are checked end to end against `cmd/mock`.

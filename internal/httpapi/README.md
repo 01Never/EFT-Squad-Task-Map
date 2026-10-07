@@ -51,6 +51,7 @@ and `Guard` makes sure only the app's own page in the browser can use it).
 |---|---|---|
 | `GET /`, `/index.html`, `/js/…`, `/fonts/{name}`, `/maps/{file}.svg`, `/api/config` | the page, its modules, the Bender font, map art, `assets/maps-config.json` | |
 | `GET /api/data` | the game data in the page's format | `gamedata` |
+| `GET /api/loot/{map}` | one map's loot spots: containers, loose loot, locks, names (ticket 08) | 404 unless `{map}` is `[a-z0-9-]{1,40}` and a map the data knows; shape in `web/js/features/loot/README.md` |
 | `GET /api/status` | everything the page shows about the program | version, data, settings, logs, screenshots, keybind, raid, gps, trail, capture, ai, updates |
 | `POST /api/data/refresh` | download the game data now | |
 | `GET /api/events` | live events (SSE) | `events` |

@@ -52,6 +52,8 @@ type Store struct {
 	refreshing bool
 	mode       string
 	cachedJSON []byte
+	// /api/loot/<map> answers, encoded once per map and data change (ticket 08).
+	cachedLootJSON map[string][]byte
 
 	files     storage.Files
 	builtIn   func() (GameData, error)
@@ -117,6 +119,11 @@ func (store *Store) SetMode(mode string, notify bool) {
 	}
 	store.lastError = nil
 	needsDownload := store.fetchedAt == nil || nowMillis()-*store.fetchedAt > float64(refreshWhenOlderThan.Milliseconds())
+	// A copy saved before loot spots existed (before ticket 08) is downloaded again once, so the
+	// Loot section doesn't wait up to a day for its data.
+	if store.current.Loot == nil {
+		needsDownload = true
+	}
 	store.mutex.Unlock()
 	if notify {
 		store.onChange()
@@ -130,6 +137,7 @@ func (store *Store) setCurrentLocked(data GameData) {
 	store.current = data
 	store.cachedJSON = nil
 	store.itemIDs = ItemIDs(data)
+	store.cachedLootJSON = map[string][]byte{}
 	store.taskIDs = make(map[string]bool, len(data.Tasks))
 	for _, task := range data.Tasks {
 		store.taskIDs[task.ID] = true
@@ -137,8 +145,9 @@ func (store *Store) setCurrentLocked(data GameData) {
 }
 
 type cacheFile struct {
-	FetchedAt float64  `json:"fetchedAt"`
-	Data      GameData `json:"data"`
+	FetchedAt float64   `json:"fetchedAt"`
+	Data      GameData  `json:"data"`
+	Loot      *LootData `json:"loot,omitempty"` // ticket 08; missing in copies saved before it
 }
 
 func (store *Store) loadCache(mode string) (GameData, float64, bool) {
@@ -150,6 +159,7 @@ func (store *Store) loadCache(mode string) (GameData, float64, bool) {
 	if json.Unmarshal(data, &cache) != nil || cache.Data.Format != "stm-v2" || len(cache.Data.Tasks) <= 100 {
 		return GameData{}, 0, false
 	}
+	cache.Data.Loot = cache.Loot
 	return cache.Data, cache.FetchedAt, true
 }
 
@@ -187,7 +197,7 @@ func (store *Store) Refresh() RefreshResult {
 		return RefreshResult{OK: false, Error: &message}
 	}
 	now := nowMillis()
-	if saveErr := saveCache(store.files.GameDataCache(mode), cacheFile{FetchedAt: now, Data: converted}); saveErr != nil {
+	if saveErr := saveCache(store.files.GameDataCache(mode), cacheFile{FetchedAt: now, Data: converted, Loot: converted.Loot}); saveErr != nil {
 		message := saveErr.Error()
 		store.lastError = &message
 	}
@@ -311,6 +321,40 @@ func (store *Store) JSON() []byte {
 		store.cachedJSON, _ = json.Marshal(withStatus)
 	}
 	return store.cachedJSON
+}
+
+// LootJSON is /api/loot/<map>: one map's loot spots (ticket 08), encoded once per map and data
+// change. False for a map key the data doesn't know, so only real map names are ever looked up
+// or cached.
+func (store *Store) LootJSON(mapKey string) ([]byte, bool) {
+	store.mutex.Lock()
+	defer store.mutex.Unlock()
+	if !store.isKnownMapLocked(mapKey) {
+		return nil, false
+	}
+	if encoded, isCached := store.cachedLootJSON[mapKey]; isCached {
+		return encoded, true
+	}
+	encoded, err := json.Marshal(store.current.Loot.AnswerForMap(mapKey))
+	if err != nil {
+		return nil, false
+	}
+	store.cachedLootJSON[mapKey] = encoded
+	return encoded, true
+}
+
+// isKnownMapLocked: the map key is one of the data's maps (or has loot of its own).
+func (store *Store) isKnownMapLocked(mapKey string) bool {
+	for _, info := range store.current.Maps {
+		if info.Key == mapKey {
+			return true
+		}
+	}
+	if store.current.Loot == nil {
+		return false
+	}
+	_, hasLoot := store.current.Loot.Maps[mapKey]
+	return hasLoot
 }
 
 // Current returns the current data (read-only by convention).

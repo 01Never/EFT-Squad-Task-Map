@@ -6,6 +6,7 @@ package gamedata
 //     traders_en, items_en). Names in them are translation keys ("<id> name"); the _en files hold
 //     the English text.
 //   - FromSnapshot: the snapshot built into the exe (tarkovtaskmap's format), the offline fallback.
+//   - Loot spots (ticket 08) come from the same maps file: see loot.go.
 //
 // This is a 1:1 port of v2's server/convert.ts; its output must stay JSON-equal to the golden
 // files in testdata/golden.
@@ -89,7 +90,10 @@ func FromRaw(docs RawDocs, mode string, generated *string) (GameData, error) {
 		tasks = append(tasks, converter.task(entry.Key, entry.Value))
 	}
 
-	return GameData{Format: "stm-v2", Generated: generated, Mode: mode, Tasks: tasks, Maps: converter.maps(rawMaps)}, nil
+	containerKinds := asObject(objectField(dataOf(docs.Maps), "lootContainers"))
+	loot := converter.lootFromMaps(rawMaps, containerKinds)
+
+	return GameData{Format: "stm-v2", Generated: generated, Mode: mode, Tasks: tasks, Maps: converter.maps(rawMaps), Loot: loot}, nil
 }
 
 // ---------------------------------------------------------------- names and translations

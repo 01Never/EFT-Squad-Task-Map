@@ -98,6 +98,7 @@ pixel by pixel (prints the % of differing pixels and writes a diff image to `<af
 | `saved-data.e2e.mjs` | v1 fixture → recorded migration; rich v2 fixture saves back unchanged; v2 with missing fields → recorded fill; `STM_E2E_STATE` (skipped unless set). |
 | `icons.e2e.mjs` | ticket 07: A Fuel Matter on Reserve shows the MS2000 icon (`image[href="/icons/<id>.webp"]` in `g.mk`; the app fetched it once from the mock's `/assets/`); Dandies on Streets shows the stashed items; with the icon 404 (`POST /icons-missing` on the mock) markers silently become shapes (no `image` left); Settings → Task markers (`#sMarkers`) "shapes" is saved as `taskIcons: false`; a plant with alternatives has a `circle[r="3.4"]` "+" badge; frame timing and a Chrome trace with every task active on Streets, shapes vs icons. `STM_E2E_SHOTS=<dir>` saves screenshots. |
 | `squad.e2e.mjs` | ticket 05: **three copies of the app on the dev transport** (own data folders, app ports and peer ports; the harness's `startApp`/`Scenario` take `env`, and `startApp` takes `keepData` to restart a copy): Join in Settings (bad code shows the server's message), drawings travel in the friend's colour and undo removes them, a friend's ✎ Draw switch hides them, tasks shared by one and not the other, "Also: …", badge dots, Shared with squad, popup progress, Friends' tasks, a friend offline ("last seen") and back, Leave. `STM_E2E_SHOTS=<dir>` saves screenshots. Uses `#sSquad*`, `.squad-chip`, `[data-squad-drawings]`, `[data-squad-tasks]`, `[data-act=squadonly]`, `.also`, `.squad-dot`, `.squad-tasks`, `.friend-marker`, `g[data-friend]`. |
+| `loot.e2e.mjs` | ticket 08, against a **second mock serving the real json.tarkov.dev files** (`startRealDataMock()`: `MOCK_DOCS=real`, on a port claimed from the app range; the app gets it as `STM_JSON_BASE`): the Loot section starts closed and nothing is loaded; chip counts equal `testdata/golden/loot-real.json.gz`; ★ High value (saved set), a spot's popup, an empty-map click closes it, a bubble click zooms in, a single chip, reload keeps the choices, another map has none, None; markers, "!", the Bring tab and selection never change; Streets with every chip on: far fewer markers than spots, 0 Paint / 0 Layout in a 3 s idle trace. Uses `[data-loot-section]` (+ `summary`, `open`), `[data-loot="<type>"]` (`aria-pressed`, `.n`), `[data-act="loothigh"]`, `[data-act="lootnone"]`, `svg.map g.lt` (`.lt-group` = bubble), `#lootpop` (`hidden`, `h3`, `.m`), `.mapui`. |
 | `screens.e2e.mjs` | the main screens come up; the baseline screenshots in record mode. |
 
 **Fixtures** (`fixtures/`): `fresh-v2-state.json` (the page's empty state), `rich-v2-state.json`
@@ -112,7 +113,7 @@ turns, and the saved-data round trips.
 
 ## What the suite relies on (keep these, or update the suite with them)
 
-**HTTP:** `GET /api/status` (`statePath`, `data.origin`, `data.mode`, `settings`, `raid.sessionMode`,
+**HTTP:** `GET /api/loot/<map>` (the loot scenario), `GET /api/status` (`statePath`, `data.origin`, `data.mode`, `settings`, `raid.sessionMode`,
 `gps`, `ai`), `GET /api/data`, `GET /api/config`; requests matched by path: `PUT /api/state`,
 `PUT /api/settings`, `PUT /api/ai/key`, `POST /api/scan/start`, `POST /api/scan/cancel`.
 Files in the data folder: `squad-task-map-data.json`, `squad-task-map-settings.json`.

@@ -38,6 +38,12 @@ import {
 import { EXTRACTS_SECTION_ACTIONS, renderExtractsSection, onKindChipClicked } from "../features/extracts/panel.js";
 import { SUB_TASK_ACTIONS, onFloorChanged, onAddBoxEnter } from "../features/sub-tasks/panel.js";
 import {
+  LOOT_SECTION_ACTIONS,
+  renderLootSection,
+  onLootChipClicked,
+  onLootSectionToggled,
+} from "../features/loot/panel.js";
+import {
   renderAiCategorizeBox,
   onAiCategorizeClicked,
   onAiCategorizeKeyDown,
@@ -64,6 +70,7 @@ const TASKS_TAB_SECTIONS = [
   renderSquadSection, // a chip per friend, "Shared with squad" (features/squad)
   renderAiCategorizeBox, // 🤖 AI Categorize (features/ai-categorize)
   renderExtractsSection, // Extracts & labels (features/extracts)
+  renderLootSection, // Loot, closed until opened (features/loot)
   renderCategoryLists, // the categories and their task rows (features/tasks)
   renderNewCategoryBox, // + Category (features/tasks)
   renderFriendsTasksSection, // friends' tasks you don't have, read-only (features/squad)
@@ -141,6 +148,7 @@ const PANEL_ACTIONS = {
   ...CATEGORY_ACTIONS,
   ...BRING_LIST_ACTIONS,
   ...EXTRACTS_SECTION_ACTIONS,
+  ...LOOT_SECTION_ACTIONS,
   ...SUB_TASK_ACTIONS,
   ...SQUAD_SECTION_ACTIONS,
 };
@@ -152,6 +160,7 @@ const PANEL_ACTIONS = {
 const PANEL_BUTTONS_BY_ATTRIBUTE = [
   ["data-tab", onTabClicked],
   ["data-ext", onKindChipClicked],
+  ["data-loot", onLootChipClicked],
   ["data-shape", onShapeClicked],
   ["data-goto", onOtherPartClicked],
   ["data-tick", onCounterButtonClicked],
@@ -236,14 +245,15 @@ function onPanelKeyDown(event) {
 }
 
 /**
- * A "Done (n)" list opened or closed (the toggle event doesn't bubble, so this listens while it
- * travels down).
+ * A "Done (n)" list or the Loot section opened or closed (the toggle event doesn't bubble, so this
+ * listens while it travels down).
  * @param {Event} event
  */
 function onPanelToggle(event) {
   const target = /** @type {Element} */ (event.target);
   const doneList = target.closest && target.closest("[data-done]");
   if (doneList) onDoneListToggled(/** @type {HTMLDetailsElement} */ (doneList));
+  if (target.matches && target.matches("[data-loot-section]")) onLootSectionToggled(/** @type {HTMLDetailsElement} */ (target));
 }
 
 /** Wire up the panel. Called once per opened map (the panel element is new each time). */

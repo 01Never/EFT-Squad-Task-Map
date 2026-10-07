@@ -256,9 +256,39 @@ export async function startMock(tools) {
   return { stop: () => stopProcess(child), reused: false };
 }
 
-async function mockIsAnswering() {
+/**
+ * Starts a second mock that serves the real json.tarkov.dev files (MOCK_DOCS=real), which have
+ * loot spots (ticket 08), on a port claimed from the app range. The suite's own mock keeps the
+ * snapshot docs every other scenario expects. Pass `base` to an app as STM_JSON_BASE.
+ * @returns {Promise<{ base: string, stop: () => Promise<void> }>}
+ */
+export async function startRealDataMock() {
+  const { tools } = await prepareProcess();
+  const { port, release } = await claimPort();
+  const child = spawn(tools.mockExe, [], {
+    cwd: REPO_ROOT,
+    env: { ...environmentWithoutAppSettings(), MOCK_PORT: String(port), MOCK_DOCS: "real" },
+    stdio: ["ignore", "ignore", "ignore"],
+    windowsHide: true,
+  });
+  childProcesses.add(child);
+  const base = `http://127.0.0.1:${port}`;
+  const stop = async () => {
+    await stopProcess(child);
+    release();
+  };
   try {
-    const response = await fetch(MOCK_BASE + "/log", { signal: AbortSignal.timeout(1000) });
+    await waitUntil(() => mockIsAnswering(base), { timeout: 15_000, what: `the real-data mock on port ${port}` });
+  } catch (error) {
+    await stop();
+    throw error;
+  }
+  return { base, stop };
+}
+
+async function mockIsAnswering(base = MOCK_BASE) {
+  try {
+    const response = await fetch(base + "/log", { signal: AbortSignal.timeout(1000) });
     return response.ok && Array.isArray(await response.json());
   } catch {
     return false;
