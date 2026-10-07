@@ -4,7 +4,7 @@
 
 Squad Task Map is a small Windows program for Escape from Tarkov. It shows the tasks you actually have on each map, split by kind of work (boss hunts, kills, placing, retrieving…), with what you need to bring. It follows the game while you play: it reads Tarkov's log files and screenshot names, so accepted and finished tasks update by themselves and your position shows on the map.
 
-- One `.exe`, about 12 MB. Nothing to install, no account.
+- One `.exe`, about 28 MB. Nothing to install, no account.
 - The map page opens in your browser at `http://127.0.0.1:7777` and only listens on your own PC.
 - It's built to stay light next to a CPU-bound game: idle CPU is practically zero.
 
@@ -24,13 +24,14 @@ Windows SmartScreen may say "Windows protected your PC" the first time, because 
 | **Find me** | Your position and facing come from Tarkov's screenshot file names: a stand-out marker, a pulse when it updates, an off-screen pointer, optional auto-centre. |
 | **Closest extract** | The nearest of the extracts you have this raid, with a line and a straight-line distance. |
 | **Bring list** | The keys, items to place and gear the tasks on the map need, with "have" counts that fade spots you can't do yet. |
+| **Squad** | Join friends with an invite code (private Tailscale network built into the exe, nothing else to install) and see each other's drawings live and, if you both choose, each other's tasks with "Also: Mike" badges. Optional. |
 | **AI Categorize** | Sort tasks by plain-English instructions, checked against each task's wiki page (optional). |
 
 The full manual is the **[user guide](docs/USER-GUIDE.md)**: setup, every feature, settings, privacy, and the files the app keeps next to the exe.
 
 ## Privacy
 
-The app contacts GitHub only when you click Check for updates. Everything else stays on your PC except downloads of game data (json.tarkov.dev), item icons (assets.tarkov.dev), wiki pages for AI Categorize, and, only if you add a key, requests to api.openai.com. Your OpenAI key stays in the settings file on your PC and is sent nowhere else. The app deletes only screenshots you confirmed in a scan, and the GPS screenshots of the raid that just ended.
+The app contacts GitHub only when you click Check for updates. If you join a squad, your drawings (and your tasks, only if you turn that on) go directly to your friends' copies over a private Tailscale network; Tailscale relays traffic when two PCs can't connect directly but can't read it. Never joined, nothing of this runs. Everything else stays on your PC except downloads of game data (json.tarkov.dev), item icons (assets.tarkov.dev), wiki pages for AI Categorize, and, only if you add a key, requests to api.openai.com. Your OpenAI key stays in the settings file on your PC and is sent nowhere else. The app deletes only screenshots you confirmed in a scan, and the GPS screenshots of the raid that just ended.
 
 ## Building from source
 

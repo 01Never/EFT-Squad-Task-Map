@@ -87,6 +87,37 @@ You need a **screenshot key** bound in Tarkov's control settings. The app warns 
 - **OpenAI:** key, model and reasoning level.
 - **Updates:** the version you're on and **Check for updates** (see "Updating" below).
 
+## Squad (see your friends' drawings and tasks)
+Friends who run the app can see each other's **drawings** live and, if each chooses, each other's **tasks**. There is no website and no server: the copies connect directly over a private network built into the program. Your squad leader sets that up once (next section); you only paste an invite code.
+
+**Join:** ⚙ Settings → **Squad**, paste the invite code, **Join**. It can take up to a minute and a half; if it fails the reason is shown. Once joined you see the status ("Connected · 3 of 4 friends online"), and can set **your name** and **your colour** (friends see your drawings in that colour) and turn **Share my tasks** on. It is **off** by default. **Leave squad** (after a confirm) logs this PC out of the squad network and forgets your friends' data.
+
+**In the task list:** a **Squad** box with a chip per friend: a colour dot, their name, "online" or "last seen 2 h", and two switches:
+- **✎ Draw**: show that friend's drawings on the map, in their colour, under your own. On by default. They are read-only.
+- **☰ Tasks**: show that friend's tasks (only if they share them). Off by default.
+
+With a friend's tasks on:
+- A task you both have shows **Also: Mike, Sam** in the list and in the map popup, a small dot in each friend's colour at the bottom left of its markers, and each friend's progress in the popup ("Mike 2/5 · Sam ✓").
+- **👥 Shared with squad** shows only those tasks, in the list and on the map.
+- Tasks a friend has and you don't appear in a **Friends' tasks** block at the bottom of the list, and as smaller markers in their colour. They are only for looking: they never change your list, your Bring list or what is ready.
+
+A friend who is offline still shows what they last shared, with "last seen". No position is shared: your friends never see where you are in a raid.
+
+## Setting up a squad (once, for the squad leader)
+The squad runs on a free **Tailscale** account (the Personal plan; non-commercial use). Friends install nothing extra.
+1. Create a free Tailscale account at tailscale.com.
+2. In **Access controls**, define the tag and allow squad copies to reach each other on port 7777 only:
+   ```json
+   {
+     "tagOwners": { "tag:stm": ["autogroup:admin"] },
+     "grants": [ { "src": ["tag:stm"], "dst": ["tag:stm"], "ip": ["tcp:7777"] } ]
+   }
+   ```
+   Keep whatever else your policy has. If it uses `acls` instead of `grants`, the same rule is `{"action": "accept", "src": ["tag:stm"], "dst": ["tag:stm:7777"]}`.
+3. **Settings → Keys → Generate auth key**: **reusable**, **pre-approved**, tag **`tag:stm`**, expiry 90 days or less. That key (`tskey-auth-…`) is your squad's **invite code**. Send it privately (a Discord DM), never in a public channel.
+4. Each friend pastes it into **Settings → Squad → Join**. Devices stay joined after the key expires; a new key is only needed for new people. In the admin console's **Machines** list, check that **key expiry is disabled** for the squad machines, so nobody is logged out later.
+5. To remove someone, delete their machine in the admin console. Their copy then says "Signed out of the squad network" until they leave and join again with a new code.
+
 ## Updating
 When the owner publishes a new version, you update from inside the app. **Nothing happens unless you click:** the app never checks, downloads or installs by itself.
 1. **⚙ Settings → Updates → Check for updates.** It says "You're up to date", or "2.7.0 is available" with what's new and the download size. After a check that found something, a small dot shows on **⚙ Settings** until you've updated.
@@ -111,6 +142,7 @@ The **🤖 AI Categorize** box in the panel sorts parts by your instructions, e.
   - Requests to **api.openai.com**: each scanned screenshot (shrunk to 2048 px), and for AI Categorize, task data plus wiki excerpts.
 - OpenAI is billed to your key's account. A scan costs roughly 1–2k input tokens per screenshot; an AI Categorize request roughly 5–30k.
 - The OpenAI key is stored in plain text in `squad-task-map-settings.json` next to the exe, and only sent to api.openai.com.
+- **Squad (only if you join one):** your friends' copies get your **drawings** (all maps, every line) and your name and colour; your **active tasks with their ticks and progress** only if you turn **Share my tasks** on. Nothing else is shared: not your OpenAI key, folders, screenshots, settings, Bring list counts, categories, or your position. Only copies in your squad can connect (the network accepts only machines you let in with the invite code), and what a friend sends is only ever shown as drawings and text; it can't change your data. The data is encrypted between PCs. Tailscale can see that your PC is on its network and how it connects (it relays traffic through its own servers when two PCs can't connect directly, but it can't read it); log uploads to Tailscale are switched off in this program. If you never join a squad, none of this runs and nothing is sent.
 - The program on 127.0.0.1 only answers its own page: only the app's own page can use it; other websites open in your browser can't.
 - The app deletes only two kinds of files: screenshots you confirmed in a scan, and GPS screenshots from the raid that just ended.
 
@@ -127,6 +159,8 @@ While idle the program uses practically no CPU (measured 0.00% of one core over 
 | `squad-task-map-wikicache.json` | Wiki pages, kept 7 days |
 | `squad-task-map-data.v1-backup.json` | Your v1 file, from the upgrade |
 | `squad-task-map-data.before-<version>.json` | Your saved data as it was just before updating to that version (newest 3 kept) |
+| `squad-task-map-squad.json` | Squad: your last share, and your friends' last shares with "last seen" (cleared by Leave squad) |
+| `squad-task-map-tailscale/` | Squad network: this PC's key for the private network. **Keep it private.** Deleted by Leave squad |
 | `SquadTaskMap.previous.exe` | The version you had before the last update, as a way back |
 
 To back up or move to another PC, copy `squad-task-map-data.json` (and the settings file if you want the key).

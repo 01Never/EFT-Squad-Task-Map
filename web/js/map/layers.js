@@ -11,9 +11,11 @@ import { createSvgElement } from "../app/dom.js";
 const MAP_LAYERS_BOTTOM_TO_TOP = [
   "zones", // task zones (features/tasks/map-layer.js)
   "placeNames", // place names (map/place-names.js)
+  "friendDrawings", // friends' drawings, read-only, under yours (features/squad/map-layer.js)
   "drawings", // your drawings (features/drawing/map-layer.js)
   "extracts", // extracts and transits (features/extracts/map-layer.js)
   "closestExtract", // the closest-extract ring and line (features/extracts/map-layer.js)
+  "friendTasks", // friends' other tasks: small markers in their colour (features/squad/map-layer.js)
   "taskMarkers", // task and sub-task markers (features/tasks/map-layer.js)
   "player", // you: marker, trail, "You" (features/find-me/map-layer.js)
 ];

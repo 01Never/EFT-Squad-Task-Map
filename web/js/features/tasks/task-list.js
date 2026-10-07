@@ -19,6 +19,7 @@ import {
 } from "./rules.js";
 import { categoryOfPart } from "./categories.js";
 import { updateBagForTick } from "../readiness/rules.js";
+import { isHiddenBySquadFilter } from "../squad/friends.js";
 
 /** @import { Task, Part, Category, Objective, TaskEntry, PartOnMap } from "../../app/types.js" */
 
@@ -99,7 +100,7 @@ export function partsOnMap(mapKey) {
  * @param {PartOnMap} row
  */
 export function isShownOnMap(row) {
-  return isRowShownOnMap(row, app.saved.pinnedOnly);
+  return isRowShownOnMap(row, app.saved.pinnedOnly) && !isHiddenBySquadFilter(row.task.id);
 }
 
 /**

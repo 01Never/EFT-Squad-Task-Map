@@ -3,6 +3,7 @@
 // (PUT /api/state, atomic write + .bak). Changes are batched: one save shortly after the last one.
 import { app } from "./state.js";
 import { findElement } from "./dom.js";
+import { scheduleShareUpdate } from "../features/squad/share-sync.js";
 
 // Wait this long after the last change before saving, so a burst of clicks is one save.
 const SAVE_DEBOUNCE_MS = 500;
@@ -23,6 +24,7 @@ export function save() {
   }
   clearTimeout(saveTimer);
   saveTimer = setTimeout(flush, SAVE_DEBOUNCE_MS);
+  scheduleShareUpdate(); // in a squad, my friends get what changed about a second later
 }
 
 /**

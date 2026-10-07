@@ -21,6 +21,7 @@ import {
 } from "./categories.js";
 import { partsOnMap } from "./task-list.js";
 import { renderTaskRow } from "./panel.js";
+import { isHiddenBySquadFilter } from "../squad/friends.js";
 
 /** @import { Category, PartOnMap } from "../../app/types.js" */
 
@@ -64,7 +65,8 @@ export function renderCategoryLists(rows) {
  */
 function renderCategory(category, rows) {
   const saved = app.saved;
-  const liveRows = rows.filter((row) => !row.done && (!saved.pinnedOnly || row.pinned)).sort(compareRowsByName);
+  const isListed = (row) => !row.done && (!saved.pinnedOnly || row.pinned) && !isHiddenBySquadFilter(row.task.id);
+  const liveRows = rows.filter(isListed).sort(compareRowsByName);
   const doneRows = rows.filter((row) => row.done).sort(compareRowsByName);
   const menu = app.mapView.categoryMenuId === category.id ? renderCategoryMenu(category) : "";
   const list = saved.collapsed[category.id] ? "" : renderCategoryRows(category, liveRows, doneRows);

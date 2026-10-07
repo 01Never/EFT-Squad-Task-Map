@@ -10,6 +10,7 @@ import { partLabel, partProgressPercent, isObjectiveOnMap } from "./rules.js";
 import { partsOnMap } from "./task-list.js";
 import { deselectPart } from "./selection.js";
 import { renderObjectiveLine, onTickBoxChanged, onTickCounterClicked } from "./objective-line.js";
+import { renderSquadLinesForPopup } from "../squad/panel.js";
 
 /** @import { PartOnMap } from "../../app/types.js" */
 
@@ -39,6 +40,7 @@ function renderPopupContent(row) {
   const subTaskLine = clickedSubTask ? `<div style="margin-bottom:6px;color:#fff">Sub-task: ${escapeHtml(clickedSubTask.text)}</div>` : "";
   const objectivesHere = part.objs.filter((objective) => isObjectiveOnMap(objective, mapView.key, task));
   return `<button class="x" title="Close">×</button><h3>${escapeHtml(task.name)}</h3><div class="m">${escapeHtml(task.trader)} · ${escapeHtml(cat.name)}${partText} · ${partProgressPercent(part, app.saved.ticks)}%</div>
+    ${renderSquadLinesForPopup(task, part)}
     <div class="popacts">${wiki}<button class="btn sm line" data-pin="${escapeHtml(task.id)}">${entry.pinned ? "📌 Unpin" : "📌 Pin"}</button></div>
     ${subTaskLine}
     <ul class="objs">${objectivesHere.map((objective) => renderObjectiveLine(objective)).join("")}</ul>`;
