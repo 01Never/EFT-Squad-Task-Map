@@ -6,6 +6,7 @@
 // STM_E2E_SHOTS=<dir> also saves screenshots there.
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import http from "node:http";
 import net from "node:net";
 import path from "node:path";
 import { test } from "node:test";
@@ -254,5 +255,93 @@ test("three copies: drawings, task sharing, offline and back, and leaving", { ti
     for (const player of players) player.scenario.assertNoPageErrors();
   } finally {
     for (const player of players) await player.scenario.stop().catch(() => {});
+  }
+});
+
+// ---------------------------------------------------------------- hostile friends (QA round 2)
+
+/** A friend that is only a peer API serving the share we give it, so its name and task ids are ours. */
+class FakeFriend {
+  constructor(id, name, tasks) {
+    this.share = { v: 1, player: { id, name, color: "#ff922b" }, rev: 1, updatedAt: 1000, draw: {}, tasks };
+  }
+
+  async start() {
+    this.port = await freePort();
+    this.server = http.createServer((req, res) => {
+      if (req.url === "/squad/v1/share") {
+        res.setHeader("Content-Type", "application/json");
+        return res.end(JSON.stringify(this.share));
+      }
+      res.writeHead(200, { "Content-Type": "text/event-stream" });
+      res.write(": hi\n\nevent: share\ndata: " + JSON.stringify(this.share) + "\n\n");
+    });
+    await new Promise((resolve) => this.server.listen(this.port, "127.0.0.1", resolve));
+  }
+
+  stop() {
+    this.server.close();
+    this.server.closeAllConnections();
+  }
+}
+
+test("a 32-wide name keeps the toggles in the panel, and task ids like 'toString' change nothing", { timeout: 180_000 }, async () => {
+  const wide = new FakeFriend("a1a1a1a1a1a1a1a1", "W".repeat(32), {
+    toString: { ticks: { toString: true }, pct: 1 },
+    valueOf: { ticks: {}, pct: 1 },
+    hasOwnProperty: { ticks: {}, pct: 1 },
+    [glory.id]: { ticks: {}, pct: 0 },
+  });
+  const rtl = new FakeFriend("b2b2b2b2b2b2b2b2", "‮evil‬ Mike", null);
+  await wide.start();
+  await rtl.start();
+  const ownPort = await freePort();
+  const victim = new Player("Victim", "#e03131", ownPort, [wide.port, rtl.port], stateWithTasks([revision.name]));
+  try {
+    await victim.start();
+    await victim.openSettings();
+    await victim.page.fill("#sSquadKey", "tskey-auth-dev-test");
+    await victim.page.click("#sSquadJoin");
+    await victim.page.waitForSelector("#sSquadName", { timeout: 30_000 });
+    await victim.closeSettings();
+    await eventually(async () => (await victim.page.locator(".squad-chip").count()) === 2, "both fake friends show", 20_000);
+
+    const ownTasks = () => victim.page.locator("#panel .cat .task").count();
+    const ownMarkers = () => victim.page.locator("svg.map g.mk").count();
+    const [tasksBefore, markersBefore] = [await ownTasks(), await ownMarkers()];
+    assert.ok(tasksBefore > 0 && markersBefore > 0, "the victim has a list and markers");
+
+    const togglesInsidePanel = async (what) => {
+      const fits = await victim.page.evaluate(() => {
+        const panel = document.querySelector("#panel").getBoundingClientRect();
+        return [...document.querySelectorAll(".squad-toggle")].map((button) => {
+          const box = button.getBoundingClientRect();
+          return box.width > 0 && box.left >= panel.left && box.right <= panel.right;
+        });
+      });
+      assert.deepEqual(fits, [true, true, true, true], `${what}: all four toggles are inside the panel`);
+    };
+    await togglesInsidePanel("desktop");
+    await victim.shot("chips-long-and-rtl-names");
+    await victim.page.setViewportSize({ width: 390, height: 800 });
+    await togglesInsidePanel("phone");
+    await victim.shot("chips-long-and-rtl-names-phone");
+    await victim.page.setViewportSize({ width: 1280, height: 800 });
+
+    // switching on the hostile friend's tasks (and a reload with it on) leaves the page whole
+    await victim.page.click(`[data-squad-tasks="${wide.share.player.id}"]`);
+    await eventually(async () => (await victim.page.locator(".squad-chip").count()) === 2, "chips still there");
+    assert.equal(await ownTasks(), tasksBefore, "your task list is intact");
+    assert.equal(await ownMarkers(), markersBefore, "your markers are intact");
+    await victim.page.reload();
+    await victim.scenario.waitForMap(MAP);
+    assert.equal(await ownTasks(), tasksBefore, "your task list is intact after a reload");
+    assert.equal(await ownMarkers(), markersBefore, "your markers are intact after a reload");
+    await togglesInsidePanel("after reload");
+    victim.scenario.assertNoPageErrors();
+  } finally {
+    await victim.scenario.stop().catch(() => {});
+    wide.stop();
+    rtl.stop();
   }
 });

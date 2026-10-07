@@ -14,7 +14,7 @@ const NAMES_OF_MAPS_WITHOUT_ART = { "the-lab": "The Lab", labyrinth: "The Labyri
 
 /** Build the lookups for freshly loaded game data. */
 export function indexGameData() {
-  app.taskById = {};
+  app.taskById = Object.create(null);
   for (const task of app.gameData.tasks) app.taskById[task.id] = task;
   app.taskNameMatcher = makeTaskNameMatcher(app.gameData.tasks);
   clearPartsCache();

@@ -30,6 +30,8 @@ const MAX_SHARED_TASKS = 2000;
 const MAX_TICKS_PER_TASK = 200;
 const MAX_TICK_COUNT = 100000;
 const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
+// The game's own task and objective ids; the server refuses any other id in a share.
+const GAME_ID = /^[0-9a-f]{24}$/;
 const STROKE_COLOR = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 // Used when a stroke's colour isn't one the server accepts (it never happens with the colour picker).
@@ -45,6 +47,22 @@ const STRICT_COLOR = /^#[0-9a-fA-F]{6}$/;
 // The longest name the server accepts; used here only to cut text that is somehow longer.
 const MAX_NAME_LENGTH = 32;
 const UNKNOWN_FRIEND_NAME = "Friend";
+const NO_NAME_TEXT = "(no name)";
+// Direction overrides and invisible characters: one name must not be able to reorder the text
+// around it, or look empty while not being empty.
+const BIDI_AND_INVISIBLE = /[\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g;
+
+/**
+ * Own-property read: a friend can send any key, including "toString" or "__proto__", and those
+ * must never find something on Object.prototype.
+ * @param {any} object
+ * @param {string} key
+ * @returns {any}
+ */
+export function ownValue(object, key) {
+  if (!object || typeof object !== "object") return undefined;
+  return Object.hasOwn(object, key) ? object[key] : undefined;
+}
 
 /**
  * A colour that is safe to put in a style or an SVG attribute.
@@ -57,14 +75,16 @@ export function safeFriendColor(color) {
 }
 
 /**
- * A friend's name as shown: text only, control characters removed, at most 32 characters.
+ * A friend's name as shown: text only, control, direction and zero-width characters removed, at
+ * most 32 characters (not UTF-16 units), "(no name)" when nothing is left.
  * (It is still escaped wherever it goes into HTML.)
  * @param {unknown} name
  */
 export function friendDisplayName(name) {
   if (typeof name !== "string") return UNKNOWN_FRIEND_NAME;
-  const cleaned = name.replace(/[\u0000-\u001f\u007f-\u009f]/g, "").trim().slice(0, MAX_NAME_LENGTH);
-  return cleaned || UNKNOWN_FRIEND_NAME;
+  const cleaned = name.replace(/[\u0000-\u001f\u007f-\u009f]/g, "").replace(BIDI_AND_INVISIBLE, "").trim();
+  const cut = Array.from(cleaned).slice(0, MAX_NAME_LENGTH).join("").trim();
+  return cut || NO_NAME_TEXT;
 }
 
 const SECOND_MS = 1000;
@@ -111,7 +131,7 @@ const DEFAULT_FRIEND_PREFS = Object.freeze({ drawings: true, tasks: false });
  * @returns {FriendPrefs}
  */
 export function friendPrefsOf(saved, playerId) {
-  const stored = saved.squad && saved.squad.friends && saved.squad.friends[playerId];
+  const stored = ownValue(saved.squad && saved.squad.friends, playerId);
   return {
     drawings: stored && typeof stored.drawings === "boolean" ? stored.drawings : DEFAULT_FRIEND_PREFS.drawings,
     tasks: stored && typeof stored.tasks === "boolean" ? stored.tasks : DEFAULT_FRIEND_PREFS.tasks,
@@ -128,7 +148,9 @@ export function friendPrefsOf(saved, playerId) {
 export function setFriendPref(saved, playerId, choice, isOn) {
   const squad = (saved.squad = saved.squad || { friends: {} });
   squad.friends = squad.friends || {};
-  squad.friends[playerId] = { ...friendPrefsOf(saved, playerId), [choice]: isOn };
+  const prefs = { ...friendPrefsOf(saved, playerId), [choice]: isOn };
+  // defineProperty, so an id like "__proto__" becomes a plain key instead of changing the object
+  Object.defineProperty(squad.friends, playerId, { value: prefs, enumerable: true, writable: true, configurable: true });
 }
 
 /**
@@ -184,7 +206,7 @@ export function friendTasksOf(friend) {
  * @param {SquadFriend[]} friendsWithTasks
  */
 export function friendsAlsoDoing(taskId, friendsWithTasks) {
-  return friendsWithTasks.filter((friend) => !!friendTasksOf(friend)?.[taskId]);
+  return friendsWithTasks.filter((friend) => !!ownValue(friendTasksOf(friend), taskId));
 }
 
 /**
@@ -221,12 +243,33 @@ export function friendPartProgress(part, friendTicks) {
  * @param {SquadFriend[]} friends friends who have the task (friendsAlsoDoing)
  */
 export function progressSummaryText(part, taskId, friends) {
-  const pieces = [];
-  for (const friend of friends) {
-    const ticks = friendTasksOf(friend)?.[taskId]?.ticks || {};
-    pieces.push(`${friendDisplayName(friend.name)} ${friendPartProgress(part, ticks).text}`);
-  }
-  return pieces.join(" · ");
+  return progressPieces(part, taskId, friends)
+    .map((piece) => `${piece.name} ${piece.text}`)
+    .join(" · ");
+}
+
+/**
+ * The parts of progressSummaryText, one per friend, so the page can isolate each name.
+ * @param {Part} part
+ * @param {string} taskId
+ * @param {SquadFriend[]} friends
+ * @returns {{ name: string, text: string }[]}
+ */
+export function progressPieces(part, taskId, friends) {
+  return friends.map((friend) => {
+    const ticks = ticksOfSharedTask(ownValue(friendTasksOf(friend), taskId));
+    return { name: friendDisplayName(friend.name), text: friendPartProgress(part, ticks).text };
+  });
+}
+
+/**
+ * The ticks inside one shared task (`{ticks, pct}`), or {} when it isn't shaped like that.
+ * @param {any} sharedTask
+ * @returns {Record<string, true | number>}
+ */
+function ticksOfSharedTask(sharedTask) {
+  const ticks = sharedTask && typeof sharedTask === "object" ? sharedTask.ticks : null;
+  return ticks && typeof ticks === "object" ? ticks : {};
 }
 
 // ---------------------------------------------------------------- friends' other tasks
@@ -245,10 +288,11 @@ export function friendsOwnTasksOnMap(friend, saved, taskById, mapKey) {
   if (!shared) return [];
   const found = [];
   for (const taskId of Object.keys(shared)) {
-    const task = taskById[taskId];
-    const isOnMyList = saved.tasks[taskId] && saved.tasks[taskId].active;
+    const task = ownValue(taskById, taskId);
+    const mine = ownValue(saved.tasks, taskId);
+    const isOnMyList = mine && mine.active;
     if (!task || isOnMyList || !isTaskOnMap(task, mapKey)) continue;
-    const ticks = shared[taskId].ticks || {};
+    const ticks = ticksOfSharedTask(shared[taskId]);
     found.push({ task, ticks, percent: wholeTaskPercent(task, ticks) });
   }
   return found.sort((first, second) => first.task.name.localeCompare(second.task.name));
@@ -304,7 +348,7 @@ function shareableDrawings(draw) {
   for (const mapKey of Object.keys(draw || {})) {
     if (Object.keys(shared).length >= MAX_SHARED_MAPS) break;
     if (!SAFE_ID.test(mapKey)) continue;
-    const strokes = draw[mapKey].filter(isShareableStroke).slice(-MAX_STROKES_PER_MAP);
+    const strokes = (Array.isArray(draw[mapKey]) ? draw[mapKey] : []).filter(isShareableStroke).slice(-MAX_STROKES_PER_MAP);
     if (strokes.length) shared[mapKey] = strokes.map(strokeForShare);
   }
   return shared;
@@ -342,8 +386,8 @@ function shareableTasks(saved, taskById) {
   const shared = {};
   for (const taskId of Object.keys(saved.tasks)) {
     if (Object.keys(shared).length >= MAX_SHARED_TASKS) break;
-    const task = taskById[taskId];
-    if (!task || !saved.tasks[taskId].active || !SAFE_ID.test(taskId)) continue;
+    const task = ownValue(taskById, taskId);
+    if (!task || !saved.tasks[taskId].active || !GAME_ID.test(taskId)) continue;
     const ticks = shareableTicks(task, saved.ticks);
     shared[taskId] = { ticks, pct: wholeTaskPercent(task, saved.ticks) };
   }
@@ -360,7 +404,8 @@ function shareableTicks(task, ticks) {
   const shared = {};
   for (const objective of task.objs) {
     if (Object.keys(shared).length >= MAX_TICKS_PER_TASK) break;
-    const tick = ticks[objective.id];
+    if (!GAME_ID.test(objective.id)) continue;
+    const tick = ownValue(ticks, objective.id);
     if (tick === true) {
       shared[objective.id] = true;
     } else if (typeof tick === "number" && tick >= 1 && tick <= MAX_TICK_COUNT) {
@@ -461,8 +506,8 @@ function compareFriend(change, before, after, mapKey) {
   if (before.color !== after.color && mapKey) change.drawingsChanged.push(playerId);
   if (!hasShareChanged(before, after)) return;
   if (mapKey && !change.drawingsChanged.includes(playerId)) {
-    const drawingsBefore = JSON.stringify(before.share?.draw?.[mapKey] || null);
-    const drawingsAfter = JSON.stringify(after.share?.draw?.[mapKey] || null);
+    const drawingsBefore = JSON.stringify(ownValue(before.share?.draw, mapKey) || null);
+    const drawingsAfter = JSON.stringify(ownValue(after.share?.draw, mapKey) || null);
     if (drawingsBefore !== drawingsAfter) change.drawingsChanged.push(playerId);
   }
   if (!change.tasksChanged.includes(playerId)) {

@@ -18,9 +18,12 @@ Your choices per friend are in the saved data (below). The page never polls.
 
 **The rules** (`rules.js`, tested in `rules.test.js`):
 - **Friends are untrusted.** `safeFriendColor()` accepts only `#rrggbb` (else a neutral grey);
-  `friendDisplayName()` cuts to 32 characters and drops control characters; every name is
+  `friendDisplayName()` cuts to 32 characters (not UTF-16 units), drops control, bidi and
+  zero-width characters ("(no name)" if nothing is left); every name is shown inside `<bdi>`; every name is
   `escapeHtml()`-ed where it goes into HTML; friend text is never used in a URL or in `innerHTML`
-  unescaped. Stroke numbers are checked before they reach SVG attributes. Friends' strokes are
+  unescaped. Every lookup keyed by friend data (task, objective and map ids, friend ids) uses own-property
+  checks (`ownValue()`), so `toString` or `__proto__` find nothing; a friend whose data throws is
+  skipped with one `console.warn` (`safe.js`). My share carries only 24-hex game ids. Stroke numbers are checked before they reach SVG attributes. Friends' strokes are
   drawn in the **friend's profile colour**, whatever colour the stroke has (owner's default).
 - **Per friend:** drawings **on**, tasks **off** by default (`friendPrefsOf`).
 - **Shown friends for tasks** = tasks switch on **and** they share tasks (`tasks` not null).
