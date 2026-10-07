@@ -19,6 +19,8 @@ type Files struct {
 	WikiCache    string // squad-task-map-wikicache.json
 	Instance     string // squad-task-map-instance.json: which port the running copy listens on
 	UpdateNotice string // squad-task-map-update-notice.json: release notes handed to the copy an update starts
+	SquadCache   string // squad-task-map-squad.json: my last share and friends' last shares (ticket 05)
+	SquadNetwork string // squad-task-map-tailscale/: tsnet's state folder with the node key; secret (ticket 05)
 	gameDataFn   func(mode string) string
 }
 
@@ -37,6 +39,8 @@ func FilesIn(dir string) Files {
 		WikiCache:    join("squad-task-map-wikicache.json"),
 		Instance:     join("squad-task-map-instance.json"),
 		UpdateNotice: join("squad-task-map-update-notice.json"),
+		SquadCache:   join("squad-task-map-squad.json"),
+		SquadNetwork: join("squad-task-map-tailscale"),
 		gameDataFn:   func(mode string) string { return join("squad-task-map-gamedata-" + mode + ".json") },
 	}
 }

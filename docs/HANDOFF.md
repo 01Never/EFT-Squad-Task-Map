@@ -8,11 +8,14 @@ Current version: see `Version` in `internal/app/run.go` (also `version` in `pack
 
 ## 1. Read this first
 
-1. **What it is:** a Windows desktop helper for Escape from Tarkov. One Go program compiled to `SquadTaskMap.exe` (~12 MB; v2 up to 2.3.0 was Bun/TypeScript) that:
+1. **What it is:** a Windows desktop helper for Escape from Tarkov. One Go program compiled to `SquadTaskMap.exe` (~27 MB since ticket 05 added tsnet, ~12 MB before; v2 up to 2.3.0 was Bun/TypeScript) that:
    - serves a map web page on `http://127.0.0.1:7777`;
    - watches the game's **log files** (tasks accepted/finished, raid start/end, game mode);
    - watches the **screenshots folder** (in-raid GPS position from file names; task-list scans read by OpenAI vision);
-   - downloads task/map data from **json.tarkov.dev**.
+   - downloads task/map data from **json.tarkov.dev**;
+   - once the player joins a squad (ticket 05), shares drawings (and, if chosen, tasks) with
+     friends' copies over a private Tailscale network built into the exe (tsnet). Never joined →
+     none of that starts.
    The owner and their squad use it while playing, often with the map on half the screen.
 2. **The game is CPU-bound and runs at the same time.** Lightness is a hard requirement, not a nice-to-have. See §7.
 3. **The owner decides features.** They like to talk a feature through before anything is built. Don't change behavior that wasn't asked for. When a request is ambiguous, ask. Squadmates' feedback arrives through the owner; build what the owner asks for, which can differ from the raw feedback (e.g., the friend asked for red highlights and the owner said "not red").
@@ -41,7 +44,7 @@ Current version: see `Version` in `internal/app/run.go` (also `version` in `pack
 
 Go 1.27 and Node 24 are portable installs in `E:\coding\toolchains` (`go\bin`, `node`), on the user PATH (the owner chose portable after the admin prompt for a system-wide install was cancelled). Git is at `E:\coding\Git\cmd\git.exe`. Bun was uninstalled after the Go port passed its parity check (owner's decision).
 
-Go dependencies: `github.com/fsnotify/fsnotify` (screenshots folder notifications), `golang.org/x/sys` (Windows registry and the Documents known folder). The page has no dependencies and no build step.
+Go dependencies: `github.com/fsnotify/fsnotify` (screenshots folder notifications), `golang.org/x/sys` (Windows registry and the Documents known folder), `tailscale.com` (tsnet, the squad network of ticket 05; it brings many indirect modules and +14.7 MB of exe; its test helpers `tstest/integration/testcontrol` run a fake tailnet in `internal/features/squad/tsnet_test.go`). The page has no dependencies and no build step.
 
 | Task | Command |
 |---|---|
@@ -50,7 +53,7 @@ Go dependencies: `github.com/fsnotify/fsnotify` (screenshots folder notification
 | Page tests | `npm test` (= `node --test "web/js/**/*.test.js"`) |
 | Page type check | `npm run typecheck` (= `npx -y -p typescript tsc -p jsconfig.json --noEmit`; downloads TypeScript on first use, nothing installed in the project). VS Code checks the same files as you type (`jsconfig.json`, `// @ts-check`). |
 | Browser suite | `npm run test:browser` (see §9 and `tests/browser/README.md`) |
-| Windows exe | `go build -trimpath -ldflags "-s -w" -o dist/SquadTaskMap.exe .` (~12 MB) |
+| Windows exe | `go build -trimpath -ldflags "-s -w" -o dist/SquadTaskMap.exe .` (~27 MB; zipped ~10 MB) |
 | Icon / version info | edit `winres/winres.json`, then `go-winres make --arch amd64 --out rsrc` (writes `rsrc_windows_amd64.syso`, picked up by `go build`) |
 
 **Environment variables** (PowerShell: `$env:NAME="value"; go run .`):
@@ -67,6 +70,10 @@ Go dependencies: `github.com/fsnotify/fsnotify` (screenshots folder notification
 | `STM_UPDATES_PUBLIC_KEY` | Only when `STM_UPDATES_BASE` is on this PC (127.0.0.1, ::1, localhost); otherwise ignored: trust this base64 public key instead of the built-in one (the mock's test key is in `testdata/updates/mock-public-key.txt`) |
 | `STM_RELEASE_KEY` | For `cmd/release` only: the path of the owner's private signing key file |
 | `STM_ASSETS_DIR` | Serve the page files from this folder instead of the ones built into the exe (automatic under `go run`) |
+| `STM_SQUAD_DEV_LISTEN` | Squad dev transport (ticket 05): serve the peer API on this address on this PC (e.g. `127.0.0.1:7901`) instead of using tsnet at all. Ignored (one console line) unless it's a loopback address. |
+| `STM_SQUAD_DEV_PEERS` | With `STM_SQUAD_DEV_LISTEN`: the other copies' peer API addresses, comma-separated (`127.0.0.1:7902,127.0.0.1:7903`) |
+| `STM_SQUAD_DEBUG=1` | Print tsnet's own (verbose) log in the console |
+| `TS_CONTROL_URL` | Tailscale's own variable, read by tsnet: use another control server (only for tests and measurements, e.g. a fake tailnet). Not needed with a real tailnet. |
 
 **One copy at a time:** the running copy writes `squad-task-map-instance.json` (port, pid) in the data folder; a second launch on the same data folder opens that copy's page and exits. Copies with different `STM_DATA_DIR`s run side by side (tests, squad dev setups).
 
@@ -121,6 +128,47 @@ publishing a version lower than a friend's shows them "older than the version yo
 
 ---
 
+## 3c. Squad network setup (ticket 05, owner, once)
+
+The squad's copies talk directly over a private Tailscale network (a "tailnet"). Friends install
+nothing: the network is inside the exe. The owner sets it up once:
+1. Create a free Tailscale account (the Personal plan; non-commercial use).
+2. In **Access controls**, define the tag and allow squad copies to reach each other on port 7777
+   only:
+   ```jsonc
+   {
+     "tagOwners": { "tag:stm": ["autogroup:admin"] },
+     "grants": [ { "src": ["tag:stm"], "dst": ["tag:stm"], "ip": ["tcp:7777"] } ]
+   }
+   ```
+   (Keep whatever else your policy has; if it uses `acls` instead of `grants`, the same rule is
+   `{"action": "accept", "src": ["tag:stm"], "dst": ["tag:stm:7777"]}`.)
+3. **Settings → Keys → Generate auth key**: **reusable**, **pre-approved**, tags: **`tag:stm`**,
+   expiry 90 days or less. That key (`tskey-auth-…`) is the squad's **invite code**. Share it
+   privately (e.g. a Discord DM), never in a public channel.
+4. Each friend pastes it into **Settings → Squad → Join** (the page part is ticket 05 part 2;
+   until then: `POST /api/squad/join {"authKey": "tskey-auth-…"}`).
+   - Devices stay joined after the key expires: a new key is only needed for new people.
+   - In the admin console's **Machines** list, check that **key expiry is disabled** for the squad
+     machines (tagged devices usually have it off), so nobody is logged out after the default
+     node-key lifetime.
+5. To remove someone, delete their machine in the admin console. Their copy then shows "Signed
+   out of the squad network" until they leave and join with a new code.
+
+Each copy shows up as `stm-<player id>`. Its node key is in `squad-task-map-tailscale/` next to
+the data files: treat that folder as secret. **Leave squad** logs out and deletes it.
+
+**Trying it on one PC (no Tailscale):** three copies with their own data folders and the dev
+transport, e.g. in three PowerShell windows:
+```
+$env:STM_DATA_DIR="E:\scratch\a"; $env:PORT=8101; $env:STM_SQUAD_DEV_LISTEN="127.0.0.1:7901"; $env:STM_SQUAD_DEV_PEERS="127.0.0.1:7902,127.0.0.1:7903"; go run .
+$env:STM_DATA_DIR="E:\scratch\b"; $env:PORT=8102; $env:STM_SQUAD_DEV_LISTEN="127.0.0.1:7902"; $env:STM_SQUAD_DEV_PEERS="127.0.0.1:7901,127.0.0.1:7903"; go run .
+$env:STM_DATA_DIR="E:\scratch\c"; $env:PORT=8103; $env:STM_SQUAD_DEV_LISTEN="127.0.0.1:7903"; $env:STM_SQUAD_DEV_PEERS="127.0.0.1:7901,127.0.0.1:7902"; go run .
+```
+then join each with any `tskey-…` text (the dev transport doesn't use it).
+
+---
+
 ## 4. Architecture
 
 ```
@@ -128,21 +176,22 @@ Tarkov logs ──(5 s size check)──► features/gamelog ─┐
 Screenshots ──(OS notifications)─► screenshots ─────┤
 json.tarkov.dev ──(hourly check)─► gamedata ────────┼─► internal/app ──httpapi (HTTP/SSE)──► page (web/js) ──PUT /api/state──► squad-task-map-data.json
 OpenAI ◄──(scan, categorize)───── taskscan / aicategorize ┘          127.0.0.1 only
+Friends' copies ◄─(tailnet :7777, peer API; only when joined)─► features/squad ─► internal/app ─► "squad" event ─► page
 ```
 
 - **The page owns the saved data.** It loads `GET /api/state`, migrates it, and saves the whole object with `PUT /api/state` (500 ms debounce, `flush()` on tab hide/unload). The server just stores it (atomic write plus a `.bak`).
 - **Server → page events use Server-Sent Events** (`/api/events`). There are two kinds (`server/events.ts`):
   - `deliver(ev)`: events that change saved data (`task` started/finished/failed, `raidEnd`). They're queued in `squad-task-map-pending.json` and resent until the page acks (`POST /api/events/ack`). That way a task accepted while the browser was closed still lands.
-  - `broadcast(ev)`: transient events (`gps`, `capture`, `raidStart`, `raidMap`, `mode`, `keybind`, `data`). They're dropped if no page is open.
+  - `broadcast(ev)`: transient events (`gps`, `capture`, `raidStart`, `raidMap`, `mode`, `keybind`, `data`, `updates`, `squad`). They're dropped if no page is open.
 - The page handles events in `web/js/app/live-events.js`: one named handler per event name (`app/event-names.js`, checked against `internal/events/names.go` by `names_test.go`).
-- **Only the app's own page is answered** (ticket 04d, `internal/httpapi/guard.go`). Every request goes through `httpapi.Guard` with the allowed hosts `internal/app` builds for the bound port (`127.0.0.1:<port>`, `localhost:<port>`): another Host → 421 (blocks DNS rebinding); a state-changing request (not GET/HEAD/OPTIONS) whose `Origin` isn't `http://` + an allowed host, or, without `Origin`, whose `Sec-Fetch-Site` isn't `same-origin`/`none` → 403 (blocks cross-site POSTs); a body not sent as `application/json` on a JSON-body route → 415. Clients that send neither header (curl, tests, the single-copy check) pass. The page sends every JSON body with `Content-Type: application/json` (`app/api.js`, `app/saving.js`, `features/updates/panel.js`). Ticket 05's tailnet listener gets its own list and rules.
+- **Only the app's own page is answered** (ticket 04d, `internal/httpapi/guard.go`). Every request goes through `httpapi.Guard` with the allowed hosts `internal/app` builds for the bound port (`127.0.0.1:<port>`, `localhost:<port>`): another Host → 421 (blocks DNS rebinding); a state-changing request (not GET/HEAD/OPTIONS) whose `Origin` isn't `http://` + an allowed host, or, without `Origin`, whose `Sec-Fetch-Site` isn't `same-origin`/`none` → 403 (blocks cross-site POSTs); a body not sent as `application/json` on a JSON-body route → 415. Clients that send neither header (curl, tests, the single-copy check) pass. The page sends every JSON body with `Content-Type: application/json` (`app/api.js`, `app/saving.js`, `features/updates/panel.js`). Ticket 05's peer API is not on this server: it is a separate listener (the tailnet, or a 127.0.0.1 port with the dev transport) with its own caller check (`tag:stm` nodes via tsnet `WhoIs`, or loopback only; never a request carrying `Origin` or `Sec-Fetch-Site`), in `internal/features/squad/peerapi.go`.
 - **The page never polls,** with one exception: it polls `/api/ai/job/:id` while an AI Categorize request runs.
 
 ### Server (Go; start with `internal/app/app.go`)
 | Package | Role |
 |---|---|
 | `main.go`, `embed.go` | Entry point; `//go:embed` of `web/` and `assets/` (the page is served as-is, no bundler). |
-| `internal/app` | Creates every part and wires them (`app.go`: log event → raid/gps/events; screenshot → gps or scan), the backend behind every route (`backend.go`), start-up (`run.go`: data folder, single copy, port 7777→7800, the allowed hosts for that port, banner, browser). |
+| `internal/app` | Creates every part and wires them (`app.go`: log event → raid/gps/events; screenshot → gps or scan), the backend behind every route (`backend.go`), start-up (`run.go`: data folder, single copy, port 7777→7800, the allowed hosts for that port, banner, browser), the squad's wiring (`squad.go`: tsnet or dev transport, its settings block, the `squad` event, resume at launch only when joined). |
 | `internal/httpapi` | `Guard` (Host/Origin checks) and `jsonBody` (415) in `guard.go`, route table and thin handlers (`routes.go`), static files with explicit content types and an ETag = version (`static.go`), the `Backend` interface listing everything the page can ask for. |
 | `internal/events` | Event names (`names.go`, spelled identically in `web/js/app/event-names.js`; `names_test.go` fails if the lists differ) and the SSE hub: `Deliver` (queued in `squad-task-map-pending.json` until acked) and `Broadcast` (live only). |
 | `internal/storage` | Files next to the exe: settings (unknown fields kept, `tt*` dropped), the page's saved data as opaque text (atomic write + `.bak`), v1 backup. |
@@ -156,6 +205,7 @@ OpenAI ◄──(scan, categorize)───── taskscan / aicategorize ┘   
 | `internal/features/taskscan` | Capture mode, serving captured images, the vision read, confirm/cancel. |
 | `internal/features/aicategorize` | AI Categorize (prompt, tool loop, review of the answer), wiki fetch/clean/cache (7 days), jobs. |
 | `internal/features/updates` | "Check for updates" (ticket 04c): signed manifest from GitHub Releases, background download, rename-and-replace with rollback, restart. Starts only from a click: no timers. README has the full API. |
+| `internal/features/squad` | Squad sharing over a private tailnet (ticket 05): your share (rev stamping, tasks dropped unless shared), the peer API on its own listener (`GET /squad/v1/share`, `/squad/v1/stream`), friends found on the IPN bus and held on SSE streams with 1 s → 60 s backoff, everything received validated, friends cached with `lastSeen`; tsnet or dev transport (picked in `internal/app/squad.go`). Starts only when joined. README has the full API for the page. |
 | `cmd/mock` | Offline stand-ins for json.tarkov.dev, OpenAI, the wiki and a fake GitHub Releases (byte-equal to v2's Bun mock for the first three). |
 | `cmd/release` | The owner's release tool: version check, tests, Windows build, signed `latest.json`. See "Publishing an update". |
 
@@ -269,7 +319,7 @@ See SPEC §12. Fields: `cats`, `tasks{id: {active, source, addedAt, gamePct, sca
 - **Adding a field:** add its default to `freshState()`. `fill()` adds missing defaults when loading. Only bump `version` and add a `migrate` step for structural changes; keep the v1 → v2 path working (fixture: `tests/fixtures/v1-data.json`, the owner's real v1 file).
 
 ### 6.3 Files next to the exe
-`squad-task-map-data.json` (+ `.bak`), `squad-task-map-settings.json` (OpenAI key/model/effort, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`), `squad-task-map-gamedata-<mode>.json`, `squad-task-map-pending.json`, `squad-task-map-wikicache.json`, `squad-task-map-data.v1-backup.json`, `squad-task-map-instance.json` (port of the running copy), `squad-task-map-data.before-<version>.json` (newest 3, made before an update), `squad-task-map-update-notice.json` (release notes for the copy an update starts); next to the exe, `SquadTaskMap.download.exe` and `SquadTaskMap.previous.exe` during/after an update.
+`squad-task-map-data.json` (+ `.bak`), `squad-task-map-settings.json` (OpenAI key/model/effort, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`), `squad-task-map-gamedata-<mode>.json`, `squad-task-map-pending.json`, `squad-task-map-wikicache.json`, `squad-task-map-data.v1-backup.json`, `squad-task-map-instance.json` (port of the running copy), `squad-task-map-data.before-<version>.json` (newest 3, made before an update), `squad-task-map-update-notice.json` (release notes for the copy an update starts), `squad-task-map-squad.json` (ticket 05: my last squad share, friends' last shares with `lastSeen`), `squad-task-map-tailscale/` (ticket 05: tsnet's state folder with the node key, secret; deleted by Leave squad); the settings file's `squad` block holds `playerId`, `name`, `color`, `shareTasks`, `joined` (never the invite code); next to the exe, `SquadTaskMap.download.exe` and `SquadTaskMap.previous.exe` during/after an update.
 
 ---
 
@@ -283,6 +333,16 @@ Measured idle cost with the page open (2 min, 2026-10-05): **Go 2.4.0: 0.000% of
   - **Never animate SVG attributes** or anything inside the map SVG: the map is a huge SVG, and each repaint is expensive.
   - `renderSelectionFlash()` (`map/selection-flash.js`) rebuilds the rings only when the selection signature changes, so re-renders don't restart the animation; `placeSelectionFlash()` repositions them in `applyView()` using `svg.getScreenCTM()`.
 - Pan/zoom uses `requestAnimationFrame` (`applyViewSoon()` in `map/view.js`).
+- **Squad (ticket 05):** never joined → tsnet never starts: no listener, no goroutine, no timer,
+  no traffic. Joined → event-driven only: friends come from tsnet's IPN bus, shares travel on
+  open SSE streams only when they change, no keep-alives of our own; the only timer is the
+  reconnect backoff (1 s → 60 s) while a listed friend doesn't answer. Measured 2026-10-07 on
+  Linux (the real app binary, page closed; Windows numbers still to take):
+  | | CPU, idle | Memory (RSS) | Goroutines |
+  |---|---|---|---|
+  | 2.6.1 before ticket 05 | 0 ticks in 30 s | 40 MB (28 MB private) | 19 |
+  | ticket 05, never joined | 0 ticks in 30 s | 52 MB (29 MB private; +11 MB are the bigger exe's mapped pages) | 18 |
+  | ticket 05, joined, tsnet up, 2 friends connected (fake tailnet on 127.0.0.1) | 90 ms in 180 s = 0.05% of one core | 62 MB (36 MB private) | 99 |
 
 ---
 
@@ -308,6 +368,14 @@ Measured idle cost with the page open (2 min, 2026-10-05): **Go 2.4.0: 0.000% of
 - `internal/features/gps/rules_test.go`: positions for the owner's 102 real screenshot names (43 with a position) match v2.
 - `internal/features/raid/raid_test.go`: mode matching, raid start/end, only that raid's GPS shots are deleted.
 - `cmd/mock`: its own tests.
+- `internal/features/squad` (ticket 05): the rules (rev stamping, tasks stripped, validation of
+  peer data, backoff, caller checks); **three copies on the dev transport** in one test (a share
+  reaches the others, updates propagate, an offline friend keeps their last share and `lastSeen`,
+  a returning friend refreshes); and **real tsnet nodes on a fake tailnet** (`tsnet_test.go`:
+  Tailscale's in-process control server and DERP on 127.0.0.1, checked to make no internet or DNS
+  requests): join, share, untagged node refused, restart with the node key alone, Leave, signed
+  out by the tailnet. `go test -short` skips the tsnet test, and so does Windows unless `STM_SQUAD_TSNET_TEST=1` (its UDP binding would make Windows Firewall ask about every new test binary). `internal/app/squad_test.go` covers
+  the routes. Run `go test -race ./internal/features/squad ./internal/app` after squad changes.
 
 **Page:** `npm test` (`node --test`): every `*.test.js` next to the rules it tests: `map/projection.test.js` (tarkov.dev vectors), `app/saved-data.test.js` (v1 → v2, missing fields), and `features/<name>/rules.test.js` (parts, categories, readiness and the Bring list, name matching, drawing, extracts, find-me, raid, picker, settings, AI Categorize, sub-tasks). Shared test data loading is in `tests/support/game-data.js`. `npm run typecheck` type-checks the page.
 
@@ -351,6 +419,7 @@ Verified on the owner's PC since 2.3.0: folder detection (registry → `E:\Games
 3. **Raid end:** the toast appears, `have` is 0, and only that raid's GPS shots are gone.
 4. **Scan accuracy** with real screenshots and a real model (default `gpt-5.4-mini`), and that a full scan leaves exactly the in-game list.
 5. **The Go exe on the owner's PC:** replace the exe, data and settings still there; one raid with logs, GPS, raid end and a scan.
+6. **Squad on a real tailnet (ticket 05):** the setup in §3c, then two or more PCs join with the invite code and see each other online and each other's shares live; Leave deletes `squad-task-map-tailscale/`; deleting a machine in the admin console shows "Signed out…" on it; idle CPU and working set on Windows with tsnet up and 2 friends connected (Linux measurement in §7). Windows Firewall may ask once about the exe's network access when tsnet starts (UDP for direct connections; it works through Tailscale's relays either way).
 
 ---
 

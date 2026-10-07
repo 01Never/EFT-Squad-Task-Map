@@ -1,0 +1,192 @@
+# Squad (`internal/features/squad`, ticket 05)
+
+**What it does (player's view):** friends running the app see each other's **drawings** live and,
+if each chooses to, each other's **tasks** (with ticks, so "Mike 2/5" works). There's no website
+and no server: the copies connect directly over a private Tailscale network built into the exe
+(tsnet). You join once with an invite code. A friend who is offline still shows with their last
+known data and "last seen". No GPS position is shared (owner's decision).
+This package is the server side (part 1 of ticket 05). The page (Settings → Squad, chips,
+friends' layers, "Also: …" badges) is part 2, in `web/js/features/squad/`.
+
+**Where the data comes from:**
+- **Your share:** the page builds it from its saved data and sends it with
+  `PUT /api/squad/share` (about 1 s after a save). The server stamps it and keeps the last one in
+  `squad-task-map-squad.json`, so friends get it again after a restart.
+- **Friends' shares:** each friend's copy, over the tailnet, from its **peer API** (below).
+- **Who your friends are:** the tailnet's peer list (nodes tagged `tag:stm`, named
+  `stm-<player id>`), followed on Tailscale's IPN bus (event-driven, no polling).
+
+**Never shared:** the OpenAI key, folder paths, screenshots, settings, bring-list counts,
+categories, AI chats, your position. The server only ever sends what's in the share below.
+
+## The rules (`rules.go`)
+
+| Rule | Function | Numbers and why |
+|---|---|---|
+| A share is `{v, player, rev, updatedAt, draw, tasks}` | `Share` | `v` = 1 (`ShareFormatVersion`); `updatedAt` in ms since 1970 |
+| `rev` goes up only when the content changes | `StampShare` | content = player (id, name, colour) + drawings + tasks; the same content again keeps rev and updatedAt |
+| Tasks are dropped when "Share my tasks" is off | `StampShare` | enforced by the server, whatever the page sends; turning it off re-stamps at once (rev + 1, `tasks: null`) |
+| Everything received is checked; a bad share is dropped whole and logged once | `DecodeShare`, `ValidateShare`, `ValidateParts` | ≤ 2 MB (`MaxShareBytes`, ticket's cap); player id 16 lower-case hex; name 1–32 characters, no control characters, no spaces at the ends; colour `#rrggbb`; map/task/objective ids `[A-Za-z0-9_-]{1,64}`; ≤ 64 maps, ≤ 5000 strokes a map, 1–10000 `[x, z]` points a stroke, width 0–1000, coordinates within ±1e6, stroke colour `#rgb`/`#rrggbb`; ≤ 2000 tasks, ≤ 200 ticks each, a tick is `true` or a whole number 0–100000, `pct` 0–100 |
+| A friend's share is new when rev or updatedAt differ | `HasChanged` | not "higher": a friend who reset their data starts again at rev 1 |
+| On the tailnet a share must carry the id its node is named after | `ShareFitsPeer` | so one friend can't pose as another (the dev transport has no names) |
+| Friends are the online `tag:stm` nodes named `stm-<player id>` | `SquadPeers`, `PlayerIDFromHostname` | host name first, else the first part of the DNS name; IPv4 address preferred; yourself left out |
+| The peer API answers only squad nodes | `HasSquadTag` (tsnet, via `WhoIs`), `IsLoopbackCaller` (dev) | and never a browser: `IsBrowserRequest` refuses any request with `Origin` or `Sec-Fetch-Site` (blocks DNS rebinding) |
+| Reconnecting waits 1 s, 2 s, 4 s … 60 s | `RetryDelay` | ticket 05; starts over after a stream delivered a valid share |
+| Status line | `StatusText` | "Connected · 3 of 4 friends online"; "Connected · no friends seen yet"; "Connecting…"; "Signed out of the squad network: leave, then join again with an invite code"; "Squad connection failed: …"; "Not in a squad" |
+| Profile | `NormalizeName`, `NormalizeColor`, `NewPlayerID` | name trimmed, 1–32 characters; colour lower-cased `#rrggbb`; defaults "Player" and `#4dabf7`; player id made once |
+| An invite code looks like a Tailscale auth key | `IsPlausibleAuthKey` | starts with `tskey-`, no spaces, ≤ 200 characters (Tailscale does the real check) |
+
+## Flow
+
+```
+page saves → PUT /api/squad/share → Squad.SetMyShare → StampShare → squad-task-map-squad.json
+           → shareFeed.publish → every friend's open GET /squad/v1/stream gets the whole share
+           → "squad" event to your own page (your rev)
+
+tailnet IPN bus change → TsnetTransport.WatchPeers → SquadPeers → friendLinks.reconcile
+  per friend: GET /squad/v1/share, then GET /squad/v1/stream (held open)
+           → DecodeShare + ShareFitsPeer → Squad.onFriendShare → cache file → "squad" event → page
+  stream ends → onFriendStreamClosed (lastSeen) → "squad" event; reconnect after RetryDelay
+  friend goes offline on the tailnet → its connection is cancelled at once
+```
+
+- **Never joined:** nothing starts. No tsnet, no listener, no goroutine, no timer, no traffic.
+- **Joined:** idle cost is tsnet's own keep-alives and the open streams. Shares are sent only when
+  they change. No polling: the peer list comes from the IPN bus, shares come on the streams, and a
+  stream has no keep-alive timer (a friend that vanished is noticed when the tailnet marks them
+  offline). The only timers are the reconnect backoff (≥ 1 s, ≤ 60 s) while a listed friend's
+  copy doesn't answer.
+
+## Transports (`transport.go`, `tsnet.go`)
+
+`internal/app` picks one (`internal/app/squad.go`):
+- **tsnet** (default): a Tailscale node inside the exe. Hostname `stm-<player id>`, state folder
+  `squad-task-map-tailscale/` next to the data files (holds the node key: secret), peer API on the
+  tailnet at `:7777` only. Starts only when `joined`. Joining waits up to 90 s for the tailnet to
+  accept the invite code; a failed join closes the node and deletes the state folder. After a
+  restart it resumes from the node key, with no invite code; without a node key it shows
+  "Signed out…" instead of starting. When the tailnet signs the node out (machine deleted, key
+  expired) it shows "Signed out…" and stops the node (it would otherwise keep asking for a log-in).
+  Log uploads to Tailscale are off (`TS_NO_LOGS_NO_SUPPORT`) and tsnet's log folder is the state
+  folder (`TS_LOGS_DIR`), so nothing is written outside the app's files. `STM_SQUAD_DEBUG=1`
+  prints tsnet's own log in the console.
+- **dev** (`STM_SQUAD_DEV_LISTEN=127.0.0.1:7901`, `STM_SQUAD_DEV_PEERS=127.0.0.1:7902,127.0.0.1:7903`):
+  no tsnet at all. The peer API listens on that address (it must be on this PC, else the variable
+  is ignored) and answers only 127.0.0.1/::1. Friends are the listed addresses; a friend's identity
+  is the player id in its share. Same lifecycle as tsnet: it runs only while joined, and join takes
+  any `tskey-…` text. Three copies with separate `STM_DATA_DIR`s make a squad on one PC.
+
+## The page's API (127.0.0.1, behind `httpapi.Guard`)
+
+All bodies are JSON sent as `application/json` (415 otherwise). Times are ms since 1970.
+
+### `GET /api/squad` → the squad view
+```jsonc
+{
+  "me":        { "playerId": "0123456789abcdef", "name": "Mike", "color": "#4dabf7",
+                 "rev": 42, "updatedAt": 1791336708099 },   // rev/updatedAt 0 until a share was sent
+  "settings":  { "shareTasks": false, "joined": true },
+  "transport": "tsnet",                                        // or "dev"
+  "status":    { "state": "connected",                         // off | starting | needsLogin | connected | error
+                 "text": "Connected · 2 of 3 friends online",  // show as is
+                 "friendsOnline": 2, "friendsKnown": 3,
+                 "problem": "" },                               // the error, for state "error"
+  "friends": [                                                  // sorted by name, then id
+    { "playerId": "fedcba9876543210", "name": "Sam", "color": "#ff922b",
+      "online": true, "lastSeen": 1791336708099,
+      "share": { "v": 1, "player": {…}, "rev": 7, "updatedAt": …,
+                 "draw":  { "<mapKey>": [ { "c": "#ff4d4d", "w": 2.5, "pts": [[x, z], …] } ] },
+                 "tasks": null | { "<taskId>": { "ticks": { "<objId>": true | 3 }, "pct": 40 } } } }
+  ]
+}
+```
+- A friend is **online** while their stream is open. Offline friends keep their last share;
+  `lastSeen` is when their stream closed or their last share arrived.
+- Friends' data is read-only. Draw friends' strokes in the friend's `color` (owner's default),
+  not the strokes' own `c`.
+
+### `PUT /api/squad/share {draw, tasks}` → `{ok, rev, updatedAt, changed, tasksShared, inSquad}`
+- `draw`: the page's `draw` (by map key, strokes `{c, w, pts}`); `tasks`: by task id
+  `{ticks, pct}`, or `null`. Any other field is ignored (the server stamps `v`, `player`, `rev`,
+  `updatedAt`).
+- `changed: false` when the content is the same as the last share (rev unchanged).
+  `tasksShared: false` when "Share my tasks" is off: the tasks were dropped. `inSquad: false`: kept
+  for when you join; nobody gets it now.
+- Over 2 MB → **413**; not the shape or limits above → **400** `{ok: false, error: "The share isn't valid: …"}`.
+- Send it debounced (~1 s after a save), and again after turning "Share my tasks" on (the server
+  never keeps tasks while sharing is off, so it has none to add by itself).
+
+### `POST /api/squad/join {authKey}` → `{ok: true, squad: <view>}`
+- Answers once the tailnet has accepted the code (up to 90 s), then the session runs. The code is
+  used once and never saved; the node key in `squad-task-map-tailscale/` is enough from then on.
+- **400** "That isn't an invite code. It starts with tskey-"; **409** "Already in a squad. Leave it
+  first to join another"; **502** "Couldn't join the squad: …" (Tailscale's reason; nothing kept).
+
+### `POST /api/squad/leave` → `{ok: true, squad: <view>}`
+Stops the session, logs the node out of the tailnet, deletes `squad-task-map-tailscale/`, forgets
+friends' shares (the cache keeps only your own share) and sets `joined` to false. Always succeeds
+(a failed log-out is logged; the folder is deleted anyway).
+
+### `PUT /api/squad/profile {name?, color?, shareTasks?}` → `{ok: true, squad: <view>}`
+Only the fields sent change. Name trimmed, 1–32 characters; colour `#rrggbb` (any case, saved
+lower-case). **400** with "Your name must be 1 to 32 characters" or "Your colour must look like
+#4dabf7". Your share is re-stamped at once, so friends see the new name or colour, and lose your
+tasks as soon as sharing is turned off.
+
+### Live event `squad` (broadcast)
+`{"type": "squad", "squad": <the same view as GET /api/squad>}`, whenever the status, a friend's
+share, a friend's online state, your profile or your share's rev changes. Not queued: a page
+opened later reads `GET /api/squad`. (`internal/events/names.go` and `web/js/app/event-names.js`.)
+
+## The peer API (the tailnet listener, or the dev address; never the page's server)
+
+| Route | Answer |
+|---|---|
+| `GET /squad/v1/share` | your latest share (`application/json`), or 404 "Nothing shared yet" |
+| `GET /squad/v1/stream` | Server-Sent Events: `: squad`, then `event: share` / `data: <share JSON>` now (if there is one) and again whenever it changes. No keep-alives. |
+
+Refused before any route: callers that aren't `tag:stm` nodes (tsnet `WhoIs`) or not on this PC
+(dev) → 403; any request with `Origin` or `Sec-Fetch-Site` → 403. Only GET; no request body;
+headers ≤ 16 KB, 10 s to send them; ≤ 16 open streams (503 beyond). As a client: answers' headers
+within 15 s, a share or one SSE event ≤ 2 MB.
+
+## Saved data / settings
+- `squad-task-map-settings.json`, block `"squad"` (unknown fields inside it are kept):
+  `playerId` (made once), `name`, `color`, `shareTasks` (default false), `joined`. Never the
+  invite code.
+- `squad-task-map-squad.json`: `{"v": 1, "mine": <my share> | null, "friends": {"<playerId>":
+  {"lastSeen": …, "share": …}}}`. Re-checked when read; a friend that fails the checks is left out.
+- `squad-task-map-tailscale/`: tsnet's state (node key, its logs). Secret. Deleted by Leave, and
+  only a folder with exactly this name (`StateFolderName`).
+
+## Files
+`rules.go`: every rule above (pure). `squad.go`: the `Squad` (settings, my share, friends,
+join/resume/leave/stop, the session). `peerapi.go`: the peer API server and the feed that wakes
+friends' streams. `peers.go`: one connection per friend (fetch, stream, backoff, checks, log once).
+`transport.go`: the `Transport` interface and the dev transport. `tsnet.go`: the tsnet transport.
+`cache.go`: `squad-task-map-squad.json`. Wiring: `internal/app/squad.go`; routes:
+`internal/httpapi/squad.go`.
+
+## Tests
+- `rules_test.go`: rev stamping, tasks stripped when sharing is off, validation rejects bad peer
+  data (23 cases), ticks, backoff schedule, caller checks (loopback, tag, browser), peer list
+  rules, identity check, "new share" rule, profile rules, status line.
+- `squad_test.go`: **three copies on the dev transport** (A's share reaches B and C; an update
+  propagates; B's tasks aren't sent; C goes offline and A keeps C's share with `lastSeen`, also in
+  the cache file; C comes back and refreshes), cache read/write, rev kept across a restart,
+  player id made once, sharing off re-stamps, Leave deletes the state folder and forgets friends
+  (and only deletes a folder with that name), the peer API's caller check.
+- `tsnet_test.go`: **real tsnet nodes on a fake tailnet** (Tailscale's in-process control server
+  and DERP on 127.0.0.1; no internet): a wrong invite code is refused and leaves nothing; two
+  copies join and share; the code is in no file; an untagged tailnet node gets 403; a restart
+  reconnects with the node key alone; Leave deletes the node key; a node the tailnet signs out
+  shows "needsLogin". Skipped with `go test -short`, and on Windows unless
+  `STM_SQUAD_TSNET_TEST=1` (tsnet binds UDP on every interface, so Windows Firewall would ask
+  about every new test binary).
+- `internal/app/squad_test.go`: never joined starts nothing; the server drops tasks the page sent
+  with sharing off (checked through the real peer API); 413/400/415 on the share route;
+  join/leave/profile through the routes; the code isn't in the settings file; the peer API isn't
+  on the page's server; a joined copy reconnects at launch.
+- **Needs the owner:** a real tailnet with 2+ PCs (setup in `docs/HANDOFF.md`): join with the
+  invite code, see each other online, share live; delete a machine in the admin console and see
+  "Signed out…"; idle CPU with friends connected on Windows.

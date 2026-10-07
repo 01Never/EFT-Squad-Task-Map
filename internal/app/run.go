@@ -80,6 +80,7 @@ func Run(builtIn fs.FS) error {
 	}()
 
 	app.startWatchers()
+	app.startSquad() // only when the player is in a squad (ticket 05)
 	printBanner(app, url, isDev)
 	if updatedFrom == "" {
 		// After an update the page that clicked "Download and restart" is still open and
@@ -88,7 +89,8 @@ func Run(builtIn fs.FS) error {
 	}
 
 	waitForClose(app.exitRequested)
-	app.hub.Close() // end the live-event streams, so the server stops at once
+	app.squad.Stop() // close friends' streams and the squad network (nothing is deleted)
+	app.hub.Close()  // end the live-event streams, so the server stops at once
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	_ = server.Shutdown(ctx)
@@ -166,7 +168,7 @@ func listenOnFreePort() (net.Listener, int, error) {
 
 // localPageHosts: the names the page is opened with, on the port this copy listens on. The
 // server answers no other Host, and takes state-changing requests only from these origins.
-// (Ticket 05's squad listener will get its own list instead of widening this one.)
+// (Ticket 05's peer API is a separate listener with its own caller check, internal/features/squad.)
 func localPageHosts(port int) httpapi.AllowedHosts {
 	return httpapi.AllowedHosts{
 		fmt.Sprintf("127.0.0.1:%d", port),

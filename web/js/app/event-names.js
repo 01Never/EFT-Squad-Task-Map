@@ -14,4 +14,5 @@ export const EVENT_NAMES = Object.freeze({
   keybind: "keybind", // broadcast: whether a screenshot key is bound in the game
   data: "data", // broadcast: the game data changed (new download, mode switch)
   updates: "updates", // broadcast: Check for updates status (ticket 04c; features/updates/panel.js)
+  squad: "squad", // broadcast: the squad view changed (ticket 05; same shape as GET /api/squad)
 });
