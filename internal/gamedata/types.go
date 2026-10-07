@@ -11,6 +11,9 @@ type GameData struct {
 	Mode      string    `json:"mode"`      // "regular", "pve" or "pvp-season"
 	Tasks     []Task    `json:"tasks"`
 	Maps      []MapInfo `json:"maps"`
+	// Loot spots per map (ticket 08). Not part of /api/data: the page loads one map's spots at a
+	// time from /api/loot/<map>. nil when the data came from the built-in snapshot.
+	Loot *LootData `json:"-"`
 }
 
 // Task is one quest.

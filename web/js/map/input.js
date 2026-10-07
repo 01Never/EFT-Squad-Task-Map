@@ -10,6 +10,7 @@ import { startStroke, extendStroke, finishStroke, cancelStroke, undoStroke, redo
 import { placeSubTaskPinAt } from "../features/sub-tasks/map-layer.js";
 import { selectPartFromMarker, deselectPart } from "../features/tasks/selection.js";
 import { onExtractTapped } from "../features/extracts/map-layer.js";
+import { onLootTapped, closeLootPopup } from "../features/loot/map-layer.js";
 
 // A press that moves less than this many pixels in total (all directions) is a tap, not a drag.
 const TAP_MAX_MOVE_PIXELS = 7;
@@ -149,8 +150,9 @@ function releasePointer(pointerId) {
 }
 
 /**
- * A tap while panning: a task marker selects its part, an extract is marked or unmarked, and a tap
- * on empty map deselects.
+ * A tap while panning: a task marker selects its part, an extract is marked or unmarked, a loot
+ * spot shows what it is (without touching the selection), and a tap on empty map deselects and
+ * closes the loot popup.
  * @param {number} clientX
  * @param {number} clientY
  */
@@ -159,12 +161,16 @@ function onMapTapped(clientX, clientY) {
   const tapped = document.elementFromPoint(clientX, clientY);
   const marker = tapped && tapped.closest(".mk");
   const extract = tapped && tapped.closest(".ex");
+  const lootMarker = tapped && tapped.closest(".lt");
   if (marker) {
     selectPartFromMarker(mapView.markerItemByKey[marker.getAttribute("data-k")]);
   } else if (extract) {
     onExtractTapped(extract.getAttribute("data-name"));
-  } else if (mapView.selectedPartKey) {
-    deselectPart();
+  } else if (lootMarker) {
+    onLootTapped(lootMarker, clientX, clientY);
+  } else {
+    closeLootPopup();
+    if (mapView.selectedPartKey) deselectPart();
   }
 }
 

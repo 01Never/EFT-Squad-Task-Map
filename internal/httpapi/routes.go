@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"squadtaskmap/internal/features/aicategorize"
@@ -43,6 +44,7 @@ func NewServer(backend Backend, static *staticFiles) *Server {
 
 		// Game data, status and live events.
 		{"GET /api/data", server.gameData},
+		{"GET /api/loot/{map}", server.mapLoot},
 		{"GET /api/status", server.status},
 		{"POST /api/data/refresh", server.refreshGameData},
 		{"GET /api/events", server.events},
@@ -102,6 +104,24 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 
 func (server *Server) gameData(writer http.ResponseWriter, _ *http.Request) {
 	writeRawJSON(writer, http.StatusOK, server.backend.GameDataJSON())
+}
+
+// A map key is lower-case letters, digits and dashes ("streets-of-tarkov").
+var mapKeyPattern = regexp.MustCompile(`^[a-z0-9-]{1,40}$`)
+
+// mapLoot is one map's loot spots (ticket 08). Anything that isn't a map the data knows is 404.
+func (server *Server) mapLoot(writer http.ResponseWriter, request *http.Request) {
+	mapKey := request.PathValue("map")
+	if !mapKeyPattern.MatchString(mapKey) {
+		http.Error(writer, "Not found", http.StatusNotFound)
+		return
+	}
+	encoded, isKnownMap := server.backend.LootJSON(mapKey)
+	if !isKnownMap {
+		http.Error(writer, "Not found", http.StatusNotFound)
+		return
+	}
+	writeRawJSON(writer, http.StatusOK, encoded)
 }
 
 func (server *Server) status(writer http.ResponseWriter, _ *http.Request) {

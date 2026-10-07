@@ -24,6 +24,7 @@
  * @property {SVGGElement} drawings
  * @property {SVGGElement} extracts
  * @property {SVGGElement} closestExtract
+ * @property {SVGGElement} loot
  * @property {SVGGElement} friendTasks
  * @property {SVGGElement} taskMarkers
  * @property {SVGGElement} player
@@ -94,6 +95,7 @@
  * @property {number} [pointersDown] fingers or mouse buttons down on the map
  * @property {(() => void) | null} [afterGesture]
  * @property {Record<string, MarkerItem>} [markerItemByKey]
+ * @property {import("../features/loot/map-layer.js").LootOnMap} [loot] the loot spots drawn (features/loot)
  * @property {StrokeInProgress | null} strokeInProgress
  */
 
@@ -133,4 +135,14 @@ export const app = {
   modePrompt: null,
   /** @type {string | null} the game mode you said "Not now" to */
   modeDismissed: null,
+  /**
+   * Loot spots per map, loaded from /api/loot/<map> the first time they're needed (features/loot).
+   * Each remembers the game data it belongs to; new game data means loading again.
+   * @type {Record<string, import("../features/loot/loot-data.js").LoadedLoot>}
+   */
+  lootByMap: {},
+  /** Whether the panel's Loot section is open (features/loot). Closed when the page loads. */
+  lootSectionOpen: false,
+  /** True once item icons (ticket 07's /icons/ route) turned out to be missing: draw signs instead. */
+  lootIconsMissing: false,
 };

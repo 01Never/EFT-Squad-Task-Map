@@ -220,6 +220,7 @@ export {};
  *   yours: `true` for a click, `{ auto: true, note }` when read from your screenshot (ticket 06)
  * @property {boolean} labels place names shown
  * @property {boolean} drawOn drawings shown
+ * @property {Record<string, true>} [loot] loot chips that are on (features/loot, ticket 08); absent = none
  */
 
 /**

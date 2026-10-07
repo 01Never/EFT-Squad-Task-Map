@@ -5,6 +5,7 @@
 import { app } from "../app/state.js";
 import { placeSelectionFlash } from "./selection-flash.js";
 import { placeFindMeOverlays } from "../features/find-me/map-layer.js";
+import { redrawLootWhenViewSettles } from "../features/loot/map-layer.js";
 
 /** @import { ViewBox } from "../app/state.js" */
 
@@ -42,7 +43,8 @@ export function applyViewSoon() {
 /**
  * Show the current view: set the viewBox, keep every "sc" group at its screen size (its
  * data-x/y position, data-ox/oy offset in pixels, data-s scale, data-r rotation), and move the
- * HTML overlays (selection flash, find-me pulse and chip) to their spots.
+ * HTML overlays (selection flash, find-me pulse and chip) to their spots. Loot spots are redrawn
+ * for the new view once it stops moving (features/loot).
  */
 export function applyView() {
   const { svg, viewBox } = app.mapView;
@@ -52,6 +54,7 @@ export function applyView() {
   if (isFinite(scale) && scale > 0) app.mapView.svgUnitsPerPixel = scale;
   placeSelectionFlash();
   placeFindMeOverlays();
+  redrawLootWhenViewSettles();
 }
 
 /**
@@ -59,7 +62,7 @@ export function applyView() {
  * @param {Element} group
  * @param {number} scale SVG units per pixel
  */
-function screenSizeTransform(group, scale) {
+export function screenSizeTransform(group, scale) {
   const data = /** @type {SVGGElement} */ (group).dataset;
   const x = +data.x + (+data.ox || 0) * scale;
   const y = +data.y + (+data.oy || 0) * scale;
