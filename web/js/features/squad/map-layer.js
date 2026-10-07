@@ -9,7 +9,8 @@ import { createSvgElement } from "../../app/dom.js";
 import { applyView } from "../../map/view.js";
 import { spotsOfPart } from "../tasks/map-layer.js";
 import { friendsShowingDrawings, friendsShowingTasks } from "./friends.js";
-import { safeFriendColor, friendsOwnTasksOnMap, openPartsOnMap } from "./rules.js";
+import { safeFriendColor, friendsOwnTasksOnMap, openPartsOnMap, ownValue } from "./rules.js";
+import { warnOnce } from "./safe.js";
 
 /** @import { SquadFriend, Stroke } from "../../app/types.js" */
 
@@ -27,7 +28,7 @@ export function renderFriendDrawings() {
   const layer = app.mapView.layers.friendDrawings;
   layer.innerHTML = "";
   for (const friend of friendsShowingDrawings()) {
-    drawFriendStrokes(layer, friend);
+    drawFriendStrokesSafely(layer, friend);
   }
 }
 
@@ -44,8 +45,26 @@ export function renderFriendDrawingsOf(playerId) {
     if (oldGroup) oldGroup.remove();
     return;
   }
-  const newGroup = drawFriendStrokes(layer, friend);
-  if (oldGroup) oldGroup.replaceWith(newGroup);
+  const newGroup = drawFriendStrokesSafely(layer, friend);
+  if (oldGroup) {
+    if (newGroup) oldGroup.replaceWith(newGroup);
+    else oldGroup.remove();
+  }
+}
+
+/**
+ * drawFriendStrokes, but a friend whose data breaks it is skipped (and noted once in the console).
+ * @param {SVGGElement} layer
+ * @param {SquadFriend} friend
+ * @returns {SVGGElement | null}
+ */
+function drawFriendStrokesSafely(layer, friend) {
+  try {
+    return drawFriendStrokes(layer, friend);
+  } catch (error) {
+    warnOnce("drawings", error);
+    return null;
+  }
 }
 
 /**
@@ -59,7 +78,7 @@ function drawFriendStrokes(layer, friend) {
   const mapView = app.mapView;
   const group = createSvgElement("g", { "data-friend": friend.playerId, "pointer-events": "none" }, layer);
   const color = safeFriendColor(friend.color);
-  const strokes = friend.share && friend.share.draw && friend.share.draw[mapView.key];
+  const strokes = ownValue(friend.share && friend.share.draw, mapView.key);
   if (!Array.isArray(strokes)) return group;
   for (const stroke of strokes) {
     const points = svgPointsOfStroke(stroke);
@@ -108,7 +127,11 @@ export function renderFriendTaskMarkers() {
   layer.innerHTML = "";
   const friends = friendsShowingTasks();
   friends.forEach((friend, friendIndex) => {
-    drawFriendTaskMarkers(layer, friend, friendIndex, friends.length);
+    try {
+      drawFriendTaskMarkers(layer, friend, friendIndex, friends.length);
+    } catch (error) {
+      warnOnce("task markers", error);
+    }
   });
 }
 

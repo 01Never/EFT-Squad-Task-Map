@@ -13,6 +13,7 @@ import { renderMapPage } from "../../map/map-page.js";
 import { partsOnMap } from "../tasks/task-list.js";
 import { isInSquad, allFriends, friendsShowingTasks, friendsAlsoDoingTask } from "./friends.js";
 import { renderFriendDrawingsOf } from "./map-layer.js";
+import { warnOnce } from "./safe.js";
 import {
   safeFriendColor,
   friendDisplayName,
@@ -23,8 +24,7 @@ import {
   friendsOwnTasksOnMap,
   isSharedOnlyFilterOn,
   setSharedOnlyFilter,
-  alsoText,
-  progressSummaryText,
+  progressPieces,
 } from "./rules.js";
 
 /** @import { SquadFriend } from "../../app/types.js" */
@@ -46,7 +46,7 @@ export function renderSquadSection() {
 function renderSquadSectionContent() {
   const friends = allFriends();
   if (!friends.length) return "";
-  const chips = friends.map(renderFriendChip).join("");
+  const chips = friends.map((friend) => skipOnError("chip", () => renderFriendChip(friend))).join("");
   return `<div class="sec squad"><h4>Squad</h4><div class="squad-chips">${chips}</div>
     <div class="tools">${renderSharedOnlyChip()}</div></div>`;
 }
@@ -60,6 +60,28 @@ export function renderSquadChipsInPlace() {
   if (section) section.innerHTML = renderSquadSectionContent();
 }
 
+/**
+ * Run one friend's rendering; a friend whose data breaks it is skipped ("") and noted once.
+ * @param {string} what
+ * @param {() => string} render
+ */
+function skipOnError(what, render) {
+  try {
+    return render();
+  } catch (error) {
+    warnOnce(what, error);
+    return "";
+  }
+}
+
+/**
+ * A friend's name as safe HTML, isolated so its text direction can't leak into the text around it.
+ * @param {SquadFriend} friend
+ */
+function nameHtml(friend) {
+  return `<bdi>${escapeHtml(friendDisplayName(friend.name))}</bdi>`;
+}
+
 /** @param {SquadFriend} friend */
 function renderFriendChip(friend) {
   const prefs = friendPrefsOf(app.saved, friend.playerId);
@@ -69,7 +91,7 @@ function renderFriendChip(friend) {
   const tasksTitle = isSharingTasks ? `Show ${name}'s tasks` : `${name} isn't sharing tasks`;
   return `<div class="squad-chip${friend.online ? " online" : ""}" data-friend="${id}" style="--friend:${safeFriendColor(friend.color)}">
     <span class="squad-dot"></span>
-    <span class="squad-who"><b class="squad-name">${name}</b><span class="squad-state">${escapeHtml(friendStatusText(friend, Date.now()))}</span></span>
+    <span class="squad-who"><b class="squad-name"><bdi>${name}</bdi></b><span class="squad-state">${escapeHtml(friendStatusText(friend, Date.now()))}</span></span>
     <button class="squad-toggle" data-squad-drawings="${id}" aria-pressed="${prefs.drawings}" title="Show ${name}'s drawings">✎ Draw</button>
     <button class="squad-toggle${isSharingTasks ? "" : " dim"}" data-squad-tasks="${id}" aria-pressed="${prefs.tasks}" title="${tasksTitle}">☰ Tasks</button>
   </div>`;
@@ -133,8 +155,18 @@ export const SQUAD_SECTION_ACTIONS = {
  * @param {string} taskId
  */
 export function renderAlsoOnRow(taskId) {
-  const text = alsoText(friendsAlsoDoingTask(taskId));
-  return text ? `<span class="also">${escapeHtml(text)}</span>` : "";
+  return skipOnError("also line", () => {
+    const friends = friendsAlsoDoingTask(taskId);
+    return friends.length ? `<span class="also">${alsoHtml(friends)}</span>` : "";
+  });
+}
+
+/**
+ * "Also: Mike, Sam" as HTML, each name isolated.
+ * @param {SquadFriend[]} friends
+ */
+function alsoHtml(friends) {
+  return "Also: " + friends.map(nameHtml).join(", ");
 }
 
 /**
@@ -144,11 +176,14 @@ export function renderAlsoOnRow(taskId) {
  * @param {Part} part
  */
 export function renderSquadLinesForPopup(task, part) {
-  const friends = friendsAlsoDoingTask(task.id);
-  if (!friends.length) return "";
-  const also = escapeHtml(alsoText(friends));
-  const progress = escapeHtml(progressSummaryText(part, task.id, friends));
-  return `<div class="m squad-also">${also}</div><div class="m squad-progress">${progress}</div>`;
+  return skipOnError("popup lines", () => {
+    const friends = friendsAlsoDoingTask(task.id);
+    if (!friends.length) return "";
+    const progress = progressPieces(part, task.id, friends)
+      .map((piece) => `<bdi>${escapeHtml(piece.name)}</bdi> ${escapeHtml(piece.text)}`)
+      .join(" · ");
+    return `<div class="m squad-also">${alsoHtml(friends)}</div><div class="m squad-progress">${progress}</div>`;
+  });
 }
 
 // ---------------------------------------------------------------- the "Friends' tasks" block
@@ -159,7 +194,9 @@ export function renderSquadLinesForPopup(task, part) {
  * count for your readiness or Bring list.
  */
 export function renderFriendsTasksSection() {
-  const groups = friendsShowingTasks().map(renderFriendTasksGroup).filter(Boolean);
+  const groups = friendsShowingTasks()
+    .map((friend) => skipOnError("tasks block", () => renderFriendTasksGroup(friend)))
+    .filter(Boolean);
   if (!groups.length) return "";
   return `<div class="sec squad-tasks"><h4>Friends' tasks</h4>${groups.join("")}</div>`;
 }
@@ -174,7 +211,7 @@ function renderFriendTasksGroup(friend) {
   const name = escapeHtml(friendDisplayName(friend.name));
   const rows = theirTasks.map(({ task, percent }) => renderFriendTaskRow(task, percent)).join("");
   return `<div class="squad-group" data-friend="${escapeHtml(friend.playerId)}" style="--friend:${safeFriendColor(friend.color)}">
-    <div class="squad-grouphead"><span class="squad-dot"></span><b>${name}</b><small>${theirTasks.length} here</small></div>${rows}</div>`;
+    <div class="squad-grouphead"><span class="squad-dot"></span><b><bdi>${name}</bdi></b><small>${theirTasks.length} here</small></div>${rows}</div>`;
 }
 
 /**
