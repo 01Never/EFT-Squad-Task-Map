@@ -1,0 +1,78 @@
+# Every check, on Windows (the owner's platform: Edge, the exe swap, registry and Documents
+# lookups) and on Linux. Runs on every push and pull request; nothing is published from here.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install page test tools
+        run: npm ci
+
+      - name: Go formatting
+        if: runner.os == 'Linux'
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+
+      - name: Go vet
+        run: go vet ./...
+
+      - name: Go tests
+        run: go test ./...
+
+      - name: Windows exe builds
+        run: go build -trimpath -ldflags "-s -w" -o dist/SquadTaskMap.exe .
+        env:
+          GOOS: windows
+          GOARCH: amd64
+
+      - name: Page tests
+        run: npm test
+
+      - name: Page type check
+        run: npm run typecheck
+
+      - name: Browser suite (Edge)
+        if: runner.os == 'Windows'
+        run: npm run test:browser
+        env:
+          STM_E2E_KEEP: "1" # keep each scenario's app output for the upload below
+
+      - name: Browser suite (Chrome)
+        if: runner.os == 'Linux'
+        run: npm run test:browser
+        env:
+          STM_E2E_EDGE: /usr/bin/google-chrome
+          STM_E2E_KEEP: "1"
+
+      - name: Keep the browser suite's output on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-suite-${{ matrix.os }}
+          path: ${{ runner.temp }}/stm-e2e-*
+          if-no-files-found: ignore
+          retention-days: 7
