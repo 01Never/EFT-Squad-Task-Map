@@ -11,10 +11,13 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
+	"time"
 
 	"tailscale.com/envknob"
 	"tailscale.com/ipn"
@@ -47,9 +50,10 @@ type TsnetTransport struct {
 	server *tsnet.Server
 	client *http.Client
 
-	mutex     sync.Mutex
-	isStarted bool // tsnet was started, so Logout and Close have something to do
-	isClosed  bool
+	mutex           sync.Mutex
+	isStarted       bool // tsnet was started, so Logout and Close have something to do
+	isClosed        bool
+	loggedContested map[string]bool // player ids already logged as claimed by two machines
 }
 
 // NewTsnetTransport prepares a node; nothing starts until Up.
@@ -57,9 +61,12 @@ func NewTsnetTransport(config TsnetConfig) *TsnetTransport {
 	// Owner's lightness and privacy rule: no log uploads to Tailscale (tsnet would send its debug
 	// log to log.tailscale.com otherwise). Its log still goes to files in the state folder.
 	envknob.SetNoLogsNoSupport()
-	// tsnet asks for a "logs folder" (on Windows %LocalAppData%\Tailscale, on Linux it creates
-	// /var/lib/tailscale). Point it at our own state folder so nothing is made outside the app's
-	// files. (The folder exists by then: tsnet creates it first.)
+	// tsnet's own log goes to the state folder (tailscaled.log1.txt, tailscaled.log2.txt and
+	// tailscaled.log.conf, next to tailscaled.state). Separately, its backend asks logpolicy for a
+	// "logs folder" for socket statistics: on Windows that's only a path (%LocalAppData%\Tailscale,
+	// nothing is written with the standard Go toolchain), but on Linux it creates
+	// /var/lib/tailscale (checked: without this line the tests made it; with it, not). Point it at
+	// our state folder so nothing is made outside the app's files. (tsnet creates the folder first.)
 	_ = os.Setenv("TS_LOGS_DIR", config.StateDir)
 
 	server := &tsnet.Server{
@@ -101,9 +108,26 @@ func (transport *TsnetTransport) Up(ctx context.Context, isJoining bool) error {
 	transport.server.AuthKey = "" // used once; the node key in the state folder is enough from now on
 	transport.config.AuthKey = ""
 	if err != nil {
-		return fmt.Errorf("joining the squad network: %w", err)
+		return fmt.Errorf("joining the squad network: %s", transport.whyJoinFailed(err))
 	}
 	return nil
+}
+
+// whyJoinFailed: when joining just times out, Tailscale's own reason (e.g. "invalid authkey",
+// "not connected to the coordination server") is in its health messages; say that instead of
+// "context deadline exceeded".
+func (transport *TsnetTransport) whyJoinFailed(upError error) string {
+	localClient, err := transport.server.LocalClient()
+	if err != nil {
+		return upError.Error()
+	}
+	statusContext, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	status, err := localClient.StatusWithoutPeers(statusContext)
+	if err != nil || len(status.Health) == 0 {
+		return upError.Error()
+	}
+	return strings.Join(status.Health, "; ")
 }
 
 // Listen opens the peer API on the tailnet only, at :7777.
@@ -111,18 +135,34 @@ func (transport *TsnetTransport) Listen() (net.Listener, error) {
 	return transport.server.Listen("tcp", ":"+strconv.Itoa(PeerAPIPort))
 }
 
-// IsCallerAllowed asks the tailnet who is calling: only nodes tagged tag:stm.
-func (transport *TsnetTransport) IsCallerAllowed(ctx context.Context, remoteAddr string) bool {
+// IdentifyCaller asks the tailnet who is calling: only nodes tagged tag:stm. The key is the
+// machine's stable node id, so one machine is one caller whatever ports it uses.
+func (transport *TsnetTransport) IdentifyCaller(ctx context.Context, remoteAddr string) (string, bool) {
 	localClient, err := transport.server.LocalClient()
 	if err != nil {
-		return false
+		return "", false
 	}
 	who, err := localClient.WhoIs(ctx, remoteAddr)
 	if err != nil || who == nil || who.Node == nil {
-		return false
+		return "", false
 	}
-	return HasSquadTag(who.Node.Tags)
+	return "node:" + string(who.Node.StableID), HasSquadTag(who.Node.Tags)
 }
+
+// OwnAddresses are this node's tailnet addresses on the peer API port.
+func (transport *TsnetTransport) OwnAddresses() []netip.AddrPort {
+	ipv4, ipv6 := transport.server.TailscaleIPs()
+	return []netip.AddrPort{
+		netip.AddrPortFrom(ipv4, PeerAPIPort),
+		netip.AddrPortFrom(ipv6, PeerAPIPort),
+	}
+}
+
+// tailnetStreamsPerCaller: one friend's copy needs one stream; two allow a reconnect overlapping.
+const tailnetStreamsPerCaller = 2
+
+// StreamsPerCaller is 2 on the tailnet (one machine is one friend).
+func (transport *TsnetTransport) StreamsPerCaller() int { return tailnetStreamsPerCaller }
 
 // Client reaches friends through the tailnet.
 func (transport *TsnetTransport) Client() *http.Client { return transport.client }
@@ -207,7 +247,27 @@ func (transport *TsnetTransport) reportPeers(ctx context.Context, onPeers PeersF
 	if err != nil {
 		return
 	}
-	onPeers(SquadPeers(tailnetPeersFromStatus(status), transport.config.PlayerID))
+	found, contested := SquadPeers(tailnetPeersFromStatus(status), transport.config.PlayerID)
+	transport.logContestedOnce(contested)
+	onPeers(found)
+}
+
+// logContestedOnce writes one console line per player id that two machines claim (neither is
+// trusted until the owner deletes one in the admin console).
+func (transport *TsnetTransport) logContestedOnce(contested []string) {
+	transport.mutex.Lock()
+	defer transport.mutex.Unlock()
+	for _, playerID := range contested {
+		if transport.loggedContested[playerID] {
+			continue
+		}
+		if transport.loggedContested == nil {
+			transport.loggedContested = map[string]bool{}
+		}
+		transport.loggedContested[playerID] = true
+		log.Printf("squad: two machines on the tailnet claim player %s; ignoring both. "+
+			"Delete the old one in Tailscale's admin console.", playerID)
+	}
 }
 
 func tailnetPeersFromStatus(status *ipnstate.Status) []TailnetPeer {
@@ -218,6 +278,7 @@ func tailnetPeersFromStatus(status *ipnstate.Status) []TailnetPeer {
 			tags = peer.Tags.AsSlice()
 		}
 		peers = append(peers, TailnetPeer{
+			NodeID:    string(peer.ID),
 			HostName:  peer.HostName,
 			DNSName:   peer.DNSName,
 			Tags:      tags,

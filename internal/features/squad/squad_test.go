@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -175,10 +176,10 @@ func TestThreeCopiesShareOverTheDevTransport(t *testing.T) {
 		if status := alice.squad.View().Status; status.Text != "Connected · 1 of 2 friends online" {
 			t.Errorf("status %q", status.Text)
 		}
-		_, cachedFriends := readCache(filepath.Join(dirs[0], "squad-task-map-squad.json"))
-		if cachedFriends[carolSettings.PlayerID].LastSeen == 0 {
-			t.Errorf("Carol isn't in Alice's cache file with lastSeen: %+v", cachedFriends)
-		}
+		eventually(t, "Carol is in Alice's cache file with lastSeen (written within a second)", func() bool {
+			_, cachedFriends := readCache(filepath.Join(dirs[0], "squad-task-map-squad.json"))
+			return cachedFriends[carolSettings.PlayerID].LastSeen != 0
+		})
 	})
 
 	t.Run("C comes back and refreshes", func(t *testing.T) {
@@ -246,6 +247,7 @@ func TestMyShareKeepsItsRevAfterARestart(t *testing.T) {
 	first := newTestCopy(t, dir, "", nil, settings)
 	first.squad.SetMyShare(drawingAt(1))
 	first.squad.SetMyShare(drawingAt(2))
+	first.squad.Stop() // the app closing: the waiting cache write is done now
 
 	again := newTestCopy(t, dir, "", nil, settings)
 	if rev := again.squad.View().Me.Rev; rev != 2 {
@@ -344,27 +346,32 @@ func TestLeaveOnlyDeletesAFolderWithTheStateFolderName(t *testing.T) {
 func TestThePeerAPIAnswersOnlyAllowedCallers(t *testing.T) {
 	feed := newShareFeed()
 	feed.publish([]byte(`{"v":1}`))
-	dev := NewDevTransport("127.0.0.1:0", nil)
-	server := newPeerServer(feed, dev.IsCallerAllowed)
+	dev := NewDevTransport("127.0.0.1:7901", nil)
+	server := newPeerServer(feed, dev)
+	const ownHost, local = "127.0.0.1:7901", "127.0.0.1:50000"
 
 	cases := []struct {
 		name       string
 		method     string
 		path       string
+		host       string
 		remoteAddr string
 		header     http.Header
 		wantStatus int
 	}{
-		{"a copy on this PC gets the share", "GET", "/squad/v1/share", "127.0.0.1:50000", nil, http.StatusOK},
-		{"a caller on the LAN is refused", "GET", "/squad/v1/share", "192.168.1.5:50000", nil, http.StatusForbidden},
-		{"a tailnet address is refused by the dev transport", "GET", "/squad/v1/stream", "100.64.0.9:50000", nil, http.StatusForbidden},
-		{"a browser page on this PC is refused", "GET", "/squad/v1/share", "127.0.0.1:50000", http.Header{"Origin": {"http://evil.example"}}, http.StatusForbidden},
-		{"nothing can be written", "PUT", "/squad/v1/share", "127.0.0.1:50000", nil, http.StatusNotFound},
-		{"the page's API isn't here", "GET", "/api/state", "127.0.0.1:50000", nil, http.StatusNotFound},
+		{"a copy on this PC gets the share", "GET", "/squad/v1/share", ownHost, local, nil, http.StatusOK},
+		{"a caller on the LAN is refused", "GET", "/squad/v1/share", ownHost, "192.168.1.5:50000", nil, http.StatusForbidden},
+		{"a tailnet address is refused by the dev transport", "GET", "/squad/v1/stream", ownHost, "100.64.0.9:50000", nil, http.StatusForbidden},
+		{"a browser page on this PC is refused", "GET", "/squad/v1/share", ownHost, local, http.Header{"Origin": {"http://evil.example"}}, http.StatusForbidden},
+		{"a same-origin fetch from a rebinding domain (no browser headers) is refused", "GET", "/squad/v1/share", "rebind.example:7901", local, nil, http.StatusMisdirectedRequest},
+		{"localhost by name is refused", "GET", "/squad/v1/share", "localhost:7901", local, nil, http.StatusMisdirectedRequest},
+		{"nothing can be written", "PUT", "/squad/v1/share", ownHost, local, nil, http.StatusNotFound},
+		{"the page's API isn't here", "GET", "/api/state", ownHost, local, nil, http.StatusNotFound},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			request := httptest.NewRequest(tc.method, tc.path, nil)
+			request.Host = tc.host
 			request.RemoteAddr = tc.remoteAddr
 			for key, values := range tc.header {
 				request.Header[key] = values
@@ -379,11 +386,140 @@ func TestThePeerAPIAnswersOnlyAllowedCallers(t *testing.T) {
 }
 
 func TestAShareIsNotServedBeforeThePageSentOne(t *testing.T) {
-	server := newPeerServer(newShareFeed(), func(context.Context, string) bool { return true })
+	server := newPeerServer(newShareFeed(), NewDevTransport("127.0.0.1:7901", nil))
+	request := httptest.NewRequest("GET", "/squad/v1/share", nil)
+	request.Host, request.RemoteAddr = "127.0.0.1:7901", "127.0.0.1:50000"
 	recorder := httptest.NewRecorder()
-	server.Handler.ServeHTTP(recorder, httptest.NewRequest("GET", "/squad/v1/share", nil))
+	server.Handler.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusNotFound {
 		t.Errorf("status %d, want 404", recorder.Code)
+	}
+}
+
+func TestOneCallerCantHoldEveryStream(t *testing.T) {
+	feed := newShareFeed()
+	steps := []struct {
+		name   string
+		caller string
+		wantOK bool
+	}{
+		{"a friend opens a stream", "node:A", true},
+		{"and a second one (a reconnect overlapping)", "node:A", true},
+		{"but not a third", "node:A", false},
+		{"another friend still gets one", "node:B", true},
+	}
+	for _, step := range steps {
+		if _, ok := feed.subscribe(step.caller, tailnetStreamsPerCaller); ok != step.wantOK {
+			t.Errorf("%s: ok = %v, want %v", step.name, ok, step.wantOK)
+		}
+	}
+}
+
+func TestThePeerAPIRefusesAStreamOverTheCallersCap(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dev := NewDevTransport(listener.Addr().String(), nil)
+	feed := newShareFeed()
+	server := newPeerServer(feed, dev)
+	go server.Serve(listener)
+	t.Cleanup(func() { server.Close() })
+
+	var statuses []int
+	for range devStreamsPerCaller + 1 {
+		response, err := http.Get("http://" + listener.Addr().String() + "/squad/v1/stream")
+		if err != nil {
+			t.Fatal(err)
+		}
+		statuses = append(statuses, response.StatusCode)
+		t.Cleanup(func() { response.Body.Close() })
+	}
+	last := statuses[len(statuses)-1]
+	if statuses[0] != http.StatusOK || last != http.StatusServiceUnavailable {
+		t.Errorf("statuses %v: want %d streams, then 503", statuses, devStreamsPerCaller)
+	}
+}
+
+func TestThePeerServerDropsIdleAndStuckConnections(t *testing.T) {
+	server := newPeerServer(newShareFeed(), NewDevTransport("127.0.0.1:7901", nil))
+	if server.IdleTimeout != peerIdleTimeout || server.ReadHeaderTimeout != peerHeaderTimeout {
+		t.Errorf("idle %v, header %v; want %v and %v", server.IdleTimeout, server.ReadHeaderTimeout, peerIdleTimeout, peerHeaderTimeout)
+	}
+	if peerIdleTimeout > time.Minute || peerWriteTimeout > 10*time.Second {
+		t.Errorf("idle %v / write %v are longer than QA's limits", peerIdleTimeout, peerWriteTimeout)
+	}
+}
+
+// floodingFriend serves a stream that sends `count` shares (rev 1..count) as fast as it can.
+func floodingFriend(t *testing.T, count int) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/squad/v1/share" {
+			http.Error(writer, "Nothing shared yet", http.StatusNotFound)
+			return
+		}
+		writer.Header().Set("Content-Type", "text/event-stream")
+		for rev := 1; rev <= count; rev++ {
+			writer.Write(shareEvent(validShareJSON(map[string]any{"rev": rev, "updatedAt": rev})))
+		}
+		writer.(http.Flusher).Flush()
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func TestAFriendSendingABurstIsTakenAboutOnceASecondAndTheLastShareWins(t *testing.T) {
+	friend := floodingFriend(t, 1000)
+	var mutex sync.Mutex
+	var accepted []int64
+	links := newFriendLinks(newPeerHTTPClient(nil), friendEvents{
+		onShare: func(_ PeerAddress, share Share, _ bool) {
+			mutex.Lock()
+			accepted = append(accepted, share.Rev)
+			mutex.Unlock()
+		},
+		onStreamClosed: func(PeerAddress) {},
+	}, RetryDelay)
+
+	links.connectOnce(context.Background(), PeerAddress{Key: "flood", BaseURL: friend.URL})
+
+	if len(accepted) == 0 || len(accepted) > 3 || accepted[len(accepted)-1] != 1000 {
+		t.Errorf("accepted revs %v from 1000 sent: want a handful, the last one 1000", accepted)
+	}
+}
+
+func TestABurstOfFriendSharesMakesAHandfulOfPageEventsAndFileWrites(t *testing.T) {
+	var pageEvents atomic.Int64
+	dir := t.TempDir()
+	squad := New(Config{
+		CacheFile: filepath.Join(dir, "squad-task-map-squad.json"),
+		Settings:  Settings{PlayerID: mike.ID, Name: "Mike", Color: "#4dabf7"},
+		OnChange:  func() { pageEvents.Add(1) },
+	})
+	t.Cleanup(squad.Stop)
+	time.Sleep(50 * time.Millisecond) // let start-up's own write and event happen
+	eventsBefore, writesBefore := pageEvents.Load(), squad.writeCount.Load()
+
+	for rev := 1; rev <= 1000; rev++ {
+		share, err := DecodeShare(validShareJSON(map[string]any{"rev": rev, "updatedAt": rev}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		squad.onFriendShare(PeerAddress{Key: "flood"}, share, true)
+	}
+	time.Sleep(ChangeInterval + 500*time.Millisecond)
+
+	events := pageEvents.Load() - eventsBefore
+	writes := squad.writeCount.Load() - writesBefore
+	if events < 1 || events > 3 || writes < 1 || writes > 3 {
+		t.Errorf("1000 shares made %d page events and %d file writes; want 1 to 3 of each", events, writes)
+	}
+	friend, _ := (&testCopy{squad: squad}).friend(sam.ID)
+	_, cached := readCache(filepath.Join(dir, "squad-task-map-squad.json"))
+	if friend.Share.Rev != 1000 || cached[sam.ID].Share.Rev != 1000 {
+		t.Errorf("the page has rev %d and the file rev %d; the last share (1000) must win",
+			friend.Share.Rev, cached[sam.ID].Share.Rev)
 	}
 }
 
