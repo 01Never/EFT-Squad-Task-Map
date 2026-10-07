@@ -50,7 +50,10 @@ const UNKNOWN_FRIEND_NAME = "Friend";
 const NO_NAME_TEXT = "(no name)";
 // Direction overrides and invisible characters: one name must not be able to reorder the text
 // around it, or look empty while not being empty.
-const BIDI_AND_INVISIBLE = /[\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g;
+// The zero-width joiner and non-joiner (U+200C, U+200D) stay: emoji sequences and some names need
+// them. A name of only those (and spaces) is shown as "(no name)".
+const BIDI_AND_INVISIBLE = /[\u200b\u200e\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g;
+const ONLY_JOINERS_AND_SPACES = /^[\u200c\u200d\s]*$/;
 
 /**
  * Own-property read: a friend can send any key, including "toString" or "__proto__", and those
@@ -84,7 +87,7 @@ export function friendDisplayName(name) {
   if (typeof name !== "string") return UNKNOWN_FRIEND_NAME;
   const cleaned = name.replace(/[\u0000-\u001f\u007f-\u009f]/g, "").replace(BIDI_AND_INVISIBLE, "").trim();
   const cut = Array.from(cleaned).slice(0, MAX_NAME_LENGTH).join("").trim();
-  return cut || NO_NAME_TEXT;
+  return ONLY_JOINERS_AND_SPACES.test(cut) ? NO_NAME_TEXT : cut;
 }
 
 const SECOND_MS = 1000;

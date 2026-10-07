@@ -362,9 +362,13 @@ func IsValidPlayerID(id string) bool { return playerIDPattern.MatchString(id) }
 func IsValidColor(color string) bool { return colorPattern.MatchString(color) }
 
 // isInvisibleFormatting: zero-width characters and bidi controls, which can flip or hide text.
+// The zero-width joiner and non-joiner (U+200C, U+200D) are allowed: emoji sequences such as
+// 👨‍👩‍👧 and some Persian and Indic names need them. A name made only of them is still blank
+// (hasVisibleCharacter).
 func isInvisibleFormatting(character rune) bool {
 	switch {
-	case character >= 0x200B && character <= 0x200F, // zero-width space/joiners, LRM, RLM
+	case character == 0x200B, // zero-width space
+		character == 0x200E || character == 0x200F, // LRM, RLM
 		character >= 0x202A && character <= 0x202E, // embeddings and overrides
 		character >= 0x2060 && character <= 0x2069, // word joiner, isolates
 		character == 0xFEFF:                        // byte order mark / zero-width no-break space
@@ -374,7 +378,7 @@ func isInvisibleFormatting(character rune) bool {
 }
 
 // IsValidName: 1 to 32 characters (not bytes), no control characters, no bidi controls or
-// zero-width characters, no spaces at either end, not blank.
+// zero-width spaces, no spaces at either end, and at least one visible character.
 func IsValidName(name string) bool {
 	if !utf8.ValidString(name) || name != strings.TrimSpace(name) {
 		return false
@@ -388,7 +392,17 @@ func IsValidName(name string) bool {
 			return false
 		}
 	}
-	return true
+	return hasVisibleCharacter(name)
+}
+
+// hasVisibleCharacter: something other than spaces and zero-width joiners.
+func hasVisibleCharacter(name string) bool {
+	for _, character := range name {
+		if !unicode.IsSpace(character) && character != 0x200C && character != 0x200D {
+			return true
+		}
+	}
+	return false
 }
 
 // NormalizeName cleans the name the page sends: invisible formatting characters are removed,

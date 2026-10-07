@@ -30,11 +30,28 @@ type squadRig struct {
 
 func newSquadRig(t *testing.T) *squadRig {
 	t.Helper()
+	return buildSquadRig(t, httptest.NewUnstartedServer(nil))
+}
+
+// newSquadRigWithDevListener is a rig whose squad runs the dev transport on its own port. The
+// page API's port is taken first, so the squad port picked after it can never be the same one
+// (picking the squad port first let the page API grab it now and then: a flaky test).
+func newSquadRigWithDevListener(t *testing.T) (*squadRig, string) {
+	t.Helper()
+	api := httptest.NewUnstartedServer(nil) // holds its port from here on
+	listen := freeLoopbackAddress(t)
+	t.Setenv("STM_SQUAD_DEV_LISTEN", listen)
+	return buildSquadRig(t, api), listen
+}
+
+func buildSquadRig(t *testing.T, api *httptest.Server) *squadRig {
+	t.Helper()
 	files := storage.FilesIn(t.TempDir())
 	notNeeded := func() (gamedata.GameData, error) { return gamedata.GameData{}, errors.New("not needed in this test") }
 	app := newApp("2.6.1", "", files, notNeeded)
 	t.Cleanup(app.squad.Stop)
-	api := httptest.NewServer(httpapi.NewServer(app, nil))
+	api.Config.Handler = httpapi.NewServer(app, nil)
+	api.Start()
 	t.Cleanup(api.Close)
 	return &squadRig{t: t, app: app, files: files, api: api}
 }
@@ -94,9 +111,7 @@ func TestNeverJoinedStartsNothing(t *testing.T) {
 }
 
 func TestTheServerDropsTasksWhenSharingIsOffEvenIfThePageSendsThem(t *testing.T) {
-	listen := freeLoopbackAddress(t)
-	t.Setenv("STM_SQUAD_DEV_LISTEN", listen)
-	rig := newSquadRig(t)
+	rig, listen := newSquadRigWithDevListener(t)
 
 	status, answer := rig.send("PUT", "/api/squad/share", shareWithTasks)
 	if status != http.StatusOK || answer["tasksShared"] != false || answer["rev"] != 1.0 {
@@ -168,9 +183,7 @@ func TestTheShareRouteRefusesWhatItCantTake(t *testing.T) {
 }
 
 func TestJoiningAndLeavingThroughTheRoutes(t *testing.T) {
-	listen := freeLoopbackAddress(t)
-	t.Setenv("STM_SQUAD_DEV_LISTEN", listen)
-	rig := newSquadRig(t)
+	rig, listen := newSquadRigWithDevListener(t)
 
 	steps := []struct {
 		name       string

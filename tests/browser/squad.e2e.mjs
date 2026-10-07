@@ -285,18 +285,19 @@ class FakeFriend {
   }
 }
 
-test("a 32-wide name keeps the toggles in the panel, and task ids like 'toString' change nothing", { timeout: 180_000 }, async () => {
-  const wide = new FakeFriend("a1a1a1a1a1a1a1a1", "W".repeat(32), {
+test("a 32-wide name keeps the toggles and rows in the panel; friends with 'toString' task ids or a direction override are refused", { timeout: 180_000 }, async () => {
+  // Real game ids are 24 hex characters; the server refuses a share with anything else (QA round 3).
+  const wide = new FakeFriend("a1a1a1a1a1a1a1a1", "W".repeat(32), { [glory.id]: { ticks: {}, pct: 0 } });
+  const hostileIds = new FakeFriend("c3c3c3c3c3c3c3c3", "Ids", {
     toString: { ticks: { toString: true }, pct: 1 },
     valueOf: { ticks: {}, pct: 1 },
     hasOwnProperty: { ticks: {}, pct: 1 },
-    [glory.id]: { ticks: {}, pct: 0 },
   });
-  const rtl = new FakeFriend("b2b2b2b2b2b2b2b2", "‮evil‬ Mike", null);
-  await wide.start();
-  await rtl.start();
+  const rtl = new FakeFriend("b2b2b2b2b2b2b2b2", "\u202eevil\u202c Mike", null);
+  const fakes = [wide, hostileIds, rtl];
+  for (const fake of fakes) await fake.start();
   const ownPort = await freePort();
-  const victim = new Player("Victim", "#e03131", ownPort, [wide.port, rtl.port], stateWithTasks([revision.name]));
+  const victim = new Player("Victim", "#e03131", ownPort, fakes.map((fake) => fake.port), stateWithTasks([revision.name, glory.name]));
   try {
     await victim.start();
     await victim.openSettings();
@@ -304,7 +305,11 @@ test("a 32-wide name keeps the toggles in the panel, and task ids like 'toString
     await victim.page.click("#sSquadJoin");
     await victim.page.waitForSelector("#sSquadName", { timeout: 30_000 });
     await victim.closeSettings();
-    await eventually(async () => (await victim.page.locator(".squad-chip").count()) === 2, "both fake friends show", 20_000);
+    await eventually(async () => (await victim.page.locator(".squad-chip").count()) === 1, "the wide friend shows", 20_000);
+    // the other two have been fetched by now too (all three are asked at join); give them a moment
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    const shownFriends = (await victim.scenario.api("/api/squad")).friends.map((friend) => friend.playerId);
+    assert.deepEqual(shownFriends, [wide.share.player.id], "the 'toString' and direction-override friends are refused");
 
     const ownTasks = () => victim.page.locator("#panel .cat .task").count();
     const ownMarkers = () => victim.page.locator("svg.map g.mk").count();
@@ -319,18 +324,25 @@ test("a 32-wide name keeps the toggles in the panel, and task ids like 'toString
           return box.width > 0 && box.left >= panel.left && box.right <= panel.right;
         });
       });
-      assert.deepEqual(fits, [true, true, true, true], `${what}: all four toggles are inside the panel`);
+      assert.deepEqual(fits, [true, true], `${what}: both toggles are inside the panel`);
+    };
+    const panelDoesNotOverflow = async (what) => {
+      const [scroll, client] = await victim.page.evaluate(() => [document.querySelector("#panel").scrollWidth, document.querySelector("#panel").clientWidth]);
+      assert.ok(scroll <= client, `${what}: the panel doesn't scroll sideways (${scroll} > ${client})`);
     };
     await togglesInsidePanel("desktop");
-    await victim.shot("chips-long-and-rtl-names");
+    await victim.shot("chips-long-name");
+
+    // the wide friend's tasks on: "Also: WWW…" on the shared row wraps inside the panel
+    await victim.page.click(`[data-squad-tasks="${wide.share.player.id}"]`);
+    await eventually(async () => (await victim.page.locator(".squad-chip").count()) === 1, "chip still there");
+    await panelDoesNotOverflow("desktop, tasks on");
     await victim.page.setViewportSize({ width: 390, height: 800 });
     await togglesInsidePanel("phone");
-    await victim.shot("chips-long-and-rtl-names-phone");
+    await panelDoesNotOverflow("phone, tasks on");
+    await victim.shot("chips-long-name-phone");
     await victim.page.setViewportSize({ width: 1280, height: 800 });
 
-    // switching on the hostile friend's tasks (and a reload with it on) leaves the page whole
-    await victim.page.click(`[data-squad-tasks="${wide.share.player.id}"]`);
-    await eventually(async () => (await victim.page.locator(".squad-chip").count()) === 2, "chips still there");
     assert.equal(await ownTasks(), tasksBefore, "your task list is intact");
     assert.equal(await ownMarkers(), markersBefore, "your markers are intact");
     await victim.page.reload();
@@ -341,7 +353,6 @@ test("a 32-wide name keeps the toggles in the panel, and task ids like 'toString
     victim.scenario.assertNoPageErrors();
   } finally {
     await victim.scenario.stop().catch(() => {});
-    wide.stop();
-    rtl.stop();
+    for (const fake of fakes) fake.stop();
   }
 });

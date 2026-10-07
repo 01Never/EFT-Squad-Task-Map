@@ -20,6 +20,8 @@
 .trow .also{display:block;font-size:13px;color:var(--accent)}
 .pop .squad-also{color:var(--accent);margin:0 0 2px}
 .pop .squad-progress{margin:0 0 6px}
+/* a long name with no break points (32 W) wraps instead of pushing the row or popup wider */
+.trow .also,.pop .squad-also,.pop .squad-progress,.squad-grouphead{overflow-wrap:anywhere;min-width:0}
 
 /* the bottom of the list: tasks friends have and you don't (read-only) */
 .squad-group{margin:0 0 10px}

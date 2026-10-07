@@ -323,6 +323,11 @@ func TestProfileRules(t *testing.T) {
 		{"a blank name is refused", func() bool { _, ok := NormalizeName("   "); return ok }, false},
 		{"a 32-character name with accents is fine", func() bool { _, ok := NormalizeName(strings.Repeat("é", 32)); return ok }, true},
 		{"invisible characters are removed from a name", func() bool { name, ok := NormalizeName("\u202eSa\u200bm\ufeff"); return ok && name == "Sam" }, true},
+		{"zero-width joiners in an emoji stay", func() bool {
+			name, ok := NormalizeName("Sam \U0001F468\u200d\U0001F467")
+			return ok && name == "Sam \U0001F468\u200d\U0001F467"
+		}, true},
+		{"a name of only zero-width joiners is refused", func() bool { _, ok := NormalizeName("\u200d \u200c"); return ok }, false},
 		{"a name of only invisible characters is refused", func() bool { _, ok := NormalizeName("\u200b \u202e\u2060"); return ok }, false},
 		{"a name of 33 characters is refused after cleaning", func() bool { _, ok := NormalizeName(strings.Repeat("x", 32) + "\u200b" + "x"); return ok }, false},
 		{"32 invisible characters around a 32-character name are fine", func() bool { _, ok := NormalizeName(strings.Repeat("\u200b", 40) + strings.Repeat("x", 32)); return ok }, true},
