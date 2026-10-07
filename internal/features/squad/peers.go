@@ -31,6 +31,9 @@ type friendLinks struct {
 	events     friendEvents
 	retryDelay func(failuresInARow int) time.Duration
 
+	// minShareInterval: at most one share a second is taken from each friend (MinShareInterval).
+	minShareInterval time.Duration
+
 	mutex       sync.Mutex
 	running     map[string]*friendLink // by PeerAddress.Key
 	lastProblem map[string]string      // what was last logged per connection ("log once")
@@ -46,11 +49,12 @@ func newFriendLinks(
 	client *http.Client, events friendEvents, retryDelay func(int) time.Duration,
 ) *friendLinks {
 	return &friendLinks{
-		client:      client,
-		events:      events,
-		retryDelay:  retryDelay,
-		running:     map[string]*friendLink{},
-		lastProblem: map[string]string{},
+		client:           client,
+		events:           events,
+		retryDelay:       retryDelay,
+		minShareInterval: MinShareInterval,
+		running:          map[string]*friendLink{},
+		lastProblem:      map[string]string{},
 	}
 }
 
@@ -130,18 +134,121 @@ func (links *friendLinks) connectOnce(ctx context.Context, peer PeerAddress) (re
 		links.logOnce(peer, err.Error())
 		return false
 	}
-	defer response.Body.Close()
 	defer links.events.onStreamClosed(peer)
 
-	err = readShareEvents(response.Body, func(data []byte) {
+	newest := newNewestEvent()
+	readEnded := make(chan error, 1)
+	// Goroutine: reads the friend's stream, keeping only the newest event; started here, ends when
+	// the stream ends or its body is closed just below.
+	paced := &paceReader{ctx: streamContext, reader: response.Body, bytesPerSecond: maxStreamBytesPerSecond}
+	go func() { readEnded <- readShareEvents(paced, newest.put) }()
+
+	receivedAny, readErr, hasReadEnded := links.applyNewest(streamContext, peer, newest, readEnded)
+	response.Body.Close()
+	if !hasReadEnded {
+		<-readEnded
+	}
+	if readErr != nil && ctx.Err() == nil {
+		links.logOnce(peer, "stream: "+readErr.Error())
+	}
+	return receivedAny
+}
+
+// applyNewest takes the newest share from the stream at most once per minShareInterval: shares
+// that arrive meanwhile replace the waiting one, so a friend sending in a loop costs one check a
+// second, and the last one sent always wins. It returns when the stream ends (hasReadEnded) or
+// ctx ends.
+func (links *friendLinks) applyNewest(
+	ctx context.Context, peer PeerAddress, newest *newestEvent, readEnded <-chan error,
+) (receivedAny bool, readErr error, hasReadEnded bool) {
+	var lastApplied time.Time
+	applyWaiting := func() {
+		data := newest.take()
+		if data == nil {
+			return
+		}
 		if links.acceptShare(peer, data, true) {
 			receivedAny = true
 		}
-	})
-	if err != nil && ctx.Err() == nil {
-		links.logOnce(peer, "stream: "+err.Error())
+		lastApplied = time.Now()
 	}
-	return receivedAny
+	for {
+		select {
+		case <-ctx.Done():
+			return receivedAny, nil, false
+		case readErr = <-readEnded:
+			applyWaiting() // the share sent last before the stream ended
+			return receivedAny, readErr, true
+		case <-newest.arrived:
+			wait := links.minShareInterval - time.Since(lastApplied)
+			if wait > 0 && !sleepOrDone(ctx, wait) {
+				return receivedAny, nil, false
+			}
+			applyWaiting()
+		}
+	}
+}
+
+// maxStreamBytesPerSecond: a friend's stream is read at most this fast, one full share a second
+// plus room for the SSE framing (shares are only taken once a second anyway). An honest friend
+// sends about one share a second; a friend sending in a loop is held back by TCP instead of
+// costing CPU here (QA: reading a flood at full speed took about 60% of a core).
+const maxStreamBytesPerSecond = MaxShareBytes + 64<<10
+
+// paceReader reads at most bytesPerSecond, sleeping out the rest of the second once that much
+// was read (a timer only then; ctx ends the wait).
+type paceReader struct {
+	ctx            context.Context
+	reader         io.Reader
+	bytesPerSecond int
+	windowStart    time.Time
+	readInWindow   int
+}
+
+func (pace *paceReader) Read(buffer []byte) (int, error) {
+	if time.Since(pace.windowStart) >= time.Second {
+		pace.windowStart, pace.readInWindow = time.Now(), 0
+	}
+	if pace.readInWindow >= pace.bytesPerSecond {
+		if !sleepOrDone(pace.ctx, time.Second-time.Since(pace.windowStart)) {
+			return 0, pace.ctx.Err()
+		}
+		pace.windowStart, pace.readInWindow = time.Now(), 0
+	}
+	allowed := min(len(buffer), pace.bytesPerSecond-pace.readInWindow)
+	count, err := pace.reader.Read(buffer[:allowed])
+	pace.readInWindow += count
+	return count, err
+}
+
+// newestEvent holds the newest event read from a friend's stream until it is taken.
+type newestEvent struct {
+	mutex   sync.Mutex
+	data    []byte
+	arrived chan struct{} // holds one signal while there is something to take
+}
+
+func newNewestEvent() *newestEvent {
+	return &newestEvent{arrived: make(chan struct{}, 1)}
+}
+
+// put replaces any event still waiting.
+func (slot *newestEvent) put(data []byte) {
+	slot.mutex.Lock()
+	slot.data = data
+	slot.mutex.Unlock()
+	select {
+	case slot.arrived <- struct{}{}:
+	default:
+	}
+}
+
+func (slot *newestEvent) take() []byte {
+	slot.mutex.Lock()
+	defer slot.mutex.Unlock()
+	data := slot.data
+	slot.data = nil
+	return data
 }
 
 // fetchShare: GET /squad/v1/share. "Nothing shared yet" (404) is fine.

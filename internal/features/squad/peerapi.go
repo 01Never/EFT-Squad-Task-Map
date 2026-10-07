@@ -11,6 +11,7 @@ package squad
 import (
 	"context"
 	"net/http"
+	"net/netip"
 	"sync"
 	"time"
 )
@@ -22,17 +23,30 @@ const (
 	maxPeerHeaderBytes = 16 << 10
 	// peerHeaderTimeout: a caller that doesn't finish its request line in time is dropped.
 	peerHeaderTimeout = 10 * time.Second
+	// peerIdleTimeout: a kept-alive connection with no request for this long is closed
+	// (QA: idle connections were otherwise held forever).
+	peerIdleTimeout = 60 * time.Second
+	// peerWriteTimeout: each write to a stream must finish within this, so a caller that stops
+	// reading loses its stream instead of holding it (and a goroutine) forever.
+	peerWriteTimeout = 10 * time.Second
 )
+
+// peerAccess is what the peer API needs from the transport (Transport has all of it).
+type peerAccess interface {
+	IdentifyCaller(ctx context.Context, remoteAddr string) (callerKey string, isAllowed bool)
+	OwnAddresses() []netip.AddrPort
+	StreamsPerCaller() int
+}
 
 // shareFeed holds my latest share, encoded, and wakes friends' streams when it changes.
 type shareFeed struct {
 	mutex       sync.Mutex
-	encoded     []byte // nil until the page has sent a share
-	subscribers map[chan struct{}]bool
+	encoded     []byte                   // nil until the page has sent a share
+	subscribers map[chan struct{}]string // each open stream and the caller holding it
 }
 
 func newShareFeed() *shareFeed {
-	return &shareFeed{subscribers: map[chan struct{}]bool{}}
+	return &shareFeed{subscribers: map[chan struct{}]string{}}
 }
 
 // publish replaces my share and wakes every stream. A stream that hasn't sent the previous one
@@ -55,15 +69,25 @@ func (feed *shareFeed) current() []byte {
 	return feed.encoded
 }
 
-// subscribe adds a stream; ok is false when maxPeerStreams are already open.
-func (feed *shareFeed) subscribe() (chan struct{}, bool) {
+// subscribe adds a stream for a caller; ok is false when maxPeerStreams are open in all, or this
+// caller already holds perCaller of them.
+func (feed *shareFeed) subscribe(callerKey string, perCaller int) (chan struct{}, bool) {
 	feed.mutex.Lock()
 	defer feed.mutex.Unlock()
 	if len(feed.subscribers) >= maxPeerStreams {
 		return nil, false
 	}
+	heldByCaller := 0
+	for _, holder := range feed.subscribers {
+		if holder == callerKey {
+			heldByCaller++
+		}
+	}
+	if heldByCaller >= perCaller {
+		return nil, false
+	}
 	wake := make(chan struct{}, 1)
-	feed.subscribers[wake] = true
+	feed.subscribers[wake] = callerKey
 	return wake, true
 }
 
@@ -73,32 +97,47 @@ func (feed *shareFeed) unsubscribe(wake chan struct{}) {
 	delete(feed.subscribers, wake)
 }
 
-// newPeerServer builds the peer API's HTTP server.
-func newPeerServer(
-	feed *shareFeed, isCallerAllowed func(ctx context.Context, remoteAddr string) bool,
-) *http.Server {
+// callerKeyContext carries the caller's key from the check to the stream handler.
+type callerKeyContext struct{}
+
+// newPeerServer builds the peer API's HTTP server. Every request is checked first: the Host must
+// be one of our own addresses (IsOwnHost: blocks DNS rebinding), no browser headers
+// (IsBrowserRequest), and the caller must be a squad node (or this PC, dev transport).
+func newPeerServer(feed *shareFeed, access peerAccess) *http.Server {
 	routes := http.NewServeMux()
 	routes.HandleFunc("GET /squad/v1/share", func(writer http.ResponseWriter, _ *http.Request) {
 		serveShare(writer, feed)
 	})
 	routes.HandleFunc("GET /squad/v1/stream", func(writer http.ResponseWriter, request *http.Request) {
-		serveShareStream(writer, request, feed)
+		callerKey, _ := request.Context().Value(callerKeyContext{}).(string)
+		serveShareStream(writer, request, feed, callerKey, access.StreamsPerCaller())
 	})
 	routes.HandleFunc("/", func(writer http.ResponseWriter, _ *http.Request) {
 		http.Error(writer, "Not found", http.StatusNotFound)
 	})
 	guarded := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if IsBrowserRequest(request.Header) || !isCallerAllowed(request.Context(), request.RemoteAddr) {
-			refusal := "Only squad members' copies of Squad Task Map can ask this."
+		refusal := "Only squad members' copies of Squad Task Map can ask this."
+		if !IsOwnHost(request.Host, access.OwnAddresses()) {
+			http.Error(writer, refusal, http.StatusMisdirectedRequest)
+			return
+		}
+		if IsBrowserRequest(request.Header) {
+			http.Error(writer, refusal, http.StatusForbidden)
+			return
+		}
+		callerKey, isAllowed := access.IdentifyCaller(request.Context(), request.RemoteAddr)
+		if !isAllowed {
 			http.Error(writer, refusal, http.StatusForbidden)
 			return
 		}
 		request.Body = http.MaxBytesReader(writer, request.Body, 0) // GETs only: no body
-		routes.ServeHTTP(writer, request)
+		withCaller := context.WithValue(request.Context(), callerKeyContext{}, callerKey)
+		routes.ServeHTTP(writer, request.WithContext(withCaller))
 	})
 	return &http.Server{
 		Handler:           guarded,
 		ReadHeaderTimeout: peerHeaderTimeout,
+		IdleTimeout:       peerIdleTimeout,
 		MaxHeaderBytes:    maxPeerHeaderBytes,
 	}
 }
@@ -109,6 +148,7 @@ func serveShare(writer http.ResponseWriter, feed *shareFeed) {
 		http.Error(writer, "Nothing shared yet", http.StatusNotFound)
 		return
 	}
+	_ = http.NewResponseController(writer).SetWriteDeadline(time.Now().Add(peerWriteTimeout))
 	writer.Header().Set("Content-Type", "application/json")
 	writer.Header().Set("Cache-Control", "no-store")
 	writer.Write(encoded)
@@ -116,17 +156,15 @@ func serveShare(writer http.ResponseWriter, feed *shareFeed) {
 
 // serveShareStream keeps one friend's stream open. It sends my share at once (if there is one),
 // then again whenever it changes. Idle in between: no keep-alive timer. A friend that went away
-// is noticed when the tailnet reports it offline, or when a write fails.
+// is noticed when the tailnet reports it offline, or when a write fails or times out.
 //
 // Goroutine note: runs on the HTTP server's goroutine for the request; ends when the friend
-// disconnects or the server is closed (Leave squad, app closing).
-func serveShareStream(writer http.ResponseWriter, request *http.Request, feed *shareFeed) {
-	flusher, canFlush := writer.(http.Flusher)
-	if !canFlush {
-		http.Error(writer, "streaming not supported", http.StatusInternalServerError)
-		return
-	}
-	wake, ok := feed.subscribe()
+// disconnects, a write takes over peerWriteTimeout, or the server is closed (Leave, app closing).
+func serveShareStream(
+	writer http.ResponseWriter, request *http.Request, feed *shareFeed, callerKey string, perCaller int,
+) {
+	controller := http.NewResponseController(writer)
+	wake, ok := feed.subscribe(callerKey, perCaller)
 	if !ok {
 		http.Error(writer, "Too many open streams", http.StatusServiceUnavailable)
 		return
@@ -135,18 +173,24 @@ func serveShareStream(writer http.ResponseWriter, request *http.Request, feed *s
 
 	writer.Header().Set("Content-Type", "text/event-stream")
 	writer.Header().Set("Cache-Control", "no-cache")
-	writer.WriteHeader(http.StatusOK)
-	writer.Write([]byte(": squad\n\n"))
+	pending := []byte(": squad\n\n")
 	var lastSent []byte
 	for {
 		encoded := feed.current()
 		if encoded != nil && string(encoded) != string(lastSent) {
-			if _, err := writer.Write(shareEvent(encoded)); err != nil {
-				return
-			}
+			pending = append(pending, shareEvent(encoded)...)
 			lastSent = encoded
 		}
-		flusher.Flush()
+		if pending != nil {
+			_ = controller.SetWriteDeadline(time.Now().Add(peerWriteTimeout))
+			if _, err := writer.Write(pending); err != nil {
+				return
+			}
+			if controller.Flush() != nil {
+				return
+			}
+			pending = nil
+		}
 		select {
 		case <-request.Context().Done():
 			return

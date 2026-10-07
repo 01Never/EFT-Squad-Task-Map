@@ -3,7 +3,6 @@ package squad
 import (
 	"encoding/json"
 	"net/http"
-	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -261,45 +260,6 @@ func TestCallerChecks(t *testing.T) {
 	})
 }
 
-func TestFindingSquadPeersOnTheTailnet(t *testing.T) {
-	address := netip.MustParseAddr("100.64.0.7")
-	addressV6 := netip.MustParseAddr("fd7a:115c:a1e0::7")
-	cases := []struct {
-		name string
-		peer TailnetPeer
-		want []PeerAddress
-	}{
-		{
-			"an online tag:stm node named stm-<id> is a friend",
-			TailnetPeer{HostName: "stm-" + sam.ID, Tags: []string{SquadTag}, IsOnline: true, Addresses: []netip.Addr{addressV6, address}},
-			[]PeerAddress{{Key: sam.ID, PlayerID: sam.ID, BaseURL: "http://100.64.0.7:7777"}},
-		},
-		{
-			"the DNS name is used when the host name isn't ours",
-			TailnetPeer{HostName: "DESKTOP-1", DNSName: "stm-" + sam.ID + ".tail1234.ts.net.", Tags: []string{SquadTag}, IsOnline: true, Addresses: []netip.Addr{address}},
-			[]PeerAddress{{Key: sam.ID, PlayerID: sam.ID, BaseURL: "http://100.64.0.7:7777"}},
-		},
-		{
-			"an IPv6-only node gets a bracketed address",
-			TailnetPeer{HostName: "stm-" + sam.ID, Tags: []string{SquadTag}, IsOnline: true, Addresses: []netip.Addr{addressV6}},
-			[]PeerAddress{{Key: sam.ID, PlayerID: sam.ID, BaseURL: "http://[fd7a:115c:a1e0::7]:7777"}},
-		},
-		{"an offline node is skipped", TailnetPeer{HostName: "stm-" + sam.ID, Tags: []string{SquadTag}, Addresses: []netip.Addr{address}}, nil},
-		{"an untagged node is skipped", TailnetPeer{HostName: "stm-" + sam.ID, IsOnline: true, Addresses: []netip.Addr{address}}, nil},
-		{"a node with another name is skipped", TailnetPeer{HostName: "laptop", Tags: []string{SquadTag}, IsOnline: true, Addresses: []netip.Addr{address}}, nil},
-		{"our own player id is skipped", TailnetPeer{HostName: "stm-" + mike.ID, Tags: []string{SquadTag}, IsOnline: true, Addresses: []netip.Addr{address}}, nil},
-		{"a node without an address is skipped", TailnetPeer{HostName: "stm-" + sam.ID, Tags: []string{SquadTag}, IsOnline: true}, nil},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := SquadPeers([]TailnetPeer{tc.peer}, mike.ID)
-			if len(got) != len(tc.want) || (len(got) == 1 && got[0] != tc.want[0]) {
-				t.Errorf("SquadPeers = %+v, want %+v", got, tc.want)
-			}
-		})
-	}
-}
-
 func TestAShareMustCarryTheIdItsNodeIsNamedAfter(t *testing.T) {
 	share := Share{Player: sam}
 	cases := []struct {
@@ -350,7 +310,7 @@ func TestProfileRules(t *testing.T) {
 		{"a colour is lower-cased", func() bool { color, ok := NormalizeColor("#4DABF7"); return ok && color == "#4dabf7" }, true},
 		{"a three-digit colour is refused", func() bool { _, ok := NormalizeColor("#fff"); return ok }, false},
 		{"a new player id has the right shape", func() bool { return IsValidPlayerID(NewPlayerID()) }, true},
-		{"the hostname carries the player id", func() bool { id, ok := PlayerIDFromHostname(Hostname(mike.ID)); return ok && id == mike.ID }, true},
+		{"the hostname carries the player id", func() bool { return Hostname(mike.ID) == "stm-"+mike.ID }, true},
 		{"an invite code starts with tskey-", func() bool { return IsPlausibleAuthKey("tskey-auth-kAbc123-XYZ") }, true},
 		{"a pasted code with a space is refused", func() bool { return IsPlausibleAuthKey("tskey-auth- x") }, false},
 	}

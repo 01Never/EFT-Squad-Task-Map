@@ -26,11 +26,14 @@ categories, AI chats, your position. The server only ever sends what's in the sh
 | A share is `{v, player, rev, updatedAt, draw, tasks}` | `Share` | `v` = 1 (`ShareFormatVersion`); `updatedAt` in ms since 1970 |
 | `rev` goes up only when the content changes | `StampShare` | content = player (id, name, colour) + drawings + tasks; the same content again keeps rev and updatedAt |
 | Tasks are dropped when "Share my tasks" is off | `StampShare` | enforced by the server, whatever the page sends; turning it off re-stamps at once (rev + 1, `tasks: null`) |
-| Everything received is checked; a bad share is dropped whole and logged once | `DecodeShare`, `ValidateShare`, `ValidateParts` | ≤ 2 MB (`MaxShareBytes`, ticket's cap); player id 16 lower-case hex; name 1–32 characters, no control characters, no spaces at the ends; colour `#rrggbb`; map/task/objective ids `[A-Za-z0-9_-]{1,64}`; ≤ 64 maps, ≤ 5000 strokes a map, 1–10000 `[x, z]` points a stroke, width 0–1000, coordinates within ±1e6, stroke colour `#rgb`/`#rrggbb`; ≤ 2000 tasks, ≤ 200 ticks each, a tick is `true` or a whole number 0–100000, `pct` 0–100 |
+| Everything received is checked; a bad share is dropped whole and logged once | `DecodeShare`, `ValidateShare`, `ValidateParts` | ≤ 2 MB (`MaxShareBytes`, ticket's cap); player id 16 lower-case hex; name 1–32 characters, no control characters, no spaces at the ends; colour `#rrggbb`; map/task/objective ids `[A-Za-z0-9_-]{1,64}` and never `__proto__`, `constructor` or `prototype` (so the page needn't guard against them); ≤ 64 maps, ≤ 5000 strokes a map, 1–10000 `[x, z]` points a stroke, width 0–1000, coordinates within ±1e6, stroke colour `#rgb`/`#rrggbb`; ≤ 2000 tasks, ≤ 200 ticks each, a tick is `true` or a whole number 0–100000, `pct` 0–100 |
 | A friend's share is new when rev or updatedAt differ | `HasChanged` | not "higher": a friend who reset their data starts again at rev 1 |
 | On the tailnet a share must carry the id its node is named after | `ShareFitsPeer` | so one friend can't pose as another (the dev transport has no names) |
-| Friends are the online `tag:stm` nodes named `stm-<player id>` | `SquadPeers`, `PlayerIDFromHostname` | host name first, else the first part of the DNS name; IPv4 address preferred; yourself left out |
-| The peer API answers only squad nodes | `HasSquadTag` (tsnet, via `WhoIs`), `IsLoopbackCaller` (dev) | and never a browser: `IsBrowserRequest` refuses any request with `Origin` or `Sec-Fetch-Site` (blocks DNS rebinding) |
+| Friends are the online `tag:stm` nodes whose MagicDNS name is exactly `stm-<player id>` | `SquadPeers` | the id comes **only from the DNS name's first part**, which the tailnet keeps unique (a clash becomes `stm-<id>-1`, which doesn't count), never from the host name, which each node picks itself; connections are keyed by the node's stable id; when two machines claim one id (`stm-<id>` and `stm-<id>-1`, online or not), **neither** is trusted and one console line says to delete the old machine; IPv4 address preferred; yourself left out |
+| The peer API answers only squad nodes, at its own address | `IsOwnHost`, `HasSquadTag` (tsnet, via `WhoIs`), `IsLoopbackCaller` (dev), `IsBrowserRequest` | the `Host` must be our own address as an IP literal with the port (else 421): a page on a rebinding domain sends its own name, even on a same-origin fetch with no browser headers; any request with `Origin` or `Sec-Fetch-Site` → 403 |
+| One friend can't flood you | `MinShareInterval`, `ChangeInterval` | at most one share a second is taken from each friend: newer ones replace the waiting one, so the last one sent always wins; the page's `squad` event and the cache file are updated at most once a second (the first change at once). QA's flood (rev+1 in a loop) made 32k page events in 10 s before |
+| One caller can't hold every stream | `StreamsPerCaller` | ≤ 2 open streams per tailnet machine (by stable node id), 16 in all; dev: 5 per caller, since every copy on this PC calls from 127.0.0.1 |
+| Names are shown as text | `IsValidName` | markup, right-to-left overrides and zero-width characters are accepted on purpose: **the page must insert names as text (escaped) and bidi-isolated** |
 | Reconnecting waits 1 s, 2 s, 4 s … 60 s | `RetryDelay` | ticket 05; starts over after a stream delivered a valid share |
 | Status line | `StatusText` | "Connected · 3 of 4 friends online"; "Connected · no friends seen yet"; "Connecting…"; "Signed out of the squad network: leave, then join again with an invite code"; "Squad connection failed: …"; "Not in a squad" |
 | Profile | `NormalizeName`, `NormalizeColor`, `NewPlayerID` | name trimmed, 1–32 characters; colour lower-cased `#rrggbb`; defaults "Player" and `#4dabf7`; player id made once |
@@ -44,8 +47,9 @@ page saves → PUT /api/squad/share → Squad.SetMyShare → StampShare → squa
            → "squad" event to your own page (your rev)
 
 tailnet IPN bus change → TsnetTransport.WatchPeers → SquadPeers → friendLinks.reconcile
-  per friend: GET /squad/v1/share, then GET /squad/v1/stream (held open)
-           → DecodeShare + ShareFitsPeer → Squad.onFriendShare → cache file → "squad" event → page
+  per friend: GET /squad/v1/share, then GET /squad/v1/stream (held open; newest event kept)
+           → at most 1/s: DecodeShare + ShareFitsPeer → Squad.onFriendShare
+           → cache file and "squad" event, each at most 1/s → page
   stream ends → onFriendStreamClosed (lastSeen) → "squad" event; reconnect after RetryDelay
   friend goes offline on the tailnet → its connection is cancelled at once
 ```
@@ -55,7 +59,8 @@ tailnet IPN bus change → TsnetTransport.WatchPeers → SquadPeers → friendLi
   they change. No polling: the peer list comes from the IPN bus, shares come on the streams, and a
   stream has no keep-alive timer (a friend that vanished is noticed when the tailnet marks them
   offline). The only timers are the reconnect backoff (≥ 1 s, ≤ 60 s) while a listed friend's
-  copy doesn't answer.
+  copy doesn't answer, and single one-shot timers while a change waits for its second to end
+  (none when idle).
 
 ## Transports (`transport.go`, `tsnet.go`)
 
@@ -63,13 +68,18 @@ tailnet IPN bus change → TsnetTransport.WatchPeers → SquadPeers → friendLi
 - **tsnet** (default): a Tailscale node inside the exe. Hostname `stm-<player id>`, state folder
   `squad-task-map-tailscale/` next to the data files (holds the node key: secret), peer API on the
   tailnet at `:7777` only. Starts only when `joined`. Joining waits up to 90 s for the tailnet to
-  accept the invite code; a failed join closes the node and deletes the state folder. After a
+  accept the invite code; a failed join reports Tailscale's own reason (e.g. "invalid authkey",
+  from its health messages, rather than "context deadline exceeded"), closes the node and deletes
+  the state folder. After a
   restart it resumes from the node key, with no invite code; without a node key it shows
   "Signed out…" instead of starting. When the tailnet signs the node out (machine deleted, key
   expired) it shows "Signed out…" and stops the node (it would otherwise keep asking for a log-in).
-  Log uploads to Tailscale are off (`TS_NO_LOGS_NO_SUPPORT`) and tsnet's log folder is the state
-  folder (`TS_LOGS_DIR`), so nothing is written outside the app's files. `STM_SQUAD_DEBUG=1`
-  prints tsnet's own log in the console.
+  Log uploads to Tailscale are off (`TS_NO_LOGS_NO_SUPPORT`). tsnet's own log goes to the state
+  folder (`tailscaled.log1.txt`, `tailscaled.log2.txt`, `tailscaled.log.conf`, next to
+  `tailscaled.state` and `profile-data/`). `TS_LOGS_DIR` points tsnet's separate "logs folder"
+  lookup there too: without it, on Linux it creates `/var/lib/tailscale` (checked); on Windows it
+  only computes `%LocalAppData%\Tailscale` and writes nothing. So nothing is written outside the
+  app's files. `STM_SQUAD_DEBUG=1` prints tsnet's own log in the console.
 - **dev** (`STM_SQUAD_DEV_LISTEN=127.0.0.1:7901`, `STM_SQUAD_DEV_PEERS=127.0.0.1:7902,127.0.0.1:7903`):
   no tsnet at all. The peer API listens on that address (it must be on this PC, else the variable
   is ignored) and answers only 127.0.0.1/::1. Friends are the listed addresses; a friend's identity
@@ -135,7 +145,8 @@ tasks as soon as sharing is turned off.
 
 ### Live event `squad` (broadcast)
 `{"type": "squad", "squad": <the same view as GET /api/squad>}`, whenever the status, a friend's
-share, a friend's online state, your profile or your share's rev changes. Not queued: a page
+share, a friend's online state, your profile or your share's rev changes; at most once a second
+(the first change at once, the latest state always sent last). Not queued: a page
 opened later reads `GET /api/squad`. (`internal/events/names.go` and `web/js/app/event-names.js`.)
 
 ## The peer API (the tailnet listener, or the dev address; never the page's server)
@@ -145,10 +156,14 @@ opened later reads `GET /api/squad`. (`internal/events/names.go` and `web/js/app
 | `GET /squad/v1/share` | your latest share (`application/json`), or 404 "Nothing shared yet" |
 | `GET /squad/v1/stream` | Server-Sent Events: `: squad`, then `event: share` / `data: <share JSON>` now (if there is one) and again whenever it changes. No keep-alives. |
 
-Refused before any route: callers that aren't `tag:stm` nodes (tsnet `WhoIs`) or not on this PC
-(dev) → 403; any request with `Origin` or `Sec-Fetch-Site` → 403. Only GET; no request body;
-headers ≤ 16 KB, 10 s to send them; ≤ 16 open streams (503 beyond). As a client: answers' headers
-within 15 s, a share or one SSE event ≤ 2 MB.
+Refused before any route: a `Host` that isn't our own address as an IP literal with the port
+(`127.0.0.1:7901`, `100.x.y.z:7777`, `[fd7a:…]:7777`) → 421 (DNS rebinding); any request with
+`Origin` or `Sec-Fetch-Site` → 403; callers that aren't `tag:stm` nodes (tsnet `WhoIs`) or not on
+this PC (dev) → 403. Only GET; no request body; headers ≤ 16 KB, 10 s to send them; a kept-alive
+connection idle for 60 s is closed; each stream write must finish within 10 s (a caller that
+stops reading loses its stream); ≤ 2 open streams per tailnet machine (5 per caller on the dev
+transport), ≤ 16 in all (503 beyond). As a client: answers' headers within 15 s, a share or one
+SSE event ≤ 2 MB, at most one share a second taken from each friend (the newest).
 
 ## Saved data / settings
 - `squad-task-map-settings.json`, block `"squad"` (unknown fields inside it are kept):
@@ -164,20 +179,29 @@ within 15 s, a share or one SSE event ≤ 2 MB.
 join/resume/leave/stop, the session). `peerapi.go`: the peer API server and the feed that wakes
 friends' streams. `peers.go`: one connection per friend (fetch, stream, backoff, checks, log once).
 `transport.go`: the `Transport` interface and the dev transport. `tsnet.go`: the tsnet transport.
-`cache.go`: `squad-task-map-squad.json`. Wiring: `internal/app/squad.go`; routes:
+`cache.go`: `squad-task-map-squad.json`. `throttle.go`: "at most once a second, last change
+kept" for the page event and the cache file. Wiring: `internal/app/squad.go`; routes:
 `internal/httpapi/squad.go`.
 
 ## Tests
 - `rules_test.go`: rev stamping, tasks stripped when sharing is off, validation rejects bad peer
   data (23 cases), ticks, backoff schedule, caller checks (loopback, tag, browser), peer list
   rules, identity check, "new share" rule, profile rules, status line.
+- `rules_peers_test.go`: who a friend is (DNS name only, keyed by node id; `-1` names and host
+  names don't count; two machines with the same host name or id → neither trusted), the `Host`
+  check, `__proto__`/`constructor`/`prototype` refused, and names with markup, RTL override or
+  zero-width characters accepted on purpose (the page escapes them).
 - `squad_test.go`: **three copies on the dev transport** (A's share reaches B and C; an update
   propagates; B's tasks aren't sent; C goes offline and A keeps C's share with `lastSeen`, also in
   the cache file; C comes back and refreshes), cache read/write, rev kept across a restart,
   player id made once, sharing off re-stamps, Leave deletes the state folder and forgets friends
-  (and only deletes a folder with that name), the peer API's caller check.
+  (and only deletes a folder with that name), the peer API's caller and `Host` checks (a
+  rebinding domain gets 421), the per-caller stream cap, the server's idle and write limits,
+  **a friend sending 1000 shares in a burst** (taken 2–3 times, the last one wins) and **1000
+  shares into the squad** (1–3 page events and file writes, rev 1000 in both).
 - `tsnet_test.go`: **real tsnet nodes on a fake tailnet** (Tailscale's in-process control server
-  and DERP on 127.0.0.1; no internet): a wrong invite code is refused and leaves nothing; two
+  and DERP on 127.0.0.1; no internet): a wrong invite code is refused with Tailscale's reason
+  ("invalid authkey") and leaves nothing; two
   copies join and share; the code is in no file; an untagged tailnet node gets 403; a restart
   reconnects with the node key alone; Leave deletes the node key; a node the tailnet signs out
   shows "needsLogin". Skipped with `go test -short`, and on Windows unless
