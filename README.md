@@ -8,6 +8,8 @@ Squad Task Map is a small Windows program for Escape from Tarkov. It shows the t
 - The map page opens in your browser at `http://127.0.0.1:7777` and only listens on your own PC.
 - It's built to stay light next to a CPU-bound game: idle CPU is practically zero.
 
+![Customs with nine tasks, your position and the closest extract](docs/images/map-and-tasks.png)
+
 ## Download
 
 Get the latest `SquadTaskMap.exe` from **[Releases](https://github.com/01Never/EFT-Squad-Task-Map/releases/latest)**. Put it in its own folder (for example `Documents\SquadTaskMap`) and double-click it.
@@ -16,18 +18,40 @@ Windows SmartScreen may say "Windows protected your PC" the first time, because 
 
 ## What it does
 
-| | |
-|---|---|
-| **Your tasks, per map** | Markers for every objective of the tasks you have, grouped into categories you can rename, recolour and reorder. |
-| **Synced from the game** | Tasks you accept or finish in-game are added or removed within seconds, from the game's log files. |
-| **Your extracts, marked for you** | Open the in-game extract list (double-tap O) and take a screenshot: an OpenAI vision model reads it and marks your extracts on the map (optional, uses your own API key). |
-| **Scan your task list** | Screenshot the in-game Tasks screen and an OpenAI vision model reads it, so your list matches the game exactly (optional, uses your own API key). |
-| **Find me** | Your position and facing come from Tarkov's screenshot file names: a stand-out marker, a pulse when it updates, an off-screen pointer, optional auto-centre. |
-| **Closest extract** | The nearest of the extracts you have this raid, with a line and a straight-line distance. |
-| **Loot spots** | Safes, weapon boxes, PC blocks, jackets, filing cabinets and notable loose loot from tarkov.dev, toggled per type, with a "High value" preset. Small and secondary to your task markers. |
-| **Bring list** | The keys, items to place and gear the tasks on the map need, with "have" counts that fade spots you can't do yet. |
-| **Squad** | Join friends with an invite code (private Tailscale network built into the exe, nothing else to install) and see each other's drawings live and, if you both choose, each other's tasks with "Also: Mike" badges. Optional. |
-| **AI Categorize** | Sort tasks by plain-English instructions, checked against each task's wiki page (optional). |
+### Your tasks, per map
+Pick a map and see a marker for every objective of the tasks you have, grouped into categories (boss hunts, kills, placing, retrieving…) that you can rename, recolour and reorder. Tasks you accept or finish in-game are added or removed within seconds, from the game's log files. Where you have to place something, the marker shows the item's icon.
+
+![The map picker: every map with how many of your tasks are on it](docs/images/map-picker.png)
+
+Click a marker or a row to select a task: its spots flash on the map, and the popup and the list show every objective with ticks and counters, the wiki link, sub-tasks and pins.
+
+![A selected task with its popup and details](docs/images/task-selected.png)
+
+### Where you are, and your way out
+Tarkov puts your position and facing in each screenshot's file name. Take a screenshot in raid and your marker appears with a short pulse; an off-screen pointer brings you back, and **Follow** keeps the map centred on you. The closest of your extracts gets a ring and a thin line with the distance. Open the in-game extract list (double-tap O) before that screenshot and, with an OpenAI key, the app reads it and marks your extracts for you.
+
+![Your position and the closest extract](docs/images/find-me-closest-extract.png)
+
+### Bring list
+The keys, items to place and gear the tasks on the map need. Set how many you have; spots you can't do yet fade and get a "!".
+
+<img src="docs/images/bring-list.png" alt="The Bring list" width="420">
+
+### Loot spots
+Safes, weapon boxes, PC blocks, jackets, filing cabinets and notable loose loot from tarkov.dev, per type or with one **High value** click. Small and secondary to your task markers.
+
+![Customs with the High value loot spots on](docs/images/loot.png)
+
+### Squad
+Join friends with an invite code: a private Tailscale network is built into the exe, nothing else to install. See each other's drawings live, and, if you both choose, each other's tasks with "Also: Alice" and progress on the tasks you share.
+
+![A friend's drawing in their colour, and "Also: Alice" on a shared task](docs/images/squad.png)
+
+### And more
+- **Scan your task list:** screenshot the in-game Tasks screen and an OpenAI vision model reads it, so your list matches the game exactly (optional, your own API key).
+- **AI Categorize:** sort tasks by plain-English instructions, checked against each task's wiki page (optional).
+- **Draw** on the map, **pin** tasks, add **sub-tasks**, and switch between PvP and PvE data.
+- **Check for updates** in Settings: signed releases from this repo, installed with one click.
 
 The full manual is the **[user guide](docs/USER-GUIDE.md)**: setup, every feature, settings, privacy, and the files the app keeps next to the exe.
 
