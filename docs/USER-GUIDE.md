@@ -85,6 +85,7 @@ You need a **screenshot key** bound in Tarkov's control settings. The app warns 
 - **Screenshots folder:** `Documents\Escape From Tarkov\Screenshots`, found automatically even if OneDrive moved Documents.
 - **Follow my position:** switch to the raid's map when a GPS screenshot comes in.
 - **Center the map on me when I take a screenshot:** off by default. When on, every new position pans the map so you're in the middle, keeping your zoom, like a minimap. Same as **◎ Follow** on the map toolbar. If you're dragging the map when a screenshot comes in, it waits until you let go.
+- **Task markers:** **Item icons** (default) or **Category shapes only**. With icons, a spot where you place something shows that item (an MS2000 marker, a camera, a quest item, the item to stash) in a tile with the category colour as its border. If an icon can't be loaded, the marker shows its shape instead.
 - **Game data:** where it came from and **Update game data now**.
 - **OpenAI:** key, model and reasoning level.
 - **Read my extracts from my first raid screenshot:** only shown once you have an OpenAI key. On by default (after a one-time notice that explains what is sent). Untick it to stop sending that screenshot. See "Your extracts, read from a screenshot" below.
@@ -140,7 +141,7 @@ The **🤖 AI Categorize** box in the panel sorts parts by your instructions, e.
 - Everything stays on your PC except:
   - Game data downloads from **json.tarkov.dev**.
   - Wiki pages from **escapefromtarkov.fandom.com** (AI Categorize).
-  - Item icons from **assets.tarkov.dev**.
+  - Item icons from **assets.tarkov.dev**: the app downloads each icon once (on the first view) into `squad-task-map-icons/` and shows it from there afterwards; your browser never contacts assets.tarkov.dev itself. Only the 24-character item id is sent.
   - **github.com**, only when you click **Check for updates** (or Download and restart). The app contacts GitHub only when you click Check for updates.
   - Requests to **api.openai.com**: each scanned screenshot (shrunk to 2048 px); **the first in-raid screenshot of each raid** (also shrunk to 2048 px; up to 3 if the extract list wasn't on the first), so your extracts can be marked for you (Settings: "Read my extracts from my first raid screenshot", only with a key, you can turn it off); and for AI Categorize, task data plus wiki excerpts.
 - OpenAI is billed to your key's account. A scan costs roughly 1–2k input tokens per screenshot; reading your extracts about 1–2k per raid; an AI Categorize request roughly 5–30k.
@@ -160,6 +161,7 @@ While idle the program uses practically no CPU (measured 0.00% of one core over 
 | `squad-task-map-gamedata-<mode>.json` | Downloaded game data per mode |
 | `squad-task-map-pending.json` | Game events waiting for the page (usually empty) |
 | `squad-task-map-wikicache.json` | Wiki pages, kept 7 days |
+| `squad-task-map-icons/` | Item icons (one small `<id>.webp` each), downloaded once from assets.tarkov.dev. Safe to delete: they download again when needed |
 | `squad-task-map-data.v1-backup.json` | Your v1 file, from the upgrade |
 | `squad-task-map-data.before-<version>.json` | Your saved data as it was just before updating to that version (newest 3 kept) |
 | `squad-task-map-squad.json` | Squad: your last share, and your friends' last shares with "last seen" (cleared by Leave squad) |

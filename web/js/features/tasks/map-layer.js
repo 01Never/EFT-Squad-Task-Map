@@ -13,6 +13,7 @@ import { partsOnMap, isShownOnMap } from "./task-list.js";
 import { isObjectivePossible } from "../readiness/rules.js";
 import { subTaskMarkerItems } from "../sub-tasks/map-layer.js";
 import { squadColorsForTask } from "../squad/friends.js";
+import { markerIconItem, itemIconUrl, showsItemIcons } from "../icons/rules.js";
 
 /** @import { Task, Part, Objective, PartOnMap } from "../../app/types.js" */
 /** @import { MarkerItem } from "../../app/state.js" */
@@ -127,6 +128,7 @@ export function renderTaskMarkers() {
 function partMarkerItems() {
   const mapView = app.mapView;
   const bag = app.saved.have;
+  const withIcons = showsItemIcons(app.saved);
   const items = [];
   const firstShownRowByTask = new Map();
   for (const row of partsOnMap(mapView.key)) {
@@ -137,10 +139,24 @@ function partMarkerItems() {
     for (const spot of spotsOfPart(task, part)) {
       const isReady = isObjectivePossible(spot.o, bag);
       if (spot.ol) drawZone(spot.ol, cat.color, isReady);
-      items.push({ ...spot, task, part, icon: cat.icon, color: cat.color, squadColors, ready: isReady, split: part.split });
+      const iconItem = iconItemOfSpot(spot, withIcons);
+      items.push({ ...spot, task, part, icon: cat.icon, color: cat.color, squadColors, iconItem, ready: isReady, split: part.split });
     }
   }
   return { items, firstShownRowByTask };
+}
+
+/**
+ * The item picture an exact spot shows instead of its category shape (ticket 07), or null: where
+ * you place something (mark, plant), when Settings has item icons on.
+ * @param {Spot} spot
+ * @param {boolean} withIcons
+ * @returns {MarkerItem["iconItem"]}
+ */
+function iconItemOfSpot(spot, withIcons) {
+  if (!withIcons || spot.kind !== "exact" || !spot.o) return null;
+  const item = markerIconItem(spot.o);
+  return item ? { url: itemIconUrl(item.id), hasAlternatives: item.hasAlternatives } : null;
 }
 
 /**

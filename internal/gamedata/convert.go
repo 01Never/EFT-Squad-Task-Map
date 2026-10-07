@@ -209,6 +209,21 @@ func (c *rawConverter) questItemName(reference any) string {
 	return text(reference)
 }
 
+// questItemID is the quest item's id when it looks like an item id (24 hex digits), else nil: the
+// page then keeps the category shape instead of an icon (ticket 07).
+func (c *rawConverter) questItemID(reference any) *string {
+	id := text(reference)
+	if object, isObject := reference.(map[string]any); isObject {
+		id = text(object["id"])
+	}
+	if !itemIDPattern.MatchString(id) {
+		return nil
+	}
+	return &id
+}
+
+var itemIDPattern = regexp.MustCompile(`^[0-9a-f]{24}$`)
+
 // mapKeyOf turns a map id into a map key: the map's normalizedName when the id is a known map,
 // otherwise the value itself read as a normalizedName. "" means no map.
 func (c *rawConverter) mapKeyOf(id any) string {
@@ -278,6 +293,7 @@ func (c *rawConverter) objective(raw any) Objective {
 	if isSet(get(raw, "questItem")) {
 		name := c.questItemName(get(raw, "questItem"))
 		objective.QI = &name
+		objective.QIID = c.questItemID(get(raw, "questItem"))
 	}
 	if isKill {
 		objective.Gear = c.gear(raw)

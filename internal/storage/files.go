@@ -21,6 +21,7 @@ type Files struct {
 	UpdateNotice string // squad-task-map-update-notice.json: release notes handed to the copy an update starts
 	SquadCache   string // squad-task-map-squad.json: my last share and friends' last shares (ticket 05)
 	SquadNetwork string // squad-task-map-tailscale/: tsnet's state folder with the node key; secret (ticket 05)
+	Icons        string // squad-task-map-icons/: item pictures downloaded from assets.tarkov.dev (ticket 07)
 	gameDataFn   func(mode string) string
 }
 
@@ -41,6 +42,7 @@ func FilesIn(dir string) Files {
 		UpdateNotice: join("squad-task-map-update-notice.json"),
 		SquadCache:   join("squad-task-map-squad.json"),
 		SquadNetwork: join("squad-task-map-tailscale"),
+		Icons:        join("squad-task-map-icons"),
 		gameDataFn:   func(mode string) string { return join("squad-task-map-gamedata-" + mode + ".json") },
 	}
 }

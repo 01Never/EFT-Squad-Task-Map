@@ -70,6 +70,14 @@ for any title. Logged as `wiki <title>` (`wiki null` without `page`).
     tool results) moves nothing.
 - Any other `/v1/` path → 404 `nf`.
 
+**Fake assets.tarkov.dev** (ticket 07, `icons.go`): item icons for the app's icon cache. Point the
+app at it with `STM_ASSETS_BASE=http://127.0.0.1:7820/assets`.
+| Request | Answer |
+|---|---|
+| `GET /assets/<24 hex>-icon.webp` | a small valid WebP (a box on a dark ground), or 404 `nf` for an id marked missing; any other path under `/assets/` → 404 |
+| `GET /icons-log` | JSON list of the ids requested so far, oldest first (separate from `/log`, so existing log checks don't change) |
+| `POST /icons-missing` with `{"ids":[…]}` | those ids answer 404 from now on; an empty list makes every icon available again; clears `/icons-log`. `{"ok":true}` |
+
 **Fake GitHub Releases** (ticket 04c, `github.go`): for testing "Check for updates" offline. Point
 the app at it, and at the mock's TEST public key (the matching private key is
 `testdata/updates/mock-private-key.txt`; it only ever signs the mock's manifests):

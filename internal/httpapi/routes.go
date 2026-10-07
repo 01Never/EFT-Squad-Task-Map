@@ -38,6 +38,9 @@ func NewServer(backend Backend, static *staticFiles) *Server {
 		{"GET /maps/{file}", static.serveMapArt},
 		{"GET /api/config", static.serveMapsConfig},
 
+		// Item icons (ticket 07): downloaded once from assets.tarkov.dev, then served from disk.
+		{"GET /icons/{file}", server.icon},
+
 		// Game data, status and live events.
 		{"GET /api/data", server.gameData},
 		{"GET /api/status", server.status},

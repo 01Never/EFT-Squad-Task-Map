@@ -36,14 +36,15 @@ type Objective struct {
 	Opt     bool          `json:"opt"`  // optional objective
 	Maps    []string      `json:"maps"`
 	Zones   []Zone        `json:"zones"`
-	Poss    []PossibleSet `json:"poss"`    // possible spots for a quest item
-	Keys    [][]Item      `json:"keys"`    // every group is needed; inside a group any one key will do
-	Items   []Item        `json:"items"`   // alternatives (find, hand in, plant)
-	Marker  *Item         `json:"marker"`  // the marker item for "mark" objectives
-	QI      *string       `json:"qi"`      // quest item name
-	Targets []string      `json:"targets"` // kill targets ("any PMC operatives", "Killa"…)
-	Gear    *Gear         `json:"gear"`    // gear restrictions for kills, or null
-	Time    []float64     `json:"time"`    // [from hour, until hour] for kills at certain times, or null
+	Poss    []PossibleSet `json:"poss"`           // possible spots for a quest item
+	Keys    [][]Item      `json:"keys"`           // every group is needed; inside a group any one key will do
+	Items   []Item        `json:"items"`          // alternatives (find, hand in, plant)
+	Marker  *Item         `json:"marker"`         // the marker item for "mark" objectives
+	QI      *string       `json:"qi"`             // quest item name
+	QIID    *string       `json:"qiId,omitempty"` // quest item id (24 hex digits), for its icon (ticket 07)
+	Targets []string      `json:"targets"`        // kill targets ("any PMC operatives", "Killa"…)
+	Gear    *Gear         `json:"gear"`           // gear restrictions for kills, or null
+	Time    []float64     `json:"time"`           // [from hour, until hour] for kills at certain times, or null
 }
 
 // Item is anything with an id and a name (items, keys, quest items).

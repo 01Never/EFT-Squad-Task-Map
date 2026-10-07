@@ -18,7 +18,10 @@ is left untranslated, and the payload is about 1.8 MB.
   error. This protects against a half-broken download.
 - Conversion (`convert.go`, `snapshot.go`) is a 1:1 port of v2's `server/convert.ts`. Its output is
   JSON-equal to the v2 output for the snapshot, the mock files and the real files
-  (`convert_test.go` against `testdata/golden/`).
+  (`convert_test.go` against `testdata/golden/`), except what later tickets added: an objective
+  with a quest item also has `qiId`, the quest item's id (ticket 07; only when it is 24 lower-case
+  hex digits), for its icon. The goldens predate it, so the golden test strips `qiId` before
+  comparing and `convert_qiid_test.go` checks it on the real files.
 - JavaScript details the port keeps on purpose: tasks and maps come out in the files' key order;
   outlines are rounded like JavaScript's `toFixed(2)`; "is this set?" follows JavaScript truthiness
   (`jsvalues.go`).
