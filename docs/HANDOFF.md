@@ -66,6 +66,7 @@ Go dependencies: `github.com/fsnotify/fsnotify` (screenshots folder notification
 | `STM_LOGS_DIR` / `STM_SCREENSHOTS_DIR` | Override detected game folders |
 | `STM_JSON_BASE` | Game-data base URL (default `https://json.tarkov.dev`) |
 | `STM_OPENAI_API` / `STM_WIKI_API` | OpenAI and wiki endpoints (for the mock server) |
+| `STM_ASSETS_BASE` | Where item icons come from (default `https://assets.tarkov.dev`; the mock serves `http://127.0.0.1:7820/assets`) |
 | `STM_UPDATES_BASE` | Replaces `https://github.com/01Never/EFT-Squad-Task-Map` for "Check for updates" (the mock serves a fake GitHub at `http://127.0.0.1:7820/github/01Never/EFT-Squad-Task-Map`) |
 | `STM_UPDATES_PUBLIC_KEY` | Only when `STM_UPDATES_BASE` is on this PC (127.0.0.1, ::1, localhost); otherwise ignored: trust this base64 public key instead of the built-in one (the mock's test key is in `testdata/updates/mock-public-key.txt`) |
 | `STM_RELEASE_KEY` | For `cmd/release` only: the path of the owner's private signing key file |
@@ -430,7 +431,7 @@ Verified on the owner's PC since 2.3.0: folder detection (registry → `E:\Games
 - **Scan ignores the Reasoning setting:** `taskscan.Scan.Read` always sends `effort: "low"` for gpt-5/gpt-6/o-series models. SPEC §8 says to reuse the setting, defaulting to low.
 - **Don't split vs moved parts:** a manual move stored on `<id>:<action>` doesn't apply once the task is unsplit (`<id>:*`); it falls back to the precedence default.
 - GPS trail labels ("x min ago") overlap when zoomed far out.
-- Item icons load from assets.tarkov.dev; offline they remove themselves (`onerror`).
+- Item icons (ticket 07) are downloaded by the app into `squad-task-map-icons/` and served as `/icons/<id>.webp`; with none kept and no network, markers fall back to shapes and Bring list pictures remove themselves (`onerror`).
 - AI Categorize jobs live in server memory (`aicategorize.Jobs`); a restart drops a running job.
 - Story chapters on the in-game Tasks screen aren't in tarkov.dev data, so they show as "Not recognised" in scans. That's expected.
 - The map SVGs are CC BY-NC-SA 4.0: non-commercial only.

@@ -9,15 +9,13 @@ import { renderMapPage } from "../../map/map-page.js";
 import { isObjectiveOnMap } from "../tasks/rules.js";
 import { partsOnMap, isShownOnMap, activeOffMapTasks } from "../tasks/task-list.js";
 import { bringList, countMissing, requirementsOf, hasAtLeastOne, stepBagCount, setBagCount } from "./rules.js";
+import { isItemId, itemIconUrl } from "../icons/rules.js";
 
 /** @import { Objective, Task } from "../../app/types.js" */
 /** @import { BringEntry } from "./rules.js" */
 
-// Item pictures come from tarkov.dev's image server, by item id (24 hex digits). Offline, they
-// remove themselves.
-const ITEM_ID = /^[0-9a-f]{24}$/;
-const itemIconUrl = (itemId) => `https://assets.tarkov.dev/${itemId}-icon.webp`;
-
+// Item pictures come from this app (/icons/<id>.webp: downloaded once from assets.tarkov.dev, then
+// kept). With none kept and no network, they remove themselves.
 // Shown instead of a picture for sets of alternatives.
 const PLACEHOLDER_ICON_BY_KIND = { key: "🔑", gear: "🎽", fir: "🔍", place: "🎒" };
 
@@ -105,7 +103,7 @@ function renderBringLine(line, withBagCount) {
 
 /** The item's picture when it's one item, else an emoji for its kind. */
 function renderItemPicture(line) {
-  if (line.items.length === 1 && ITEM_ID.test(line.items[0].id)) {
+  if (line.items.length === 1 && isItemId(line.items[0].id)) {
     return `<img src="${itemIconUrl(line.items[0].id)}" alt="" loading="lazy" onerror="this.remove()">`;
   }
   const icon = PLACEHOLDER_ICON_BY_KIND[line.kind] || PLACEHOLDER_ICON_BY_KIND.place;

@@ -43,6 +43,7 @@
  * @property {string} icon
  * @property {string} color
  * @property {string[]} [squadColors] colours of friends who also have this task (bottom-left dots)
+ * @property {{ url: string, hasAlternatives: boolean } | null} [iconItem] the item picture the marker shows instead of the shape (features/icons)
  * @property {boolean} [ready] false = you're missing something it needs
  * @property {boolean} [split]
  * @property {boolean} [done]

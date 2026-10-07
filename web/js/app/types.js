@@ -53,6 +53,7 @@ export {};
  * @property {Item[]} items alternatives (find, hand in, plant)
  * @property {Item | null} marker the marker item of a "mark" objective
  * @property {string | null} qi quest item name
+ * @property {string} [qiId] the quest item's id, for its icon (absent in game data converted before ticket 07)
  * @property {string[]} targets kill targets
  * @property {Gear | null} gear
  * @property {number[] | null} time [from hour, until hour]
@@ -239,6 +240,7 @@ export {};
  * @property {string} dcolor drawing colour
  * @property {number} dwidth drawing width in screen pixels
  * @property {boolean} aiOpen
+ * @property {boolean} [taskIcons] false = task markers keep their category shapes; absent = item icons (Settings → Task markers; features/icons)
  * @property {boolean} [showScanBanner]
  * @property {number} [migratedFrom]
  * @property {SquadChoices} [squad] your choices about friends (2.7.0); absent until you change one

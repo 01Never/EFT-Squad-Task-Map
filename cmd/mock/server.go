@@ -64,6 +64,7 @@ type mockServer struct {
 	extractList jsValue     // what it answers for an extract-list screenshot; POST /set-extracts replaces it
 	isFailing   bool        // set by POST /fail: json.tarkov.dev answers 503 while true
 	github      githubState // what the fake GitHub Releases serves (github.go); POST /github-set changes it
+	icons       iconState   // the fake assets.tarkov.dev (icons.go)
 
 	signingKey ed25519.PrivateKey // the test key manifests are signed with; read-only after start-up
 }
@@ -91,6 +92,12 @@ func (mock *mockServer) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 		mock.handleSetRows(writer, request)
 	case path == "/set-extracts":
 		mock.handleSetExtracts(writer, request)
+	case path == iconsLogPath:
+		mock.handleIconsLog(writer)
+	case path == iconsMissingPath:
+		mock.handleIconsMissing(writer, request)
+	case strings.HasPrefix(path, assetsPrefix):
+		mock.handleIcon(writer, path)
 	case path == "/fail":
 		mock.handleFail(writer, request)
 	case path == githubControlPath:

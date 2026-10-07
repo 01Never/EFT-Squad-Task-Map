@@ -6,6 +6,8 @@
 import { app } from "../../app/state.js";
 import { escapeHtml, findElement, showToast, openModal } from "../../app/dom.js";
 import { callApi, fetchJson } from "../../app/api.js";
+import { save } from "../../app/saving.js";
+import { showsItemIcons } from "../icons/rules.js";
 import { GAME_MODE_NAMES } from "../../app/game-modes.js";
 import { reloadGameData } from "../../app/game-data.js";
 import { rerenderPage } from "../../app/routing.js";
@@ -44,6 +46,7 @@ function renderSettings(status) {
     <label class="frow"><span>Screenshots folder</span><input type="text" id="sShots" value="${escapeHtml(status.settings.screenshotsPath)}" placeholder="Found automatically — Documents\\Escape From Tarkov\\Screenshots"></label>
     <p class="mnote">${renderFolderStatus(status.screenshots)}${renderKeybindWarning(status)}</p>
     ${renderFollowCheckboxes(status)}
+    ${renderTaskMarkersRow()}
     <h4>Game data</h4>
     ${renderGameDataStatus(status)}
     <button class="btn sm line" id="sRefresh">${status.data.refreshing ? "Updating…" : "Update game data now"}</button>
@@ -104,6 +107,16 @@ function renderReadExtractsCheckbox(status) {
     <p class="mnote">Open the extract list in the raid (double-tap O) and take a screenshot: the first in-raid screenshot of each raid (shrunk to 2048 px, up to 3 tries) is sent to OpenAI to mark your extracts, about 1&ndash;2k tokens per raid.</p>`;
 }
 
+/** "Task markers: item icons / shapes" (ticket 07). Saved with your tasks, not in the settings file. */
+function renderTaskMarkersRow() {
+  const withIcons = showsItemIcons(app.saved);
+  return `<label class="frow"><span>Task markers</span><select id="sMarkers">
+      <option value="icons" ${withIcons ? "selected" : ""}>Item icons where you place something</option>
+      <option value="shapes" ${withIcons ? "" : "selected"}>Category shapes only</option>
+    </select></label>
+    <p class="mnote">Marking with an MS2000, planting a camera or quest item, stashing an item: the marker shows that item. Icons are downloaded once from assets.tarkov.dev through this app and kept next to it.</p>`;
+}
+
 /** "PvP · 515 tasks · downloaded 2 min ago", and the last update error if there was one. */
 function renderGameDataStatus(status) {
   const data = status.data;
@@ -161,6 +174,11 @@ async function onSaveClicked(dialog, close) {
   try {
     const answer = await callApi("/api/settings", { method: "PUT", body: changes });
     app.status = answer.status;
+    const wantsIcons = field("#sMarkers").value === "icons";
+    if (wantsIcons !== showsItemIcons(app.saved)) {
+      app.saved.taskIcons = wantsIcons;
+      save();
+    }
     close();
     showToast("Settings saved");
     rerenderPage();
