@@ -199,6 +199,11 @@ func (app *App) Job(id string) (*aicategorize.Job, bool) { return app.jobs.Get(i
 // Scan is the task scan.
 func (app *App) Scan() *taskscan.Scan { return app.scan }
 
+// IconPath is an item icon's file, downloaded on first use (ticket 07).
+func (app *App) IconPath(ctx context.Context, itemID string) (string, error) {
+	return app.icons.Path(ctx, itemID)
+}
+
 // ScanFolder is the watched screenshots folder.
 func (app *App) ScanFolder() string { return app.screenshots.Dir() }
 

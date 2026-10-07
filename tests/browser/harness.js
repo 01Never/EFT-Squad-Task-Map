@@ -370,7 +370,7 @@ export async function startApp(options) {
     const environment = {
       ...environmentWithoutAppSettings(),
       STM_DATA_DIR: dataDir, STM_LOGS_DIR: logsDir, STM_SCREENSHOTS_DIR: shotsDir, STM_NO_BROWSER: "1", PORT: String(port),
-      STM_JSON_BASE: MOCK_BASE, STM_OPENAI_API: MOCK_BASE + "/v1", STM_WIKI_API: MOCK_BASE + "/wiki",
+      STM_JSON_BASE: MOCK_BASE, STM_OPENAI_API: MOCK_BASE + "/v1", STM_WIKI_API: MOCK_BASE + "/wiki", STM_ASSETS_BASE: MOCK_BASE + "/assets",
       ...(PAGE_FROM_DISK ? { STM_ASSETS_DIR: REPO_ROOT } : {}),
       ...(options.env || {}),
     };
@@ -412,8 +412,8 @@ function launchBrowser() {
         "--hide-scrollbars",
         "--force-color-profile=srgb",
         "--font-render-hinting=none",
-        // Item icons come from assets.tarkov.dev: no host name resolves, so every run looks the same
-        // (the page removes icons that fail to load) and nothing leaves this PC.
+        // Item icons are fetched by the app (from the mock, STM_ASSETS_BASE); the browser itself reaches
+        // only 127.0.0.1, so nothing leaves this PC.
         "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1",
       ],
     });

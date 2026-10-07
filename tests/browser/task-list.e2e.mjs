@@ -221,7 +221,7 @@ test("selecting a row highlights it and flashes its markers; a marker click sele
     // Click a marker on the map.
     const markerPoint = await page.evaluate(() => {
       for (const marker of document.querySelectorAll("svg.map g.mk")) {
-        const box = marker.querySelector("path").getBoundingClientRect();
+        const box = marker.querySelector("path, rect").getBoundingClientRect();
         const x = box.left + box.width / 2, y = box.top + box.height / 2;
         if (document.elementFromPoint(x, y)?.closest("g.mk") === marker) return { x, y };
       }

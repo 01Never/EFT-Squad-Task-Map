@@ -90,7 +90,7 @@ func TestConverterMatchesTheV2Goldens(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			assertSameJSON(t, readMaybeGzipped(t, repoPath("testdata", "golden", testCase.golden)), converted)
+			assertSameJSON(t, readMaybeGzipped(t, repoPath("testdata", "golden", testCase.golden)), withoutQuestItemIDs(t, converted))
 		})
 	}
 }

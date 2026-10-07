@@ -16,6 +16,7 @@ import (
 	"squadtaskmap/internal/features/extracts"
 	"squadtaskmap/internal/features/gamelog"
 	"squadtaskmap/internal/features/gps"
+	"squadtaskmap/internal/features/icons"
 	"squadtaskmap/internal/features/raid"
 	"squadtaskmap/internal/features/squad"
 	"squadtaskmap/internal/features/taskscan"
@@ -48,6 +49,7 @@ type App struct {
 	ai          *openai.Client
 	updates     *updates.Updater
 	squad       *squad.Squad // ticket 05: started only when the player is in a squad (squad.go)
+	icons       *icons.Cache // ticket 07: item pictures for markers and the Bring list
 
 	// raidAndPosition keeps a raid end and a new position from interleaving: the log and the
 	// screenshots folder are watched on different goroutines, and a position must never arrive
@@ -87,6 +89,7 @@ func newApp(version, updatedFrom string, files storage.Files, builtInGameData fu
 	app.extracts = newExtractsReader(app)
 	app.updates = newUpdater(app, updatedFrom, userAgent)
 	app.squad = newSquad(app)
+	app.icons = icons.NewCacheFromEnvironment(files.Icons, userAgent)
 	return app
 }
 

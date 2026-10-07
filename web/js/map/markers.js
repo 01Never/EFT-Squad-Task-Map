@@ -25,6 +25,17 @@ const SQUAD_DOT_FIRST_X = -9.5;
 const SQUAD_DOT_Y = 9;
 const SQUAD_DOT_STEP_X = 4.6;
 
+// An item icon tile (ticket 07) is a little bigger than the shape it replaces, so a 64 px icon
+// stays readable; borders and padding in SVG units, like the sizes above.
+const ICON_TILE_EXTRA_SIZE = 3;
+const ICON_TILE_CORNER_RADIUS = 3.5;
+const ICON_TILE_BORDER = 2.4;
+const ICON_TILE_PADDING = 0.6;
+const ICON_TILE_BACKGROUND = "#1a1a1a";
+
+// Icon addresses that failed to load this session: their markers are drawn as shapes straight away.
+const failedIconUrls = new Set();
+
 // Taps within this radius around a marker's centre hit it (an invisible circle).
 const MARKER_TAP_RADIUS = 15;
 
@@ -50,6 +61,7 @@ export function drawMarker(layer, marker, markerKey) {
   );
   const radius = marker.kind === "sub" ? SUB_TASK_MARKER_RADIUS : TASK_MARKER_RADIUS;
   if (marker.kind === "possible") drawPossibleSpot(group, marker, radius);
+  else if (marker.iconItem && !failedIconUrls.has(marker.iconItem.url)) drawItemIconSpot(group, marker, radius);
   else drawExactSpot(group, marker, radius);
   if (marker.f) drawFloorBadge(group, marker.f);
   if (marker.ready === false) drawNotReadyBadge(group);
@@ -80,6 +92,43 @@ function drawExactSpot(group, marker, radius) {
     const tick = { d: "M-3.5,.5L-1,3L4,-3", fill: "none", stroke: WHITE, "stroke-width": 2.4, "stroke-linecap": "round" };
     createSvgElement("path", tick, group);
   }
+}
+
+/**
+ * An exact spot where you place an item: the item's icon in a rounded tile with a border in the
+ * category's colour (ticket 07). It takes the shape's place and size, so the badges keep their
+ * corners. While the icon loads the tile shows empty; if it can't load (offline, no such icon),
+ * the tile is swapped for the category's shape and the address is remembered, so later redraws
+ * go straight to the shape.
+ * @param {SVGGElement} group
+ * @param {MarkerItem} marker
+ * @param {number} radius
+ */
+function drawItemIconSpot(group, marker, radius) {
+  const item = /** @type {NonNullable<MarkerItem["iconItem"]>} */ (marker.iconItem);
+  const body = createSvgElement("g", {}, group);
+  const side = radius * 2 + ICON_TILE_EXTRA_SIZE;
+  const tile = { x: -side / 2, y: -side / 2, width: side, height: side, rx: ICON_TILE_CORNER_RADIUS };
+  createSvgElement("rect", { ...tile, fill: ICON_TILE_BACKGROUND, stroke: marker.color, "stroke-width": ICON_TILE_BORDER }, body);
+  const picture = side - ICON_TILE_BORDER - ICON_TILE_PADDING * 2;
+  const image = createSvgElement(
+    "image",
+    { href: item.url, x: -picture / 2, y: -picture / 2, width: picture, height: picture, preserveAspectRatio: "xMidYMid meet", "pointer-events": "none" },
+    body,
+  );
+  image.addEventListener("error", () => {
+    failedIconUrls.add(item.url);
+    body.replaceChildren();
+    drawExactSpot(body, marker, radius);
+  });
+  if (item.hasAlternatives) drawAlternativesBadge(body, side);
+}
+
+/** A small black "+" circle in the middle of the right edge: other items would do too. */
+function drawAlternativesBadge(body, tileSide) {
+  const cx = tileSide / 2;
+  createSvgElement("circle", { cx, cy: 0, r: 3.4, fill: BLACK, stroke: WHITE, "stroke-width": 1 }, body);
+  createSvgElement("path", { d: `M${cx - 1.7},0H${cx + 1.7}M${cx},-1.7V1.7`, stroke: WHITE, "stroke-width": 1.2 }, body);
 }
 
 /** The floor ("2", "B"…) in a black circle, top right. */

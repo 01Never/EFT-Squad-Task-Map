@@ -54,6 +54,10 @@ type Backend interface {
 	// ScanEnded tells the page the scan finished (confirmed or cancelled).
 	ScanEnded(how string)
 
+	// IconPath is the file holding an item's icon (downloaded first if needed); icons.ErrUnavailable
+	// when there is none. Served as /icons/<id>.webp.
+	IconPath(ctx context.Context, itemID string) (string, error)
+
 	// Updates is "Check for updates": check, download, cancel, install. Nothing in it runs
 	// unless a route below asks for it.
 	Updates() *updates.Updater
