@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -65,6 +66,12 @@ type Squad struct {
 
 	// lifecycle makes Join, Resume, Leave and Stop happen one at a time.
 	lifecycle sync.Mutex
+
+	// pageUpdates sends the "squad" event and cacheWrites saves the cache file, each at most once
+	// per ChangeInterval (a friend's flood of shares becomes a handful of each).
+	pageUpdates *throttle
+	cacheWrites *throttle
+	writeCount  atomic.Int64 // cache files written (tests)
 }
 
 // New loads the squad cache and fills in the settings' defaults (a new player id is made once and
@@ -90,6 +97,8 @@ func New(config Config) *Squad {
 		onlineLinks: map[string]string{},
 		state:       StateOff,
 	}
+	squad.pageUpdates = newThrottle(ChangeInterval, config.OnChange)
+	squad.cacheWrites = newThrottle(ChangeInterval, squad.writeCacheNow)
 	squad.mine, squad.friends = readCache(config.CacheFile)
 	delete(squad.friends, settings.PlayerID)
 	if changed {
@@ -165,7 +174,7 @@ func (squad *Squad) SetMyShare(parts ShareParts) (ShareResult, error) {
 	}
 	squad.mutex.Unlock()
 	if changed {
-		squad.config.OnChange()
+		squad.notifyPage()
 	}
 	return result, nil
 }
@@ -188,7 +197,7 @@ func (squad *Squad) SetProfile(name, color string, shareTasks bool) error {
 	squad.restampMineLocked()
 	squad.mutex.Unlock()
 	squad.config.SaveSettings(settings)
-	squad.config.OnChange()
+	squad.notifyPage()
 	return nil
 }
 
@@ -221,10 +230,28 @@ func (squad *Squad) publishMineLocked() {
 	squad.feed.publish(encoded)
 }
 
+// saveCacheLocked asks for the cache file to be written (within ChangeInterval; see cacheWrites).
 func (squad *Squad) saveCacheLocked() {
+	squad.cacheWrites.trigger()
+}
+
+// writeCacheNow writes the cache file with the current state.
+func (squad *Squad) writeCacheNow() {
+	squad.mutex.Lock()
+	defer squad.mutex.Unlock()
+	squad.writeCacheNowLocked()
+}
+
+func (squad *Squad) writeCacheNowLocked() {
+	squad.writeCount.Add(1)
 	if err := writeCache(squad.config.CacheFile, squad.mine, squad.friends); err != nil {
 		log.Printf("squad: %v", err)
 	}
+}
+
+// notifyPage asks for a "squad" event (within ChangeInterval; see pageUpdates).
+func (squad *Squad) notifyPage() {
+	squad.pageUpdates.trigger()
 }
 
 // ---------------------------------------------------------------- friends
@@ -253,7 +280,7 @@ func (squad *Squad) onFriendShare(link PeerAddress, share Share, viaStream bool)
 	}
 	squad.mutex.Unlock()
 	if hasNewContent || wasOnline != isOnline {
-		squad.config.OnChange()
+		squad.notifyPage()
 	}
 }
 
@@ -272,7 +299,7 @@ func (squad *Squad) onFriendStreamClosed(link PeerAddress) {
 		squad.saveCacheLocked()
 	}
 	squad.mutex.Unlock()
-	squad.config.OnChange()
+	squad.notifyPage()
 }
 
 func (squad *Squad) isOnlineLocked(playerID string) bool {
@@ -427,10 +454,10 @@ func (squad *Squad) Leave(ctx context.Context) {
 	squad.settings.Joined = false
 	squad.state, squad.problem = StateOff, ""
 	settings := squad.settings
-	squad.saveCacheLocked()
+	squad.writeCacheNowLocked() // friends are forgotten on disk at once
 	squad.mutex.Unlock()
 	squad.config.SaveSettings(settings)
-	squad.config.OnChange()
+	squad.notifyPage()
 }
 
 // Stop ends the session when the app closes (nothing is deleted; Resume picks it up next time).
@@ -442,6 +469,7 @@ func (squad *Squad) Stop() {
 		_ = current.transport.Close()
 	}
 	squad.forgetOnlineLinks()
+	squad.cacheWrites.flush() // the last shares and lastSeen reach the file before the app closes
 }
 
 // removeStateFolder deletes tsnet's state folder: the app's own folder, and only that one.
@@ -466,7 +494,7 @@ func (squad *Squad) setState(from *session, state, problem string) {
 	squad.state, squad.problem = state, problem
 	squad.mutex.Unlock()
 	if !isSame {
-		squad.config.OnChange()
+		squad.notifyPage()
 	}
 }
 
@@ -544,7 +572,7 @@ func (squad *Squad) runSession(ctx context.Context, current *session, isAlreadyU
 		squad.setState(current, StateError, "listening for friends: "+err.Error())
 		return
 	}
-	server := newPeerServer(squad.feed, current.transport.IsCallerAllowed)
+	server := newPeerServer(squad.feed, current.transport)
 	if !current.attachServer(server) {
 		listener.Close()
 		return

@@ -10,6 +10,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 	"time"
 )
@@ -23,8 +24,13 @@ type Transport interface {
 	Up(ctx context.Context, isJoining bool) error
 	// Listen opens the peer API listener (never the page's 127.0.0.1 server).
 	Listen() (net.Listener, error)
-	// IsCallerAllowed checks who sent a request to the peer API.
-	IsCallerAllowed(ctx context.Context, remoteAddr string) bool
+	// IdentifyCaller checks who sent a request to the peer API: isAllowed, and a key naming the
+	// caller (one per tailnet machine; per IP with the dev transport) for the per-caller stream cap.
+	IdentifyCaller(ctx context.Context, remoteAddr string) (callerKey string, isAllowed bool)
+	// OwnAddresses are the peer API's own addresses; requests must name one in their Host header.
+	OwnAddresses() []netip.AddrPort
+	// StreamsPerCaller is how many open streams one caller may hold.
+	StreamsPerCaller() int
 	// Client is the HTTP client that reaches friends.
 	Client() *http.Client
 	// WatchPeers reports the friends to connect to, and the connection state, whenever either
@@ -103,10 +109,30 @@ func (transport *DevTransport) Listen() (net.Listener, error) {
 	return net.Listen("tcp", transport.listenAddress)
 }
 
-// IsCallerAllowed: only this PC.
-func (transport *DevTransport) IsCallerAllowed(_ context.Context, remoteAddr string) bool {
-	return IsLoopbackCaller(remoteAddr)
+// IdentifyCaller: only this PC. Every copy on this PC calls from the same IP, so the key is
+// that IP and the per-caller cap is higher (see StreamsPerCaller).
+func (transport *DevTransport) IdentifyCaller(_ context.Context, remoteAddr string) (string, bool) {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	return "ip:" + host, IsLoopbackCaller(remoteAddr)
 }
+
+// OwnAddresses is the listen address.
+func (transport *DevTransport) OwnAddresses() []netip.AddrPort {
+	address, err := netip.ParseAddrPort(transport.listenAddress)
+	if err != nil {
+		return nil
+	}
+	return []netip.AddrPort{address}
+}
+
+// devStreamsPerCaller: up to 5 friends (a squad of 6) run on this PC and all call from 127.0.0.1.
+const devStreamsPerCaller = 5
+
+// StreamsPerCaller: all local copies share one caller key, so 5.
+func (transport *DevTransport) StreamsPerCaller() int { return devStreamsPerCaller }
 
 // Client is a plain HTTP client.
 func (transport *DevTransport) Client() *http.Client { return transport.client }

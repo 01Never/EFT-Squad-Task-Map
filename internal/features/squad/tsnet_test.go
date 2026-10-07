@@ -92,6 +92,9 @@ func TestTwoCopiesShareOverARealTsnetTailnet(t *testing.T) {
 		if err == nil {
 			t.Fatal("joined with a wrong invite code")
 		}
+		if !strings.Contains(err.Error(), "invalid authkey") {
+			t.Errorf("the error %q doesn't give Tailscale's reason", err)
+		}
 		if _, statErr := os.Stat(filepath.Join(bobDir, StateFolderName)); !os.IsNotExist(statErr) {
 			t.Errorf("the state folder is still there after a failed join")
 		}
@@ -226,7 +229,8 @@ func peerAddressOf(t *testing.T, copy *testCopy, playerID string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, peer := range SquadPeers(tailnetPeersFromStatus(status), copy.squad.Settings().PlayerID) {
+	friends, _ := SquadPeers(tailnetPeersFromStatus(status), copy.squad.Settings().PlayerID)
+	for _, peer := range friends {
 		if peer.PlayerID == playerID {
 			return peer.BaseURL
 		}

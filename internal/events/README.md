@@ -26,7 +26,7 @@
 | `keybind` | broadcast | `ok`, `warning` | the game's control settings were read |
 | `data` | broadcast | `status` | the game data changed (download, mode switch) |
 | `updates` | broadcast | `status` (the update state, see `internal/features/updates/README.md`) | a check, download, install or failure changed it (progress at most every 250 ms); only after a click |
-| `squad` | broadcast | `squad` (the squad view, same as `GET /api/squad`; see `internal/features/squad/README.md`) | the squad status, a friend's share or online state, your profile or your share's rev changed; never while not in a squad, except after your own actions |
+| `squad` | broadcast | `squad` (the squad view, same as `GET /api/squad`; see `internal/features/squad/README.md`) | the squad status, a friend's share or online state, your profile or your share's rev changed (at most once a second, latest state last); never while not in a squad, except after your own actions |
 
 **What it deliberately doesn't do:** decide what to send (`internal/app` does); keep broadcast
 events for later; send heartbeats (the connection is local).

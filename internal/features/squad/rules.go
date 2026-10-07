@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/netip"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -65,6 +66,15 @@ const (
 	// Reconnecting to a friend waits 1 s after the first failure, doubling up to 60 s (ticket 05).
 	firstRetryDelay = time.Second
 	maxRetryDelay   = 60 * time.Second
+
+	// MinShareInterval: at most one share a second is taken from each friend; newer ones that
+	// arrive meanwhile replace the waiting one (QA: a friend sending rev+1 in a loop flooded the
+	// page with 32k events in 10 s). The page sends at most about one a second anyway.
+	MinShareInterval = time.Second
+
+	// ChangeInterval: the page's "squad" event and the cache file are updated at most once a
+	// second (the first change at once, the last one never lost).
+	ChangeInterval = time.Second
 )
 
 var (
@@ -72,6 +82,14 @@ var (
 	colorPattern    = regexp.MustCompile(`^#[0-9a-f]{6}$`)
 	strokeColor     = regexp.MustCompile(`^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$`)
 	keyPattern      = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+	// A tailnet name that claims a player id: "stm-<id>", or "stm-<id>-1" when Tailscale had to
+	// make it unique because another machine already uses the name.
+	claimedNamePattern = regexp.MustCompile(`^stm-([0-9a-f]{16})(-[0-9]+)?$`)
+
+	// Keys that mean something special to JavaScript objects; refused so the page never has to
+	// worry about them in a friend's draw or tasks.
+	reservedKeys = map[string]bool{"__proto__": true, "constructor": true, "prototype": true}
 )
 
 // ---------------------------------------------------------------- the share
@@ -319,7 +337,8 @@ func validateTaskProgress(progress TaskProgress) error {
 }
 
 func isValidKey(key string) bool {
-	return len(key) >= 1 && len(key) <= maxKeyLength && keyPattern.MatchString(key)
+	isPlainWord := len(key) >= 1 && len(key) <= maxKeyLength && keyPattern.MatchString(key)
+	return isPlainWord && !reservedKeys[key]
 }
 
 func isFiniteIn(value, low, high float64) bool {
@@ -368,20 +387,28 @@ func NormalizeColor(color string) (string, bool) {
 // Hostname is this copy's name on the tailnet: "stm-<player id>".
 func Hostname(playerID string) string { return HostnamePrefix + playerID }
 
-// PlayerIDFromHostname reads the player id out of "stm-<player id>" (any case).
-func PlayerIDFromHostname(hostname string) (string, bool) {
-	lower := strings.ToLower(hostname)
-	if !strings.HasPrefix(lower, HostnamePrefix) {
-		return "", false
+// IsOwnHost: a request's Host header must be one of this copy's own peer API addresses, written
+// as an IP literal with the port ("127.0.0.1:7901", "100.64.0.7:7777", "[fd7a:…]:7777"). Friends'
+// copies always call it that way; a page on a rebinding domain sends its own name, so it is
+// refused even when the browser sends no Origin or Sec-Fetch-Site (a same-origin GET).
+func IsOwnHost(host string, ownAddresses []netip.AddrPort) bool {
+	requested, err := netip.ParseAddrPort(host)
+	if err != nil {
+		return false
 	}
-	id := strings.TrimPrefix(lower, HostnamePrefix)
-	return id, IsValidPlayerID(id)
+	for _, own := range ownAddresses {
+		if own.IsValid() && requested.Addr().Unmap() == own.Addr().Unmap() && requested.Port() == own.Port() {
+			return true
+		}
+	}
+	return false
 }
 
 // TailnetPeer is the part of the tailnet's peer list the squad looks at.
 type TailnetPeer struct {
-	HostName  string       // the name the node asked for ("stm-<player id>")
-	DNSName   string       // "stm-<player id>.<tailnet>.ts.net." (may get "-1" on a clash)
+	NodeID    string       // Tailscale's stable node id: one machine, whatever it calls itself
+	HostName  string       // the name the node asked for; each node picks its own, so not trusted
+	DNSName   string       // "stm-<player id>.<tailnet>.ts.net.", unique: a clash gets "-1"
 	Tags      []string     // e.g. ["tag:stm"]
 	IsOnline  bool         // connected to the tailnet right now
 	Addresses []netip.Addr // its tailnet addresses
@@ -389,21 +416,31 @@ type TailnetPeer struct {
 
 // PeerAddress is a friend's copy to connect to.
 type PeerAddress struct {
-	Key      string // stable name for the connection: the player id (tsnet) or the address (dev)
+	Key      string // the connection's name: the node's stable id (tsnet) or the address (dev)
 	PlayerID string // the player id the share must carry; "" when unknown (dev transport)
 	BaseURL  string // "http://100.64.0.7:7777"
 }
 
 // SquadPeers picks, from the tailnet's peer list, the online squad nodes to connect to: tagged
-// tag:stm, named stm-<player id>, with an address. Our own player id is left out.
-func SquadPeers(peers []TailnetPeer, ownPlayerID string) []PeerAddress {
-	var found []PeerAddress
+// tag:stm, whose MagicDNS name is exactly stm-<player id>, with an address. Our own player id is
+// left out.
+//
+// The id comes only from the DNS name, which the tailnet keeps unique, never from the host name,
+// which any node can set to anything. When two machines claim the same id ("stm-<id>" and
+// "stm-<id>-1", online or not), neither is trusted: contested lists those ids, to log.
+func SquadPeers(peers []TailnetPeer, ownPlayerID string) (found []PeerAddress, contested []string) {
+	claimsByID := map[string]int{}
 	for _, peer := range peers {
-		if !peer.IsOnline || !HasSquadTag(peer.Tags) {
+		if id, _, isClaim := playerIDClaimedBy(peer); isClaim {
+			claimsByID[id]++
+		}
+	}
+	for _, peer := range peers {
+		playerID, isExactName, isClaim := playerIDClaimedBy(peer)
+		if !isClaim || playerID == ownPlayerID || claimsByID[playerID] > 1 {
 			continue
 		}
-		playerID, isSquadName := playerIDFromPeerNames(peer)
-		if !isSquadName || playerID == ownPlayerID {
+		if !isExactName || !peer.IsOnline || !HasSquadTag(peer.Tags) || peer.NodeID == "" {
 			continue
 		}
 		address, hasAddress := preferredAddress(peer.Addresses)
@@ -411,18 +448,26 @@ func SquadPeers(peers []TailnetPeer, ownPlayerID string) []PeerAddress {
 			continue
 		}
 		baseURL := "http://" + net.JoinHostPort(address.String(), fmt.Sprint(PeerAPIPort))
-		found = append(found, PeerAddress{Key: playerID, PlayerID: playerID, BaseURL: baseURL})
+		found = append(found, PeerAddress{Key: peer.NodeID, PlayerID: playerID, BaseURL: baseURL})
 	}
-	return found
+	for id, count := range claimsByID {
+		if count > 1 && id != ownPlayerID {
+			contested = append(contested, id)
+		}
+	}
+	sort.Strings(contested)
+	return found, contested
 }
 
-// playerIDFromPeerNames reads the id from the host name, or else from the first part of the DNS name.
-func playerIDFromPeerNames(peer TailnetPeer) (string, bool) {
-	if id, ok := PlayerIDFromHostname(peer.HostName); ok {
-		return id, true
+// playerIDClaimedBy reads the player id from the first part of a node's MagicDNS name.
+// isExactName: the name is exactly "stm-<id>" (not "stm-<id>-1").
+func playerIDClaimedBy(peer TailnetPeer) (playerID string, isExactName, isClaim bool) {
+	firstLabel, _, _ := strings.Cut(strings.ToLower(peer.DNSName), ".")
+	match := claimedNamePattern.FindStringSubmatch(firstLabel)
+	if match == nil {
+		return "", false, false
 	}
-	firstLabel, _, _ := strings.Cut(peer.DNSName, ".")
-	return PlayerIDFromHostname(firstLabel)
+	return match[1], match[2] == "", true
 }
 
 // preferredAddress: the IPv4 tailnet address if there is one, else the first IPv6.
