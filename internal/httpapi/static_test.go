@@ -226,8 +226,10 @@ func (backend *fakeBackend) AcknowledgeEvents(upToID float64) {
 }
 
 func send(server http.Handler, method, path string, body []byte) *httptest.ResponseRecorder {
+	request := httptest.NewRequest(method, path, bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json") // as the page sends it
 	recorder := httptest.NewRecorder()
-	server.ServeHTTP(recorder, httptest.NewRequest(method, path, bytes.NewReader(body)))
+	server.ServeHTTP(recorder, request)
 	return recorder
 }
 

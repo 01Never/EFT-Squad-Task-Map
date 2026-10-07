@@ -69,7 +69,9 @@ func Run(builtIn fs.FS) error {
 	rememberRunningCopy(files, port)
 	defer forgetRunningCopy(files)
 
-	server := &http.Server{Handler: httpapi.NewServer(app, static), ReadHeaderTimeout: 10 * time.Second}
+	// Only the app's own page may use the server (ticket 04d): see localPageHosts.
+	handler := httpapi.Guard(localPageHosts(port), httpapi.NewServer(app, static))
+	server := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	// Goroutine: the web server; ends when server.Shutdown is called below.
 	go func() {
 		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -160,6 +162,16 @@ func listenOnFreePort() (net.Listener, int, error) {
 		lastErr = err
 	}
 	return nil, 0, fmt.Errorf("no free port from %d to %d: %w", first, lastPort, lastErr)
+}
+
+// localPageHosts: the names the page is opened with, on the port this copy listens on. The
+// server answers no other Host, and takes state-changing requests only from these origins.
+// (Ticket 05's squad listener will get its own list instead of widening this one.)
+func localPageHosts(port int) httpapi.AllowedHosts {
+	return httpapi.AllowedHosts{
+		fmt.Sprintf("127.0.0.1:%d", port),
+		fmt.Sprintf("localhost:%d", port),
+	}
 }
 
 // ---------------------------------------------------------------- one copy at a time
