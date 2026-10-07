@@ -90,6 +90,7 @@ func newApp(version, updatedFrom string, files storage.Files, builtInGameData fu
 	app.updates = newUpdater(app, updatedFrom, userAgent)
 	app.squad = newSquad(app)
 	app.icons = icons.NewCacheFromEnvironment(files.Icons, userAgent)
+	app.icons.Known = app.gameData.ItemKnown // only items in the game data are ever fetched
 	return app
 }
 
