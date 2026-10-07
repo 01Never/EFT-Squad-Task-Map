@@ -72,7 +72,8 @@ func (client *Client) call(ctx context.Context, key, method, path string, body a
 		return nil, fmt.Errorf("OpenAI: %w", err)
 	}
 	defer response.Body.Close()
-	responseBody, _ := io.ReadAll(response.Body)
+	// Capped: a real answer is a few KB; a broken or hostile endpoint can't make us read forever.
+	responseBody, _ := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes))
 	var decoded map[string]any
 	_ = json.Unmarshal(responseBody, &decoded)
 	if response.StatusCode < 200 || response.StatusCode > 299 {
@@ -80,6 +81,9 @@ func (client *Client) call(ctx context.Context, key, method, path string, body a
 	}
 	return decoded, nil
 }
+
+// maxResponseBytes caps how much of an answer is read (OpenAI's answers here are a few KB).
+const maxResponseBytes = 8 << 20
 
 // errorFromResponse turns an OpenAI error into a sentence with a hint for the usual causes.
 func errorFromResponse(response *http.Response, decoded map[string]any) error {
