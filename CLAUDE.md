@@ -48,3 +48,4 @@ Project: **Squad Task Map, local edition.** It's a Windows desktop helper for Es
 - `backend-engineer` (Go: `internal/`, `cmd/`), `frontend-engineer` (`web/`), `qa-tester` (all test layers, `tests/browser/`, verdict before merge), `docs-writer` (README, user guide, handoff).
 - Well-scoped work (one feature, clear acceptance checks) goes to a fast model (Sonnet). Behaviour-preserving refactors and security-sensitive code (self-update, signing) stay on the default model.
 - Each agent works in its own git worktree on its own branch, commits early and keeps updating, so an interrupted agent loses nothing.
+- Tickets 05 onward are **GitHub issues** (labels `ticket`, `size: …`, `server`/`page`). A ticket's PR body says `Closes #<issue>`; questions to the owner about a ticket go on its issue.
