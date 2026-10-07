@@ -3,9 +3,8 @@ package gamedata
 // ItemIDs is every item id the page can ask an icon for, taken from the game data: marker items,
 // items to plant or hand in, quest items (qiId), keys, and the gear of kill objectives (the Bring
 // list shows all of these). The icon cache fetches only these ids.
-//
-// Ticket 08 (loot): add the loose-loot item ids and the lock key ids from GameData.Loot here, with
-// one more `add` call each. This is the only place the set is built.
+// Also the loose-loot items and the keys of locked doors (ticket 08), which LootData.ItemNames
+// lists. This is the only place the set is built.
 func ItemIDs(data GameData) map[string]bool {
 	ids := map[string]bool{MS2000Marker.ID: true}
 	add := func(id string) {
@@ -38,6 +37,11 @@ func ItemIDs(data GameData) map[string]bool {
 				addGroups(objective.Gear.Mods)
 				addGroups(objective.Gear.Wearing)
 			}
+		}
+	}
+	if data.Loot != nil {
+		for id := range data.Loot.ItemNames {
+			add(id)
 		}
 	}
 	return ids
