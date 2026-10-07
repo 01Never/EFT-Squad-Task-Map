@@ -238,7 +238,7 @@ and `npm run typecheck`. Each feature folder has a README.
 - `web/js/panel/panel.js`: the panel's header, the Tasks tab's sections in order, the footer,
   hide/show, and the one router for its clicks and changes (each feature lists its handlers).
 - `web/js/features/<name>/`: `tasks`, `readiness`, `sub-tasks`, `drawing`, `extracts`, `find-me`,
-  `picker`, `raid`, `scan`, `ai-categorize`, `settings`. Each has `README.md`, `rules.js` (no DOM,
+  `picker`, `raid`, `scan`, `ai-categorize`, `settings`, `loot` (ticket 08). Each has `README.md`, `rules.js` (no DOM,
   tested in `rules.test.js`), `panel.js` and/or `map-layer.js`, and its `<name>.css`. See
   `docs/FEATURES.md`.
 - **Rendering model:** `renderMapPage()` rebuilds the panel's innerHTML (keeping its scroll position)
@@ -316,7 +316,7 @@ Log task events count only when the log's `Session mode` matches the game-mode s
 The raw json.tarkov.dev format (`{mode}/tasks`, `tasks_en`, `maps`, `maps_en`, `traders`, `traders_en`, `items_en`; names are translation keys) was first **inferred**, then **checked against the real files on 2026-10-05**: the assumptions hold, nothing is left untranslated, 515 tasks with the same ids as the snapshot, payload ~1.8 MB. The real files are kept (gzip) in `testdata/jsontarkovdev/`, and the Go converter is JSON-equal to v2 on them (`internal/gamedata/convert_test.go`).
 
 ### 6.2 Saved state (`squad-task-map-data.json`, `version: 2`)
-See SPEC §12. Fields: `cats`, `tasks{id: {active, source, addedAt, gamePct, scannedAt, noSplit, pinned, partCats}}`, `ticks`, `have`, `used`, `subs`, `draw`, `prefs{map: {ext, extMarked, labels, drawOn}}`, `pinnedOnly`, `panelTab`, `panelHidden`, `collapsed`, `dcolor`, `dwidth`, `aiOpen`, `showScanBanner`, `migratedFrom`.
+See SPEC §12. Fields: `cats`, `tasks{id: {active, source, addedAt, gamePct, scannedAt, noSplit, pinned, partCats}}`, `ticks`, `have`, `used`, `subs`, `draw`, `prefs{map: {ext, extMarked, labels, drawOn, loot?}}` (`loot` only once you change a loot chip, ticket 08), `pinnedOnly`, `panelTab`, `panelHidden`, `collapsed`, `dcolor`, `dwidth`, `aiOpen`, `showScanBanner`, `migratedFrom`.
 - **Adding a field:** add its default to `freshState()`. `fill()` adds missing defaults when loading. Only bump `version` and add a `migrate` step for structural changes; keep the v1 → v2 path working (fixture: `tests/fixtures/v1-data.json`, the owner's real v1 file).
 
 ### 6.3 Files next to the exe

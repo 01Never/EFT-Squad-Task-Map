@@ -63,6 +63,23 @@ The **Bring list** tab lists what the tasks currently shown on the map need: key
 - **📌** on a task row or map popup pins the task. **Pinned only** (panel and map toolbar) shows only pinned tasks everywhere, bring list included. **Clear pins** unpins all. Finished tasks unpin themselves.
 - Extracts show faded. Click one on the map to mark it solid (an extract you have this raid); click again to unmark. Marked extracts decide the **closest extract** (see Your position). Marks clear after each raid (or **Clear marked**). The PMC / Scav / Shared / Transit chips choose which kinds show.
 
+## Loot spots
+For planning loot and Scav runs, the **Loot** section of the task list (click its heading to open
+it) shows where containers and notable loose loot spawn, from tarkov.dev's map data.
+- One chip per container type on this map (Safe, Weapon box, PC block, Jacket, Drawer = filing
+  cabinet…) and one for **Loose loot** (keys, valuables, intel, electronics and similar), each with
+  how many there are. Click a chip to show or hide those spots.
+- **★ High value** shows safes, weapon boxes, PC blocks, tech supply crates, medcases, jackets,
+  drawers and loose loot in one click (click it again to hide them). **None** hides all loot.
+- Your choices are kept per map.
+- On the map, loot shows as small dark tiles with a sign (**$** safe, **W** weapon box, **PC**,
+  **J** jacket, **D** drawer, **L** loose loot…) and a floor badge like task markers. Where spots
+  crowd together they share a round bubble with a count: click it to zoom in until they split.
+  Click a spot to see what it is, its floor, and what can spawn there.
+- Loot never selects a task and doesn't change the "!", the Bring list or your pins.
+- The spots come with the game data download. With the built-in data (first start without
+  internet) the section says so until the data is downloaded.
+
 ## Your position (GPS)
 During a raid, Tarkov puts your position and facing in each screenshot's **file name**. When a new one appears, the app switches to the raid's map (setting **Follow my position**, on by default), draws your marker with a short trail, and brings it into view if it's off-screen (your zoom stays). The app reads the file name only, never the picture.
 

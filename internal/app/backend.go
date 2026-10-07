@@ -74,6 +74,9 @@ func (app *App) aiStatus(settings storage.Settings) map[string]any {
 // GameDataJSON is /api/data.
 func (app *App) GameDataJSON() []byte { return app.gameData.JSON() }
 
+// LootJSON is /api/loot/<map> (ticket 08).
+func (app *App) LootJSON(mapKey string) ([]byte, bool) { return app.gameData.LootJSON(mapKey) }
+
 // RefreshGameData downloads fresh data now.
 func (app *App) RefreshGameData() gamedata.RefreshResult { return app.gameData.Refresh() }
 

@@ -50,3 +50,21 @@ test("extract marks saved before ticket 06 (true) survive loading, next to auto 
     "Old Gas Station Gate": { auto: true, note: "Requires paracord" },
   });
 });
+
+test("a file from before ticket 08 loads without loot choices: no loot shown, nothing added", () => {
+  const before = { version: 2, cats: [], tasks: {}, prefs: { customs: { ext: { pmc: true }, extMarked: {} } } };
+  const saved = migrateSavedData(before);
+  assert.equal("loot" in saved.prefs.customs, false);
+});
+
+test("saved loot choices load as they are, and a damaged one keeps only the chips that are on", () => {
+  const prefs = {
+    customs: { loot: { safe: true, loose: true } },
+    woods: { loot: { jacket: "on", drawer: true } },
+    shoreline: { loot: null },
+  };
+  const saved = migrateSavedData({ version: 2, cats: [], tasks: {}, prefs });
+  assert.deepEqual(saved.prefs.customs.loot, { safe: true, loose: true });
+  assert.deepEqual(saved.prefs.woods.loot, { drawer: true });
+  assert.deepEqual(saved.prefs.shoreline.loot, {});
+});

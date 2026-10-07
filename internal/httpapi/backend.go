@@ -20,6 +20,8 @@ type Backend interface {
 	Status() any
 	// GameDataJSON is /api/data: the tasks and maps for the page.
 	GameDataJSON() []byte
+	// LootJSON is /api/loot/<map>: one map's loot spots (ticket 08); false for an unknown map.
+	LootJSON(mapKey string) ([]byte, bool)
 	// RefreshGameData downloads fresh game data now ("Update game data now").
 	RefreshGameData() gamedata.RefreshResult
 

@@ -15,6 +15,7 @@ import { renderTaskMarkers } from "../features/tasks/map-layer.js";
 import { renderPopup, bindPopup } from "../features/tasks/popup.js";
 import { togglePinnedOnly } from "../features/tasks/panel.js";
 import { renderExtracts } from "../features/extracts/map-layer.js";
+import { renderLoot } from "../features/loot/map-layer.js";
 import { renderDrawings, renderDrawingBar, bindDrawing } from "../features/drawing/map-layer.js";
 import { renderPlayer, bindFindMe } from "../features/find-me/map-layer.js";
 import { renderFriendDrawings, renderFriendTaskMarkers } from "../features/squad/map-layer.js";
@@ -160,6 +161,7 @@ export function renderMapPage() {
   renderPanel();
   renderPlaceNames();
   renderExtracts();
+  renderLoot();
   renderFriendDrawings();
   renderDrawings();
   renderFriendTaskMarkers();

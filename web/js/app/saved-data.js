@@ -4,6 +4,7 @@
 // Key order matters only for how the JSON file reads; it's kept as v2 wrote it.
 import { DEFAULT_CATEGORIES } from "../features/tasks/categories.js";
 import { DEFAULT_SHOWN_EXTRACT_KINDS } from "../features/extracts/rules.js";
+import { cleanLootChoices } from "../features/loot/rules.js";
 
 /** @import { SavedState, TaskEntry, Category, MapPrefs } from "./types.js" */
 
@@ -78,6 +79,9 @@ export function fillMissingFields(saved) {
     const mapPrefs = saved.prefs[mapKey];
     mapPrefs.ext = { ...DEFAULT_SHOWN_EXTRACT_KINDS, ...(mapPrefs.ext || {}) };
     mapPrefs.extMarked = mapPrefs.extMarked || {};
+    // Loot choices (ticket 08) are absent until you change one; absent means no loot shown, so
+    // older files load unchanged. A damaged value keeps only the chips that are on.
+    if (mapPrefs.loot !== undefined) mapPrefs.loot = cleanLootChoices(mapPrefs.loot);
   }
   return saved;
 }
