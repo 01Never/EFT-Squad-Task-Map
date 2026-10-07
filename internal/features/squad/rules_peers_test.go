@@ -127,6 +127,9 @@ func TestOnlyPlainVisibleNamesAreAcceptedFromFriends(t *testing.T) {
 		{"quotes and ampersands", `"Sam" & 'Co'`, true},
 		{"a right-to-left override", "Sam\u202eevil", false},
 		{"a zero-width space", "Sa\u200bm", false},
+		{"an emoji family held together by zero-width joiners", "Sam \U0001F468\u200d\U0001F469\u200d\U0001F467", true},
+		{"a Persian name with a zero-width non-joiner", "\u0645\u06cc\u200c\u0631\u0648\u06cc", true},
+		{"only zero-width joiners", "\u200d\u200c\u200d", false},
 	}
 	for _, tc := range cases {
 		_, err := DecodeShare(validShareJSON(withPlayer(sam.ID, tc.player, sam.Color)))

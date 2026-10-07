@@ -19,7 +19,7 @@ Your choices per friend are in the saved data (below). The page never polls.
 **The rules** (`rules.js`, tested in `rules.test.js`):
 - **Friends are untrusted.** `safeFriendColor()` accepts only `#rrggbb` (else a neutral grey);
   `friendDisplayName()` cuts to 32 characters (not UTF-16 units), drops control, bidi and
-  zero-width characters ("(no name)" if nothing is left); every name is shown inside `<bdi>`; every name is
+  zero-width spaces, keeping the zero-width joiners emoji need ("(no name)" if nothing visible is left); every name is shown inside `<bdi>`; every name is
   `escapeHtml()`-ed where it goes into HTML; friend text is never used in a URL or in `innerHTML`
   unescaped. Every lookup keyed by friend data (task, objective and map ids, friend ids) uses own-property
   checks (`ownValue()`), so `toString` or `__proto__` find nothing; a friend whose data throws is
