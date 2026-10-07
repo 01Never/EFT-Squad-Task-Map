@@ -517,7 +517,7 @@ The server listens on 127.0.0.1 only, but any web page open in the user's browse
 
 1. **Settings checkboxes are squashed into thin slivers** ("Follow my position", "Center the map on me…"). They should look like normal checkboxes, left of their label, in the tarkov.dev style (`accent-color` from the palette), and stay clickable on the label too. Check desktop and phone width.
 2. **Deselecting leaves the task row open.** Pressing Esc or clicking an empty spot on the map clears the selection (flash stops) but the task's row in the list stays expanded, so the next click on that row closes it instead of selecting it. Fix: deselecting also collapses the row it had opened, so the next click on that row selects it again (zoom + flash), exactly like a fresh click. Closing the popup behaves the same.
-3. **"Switch data" reloads the game data twice.** Clicking "Switch data" in the "Game says PvE" prompt should change the mode and reload the game data once (one `/api/data` request, one redraw).
+3. **"Switch data" reloads the game data twice.** *Outcome: kept, by design.* The two reloads are two real changes (the built-in data at once, then the fresh download); see `docs/HANDOFF.md` §11.
 
 ## Acceptance checks
 - New browser-suite checks for each bug (fail before, pass after), and new logic tests where a rule changed.
