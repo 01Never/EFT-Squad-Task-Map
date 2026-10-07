@@ -44,6 +44,7 @@ type Status struct {
 type Store struct {
 	mutex      sync.Mutex
 	current    GameData
+	itemIDs    map[string]bool // every item id an icon may be asked for (ItemIDs)
 	taskIDs    map[string]bool
 	origin     string
 	fetchedAt  *float64
@@ -128,6 +129,7 @@ func (store *Store) SetMode(mode string, notify bool) {
 func (store *Store) setCurrentLocked(data GameData) {
 	store.current = data
 	store.cachedJSON = nil
+	store.itemIDs = ItemIDs(data)
 	store.taskIDs = make(map[string]bool, len(data.Tasks))
 	for _, task := range data.Tasks {
 		store.taskIDs[task.ID] = true
@@ -316,6 +318,14 @@ func (store *Store) Current() GameData {
 	store.mutex.Lock()
 	defer store.mutex.Unlock()
 	return store.current
+}
+
+// ItemKnown reports whether an item id is in the current data (see ItemIDs): the icon cache
+// fetches no other id. Rebuilt whenever the data changes.
+func (store *Store) ItemKnown(id string) bool {
+	store.mutex.Lock()
+	defer store.mutex.Unlock()
+	return store.itemIDs[id]
 }
 
 // TaskExists reports whether a task id is in the data (daily and weekly tasks aren't).

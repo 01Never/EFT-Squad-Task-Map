@@ -88,7 +88,7 @@ func TestTheFirstRequestDownloadsAndLaterOnesComeFromDisk(t *testing.T) {
 		serveTinyIcon(writer, request)
 	})
 	dir := filepath.Join(t.TempDir(), "squad-task-map-icons")
-	cache := NewCache(dir, assets.server.URL, "test")
+	cache := newOpenCache(dir, assets.server.URL, "test")
 
 	path, err := cache.Path(context.Background(), marker2000)
 	if err != nil {
@@ -102,7 +102,7 @@ func TestTheFirstRequestDownloadsAndLaterOnesComeFromDisk(t *testing.T) {
 	}
 	// A new cache (a restart) with the same folder needs no network.
 	assets.server.Close()
-	restarted := NewCache(dir, assets.server.URL, "test")
+	restarted := newOpenCache(dir, assets.server.URL, "test")
 	if _, err := restarted.Path(context.Background(), marker2000); err != nil {
 		t.Errorf("not served from the folder: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestRequestsForOneIdAtTheSameTimeDownloadItOnce(t *testing.T) {
 		<-release
 		serveTinyIcon(writer, request)
 	})
-	cache := NewCache(t.TempDir(), assets.server.URL, "test")
+	cache := newOpenCache(t.TempDir(), assets.server.URL, "test")
 
 	var waiting sync.WaitGroup
 	for range 10 {
@@ -139,7 +139,7 @@ func TestRequestsForOneIdAtTheSameTimeDownloadItOnce(t *testing.T) {
 
 func TestAFailedDownloadIsNotRetriedUntilTheWaitIsOver(t *testing.T) {
 	assets := newFakeAssets(t, func(writer http.ResponseWriter, _ *http.Request) { http.NotFound(writer, nil) })
-	cache := NewCache(t.TempDir(), assets.server.URL, "test")
+	cache := newOpenCache(t.TempDir(), assets.server.URL, "test")
 	now := time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
 	cache.now = func() time.Time { return now }
 
@@ -172,7 +172,7 @@ func TestBadAnswersAreNeverStored(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			assets := newFakeAssets(t, handler)
 			dir := t.TempDir()
-			cache := NewCache(dir, assets.server.URL, "test")
+			cache := newOpenCache(dir, assets.server.URL, "test")
 			if _, err := cache.Path(context.Background(), marker2000); err != ErrUnavailable {
 				t.Fatalf("got %v, want ErrUnavailable", err)
 			}
@@ -185,7 +185,7 @@ func TestBadAnswersAreNeverStored(t *testing.T) {
 
 func TestANotAnIdRequestNeverReachesTheNetwork(t *testing.T) {
 	assets := newFakeAssets(t, serveTinyIcon)
-	cache := NewCache(t.TempDir(), assets.server.URL, "test")
+	cache := newOpenCache(t.TempDir(), assets.server.URL, "test")
 	for _, id := range []string{"../secret", "ABC", marker2000 + "x"} {
 		if _, err := cache.Path(context.Background(), id); err != ErrUnavailable {
 			t.Errorf("%q: got %v", id, err)
