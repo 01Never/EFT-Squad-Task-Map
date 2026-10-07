@@ -612,3 +612,64 @@ func IsPlausibleAuthKey(key string) bool {
 	hasSpaces := strings.ContainsFunc(key, unicode.IsSpace)
 	return strings.HasPrefix(key, "tskey-") && len(key) <= 200 && !hasSpaces
 }
+
+// ---------------------------------------------------------------- stale friends
+
+// StaleFriendAge: a friend not seen for this long is dropped from the cache and the view (owner's
+// decision). It also clears the old entry a friend leaves behind when they Leave and join again
+// (a new player id each time), so nobody's list fills up with ghosts. Checked when the cache is
+// loaded or written; no timer.
+const StaleFriendAge = 30 * 24 * time.Hour
+
+// PruneStaleFriends removes the friends whose lastSeen is older than StaleFriendAge at now.
+// It returns how many were removed.
+func PruneStaleFriends(friends map[string]CachedFriend, now time.Time) int {
+	oldestKept := now.Add(-StaleFriendAge).UnixMilli()
+	removed := 0
+	for playerID, friend := range friends {
+		if friend.LastSeen < oldestKept {
+			delete(friends, playerID)
+			removed++
+		}
+	}
+	return removed
+}
+
+// ---------------------------------------------------------------- join errors
+
+// tsnet's own health lines that say nothing about why a join failed: they show up in front of
+// the real reason while a node is still starting.
+const (
+	healthStarting  = "Tailscale is starting. Please wait."
+	healthLoggedOut = "You are logged out."
+	lastLoginError  = "The last login error was:"
+)
+
+// JoinFailureText turns Tailscale's reason for a failed join (its health messages, joined with
+// "; ") into the part worth showing: "this invite code has expired." when it says expired, else
+// from "invalid key: …" on, else what is left once the starting / logged-out lines are removed.
+// Example: "Tailscale is starting. Please wait.; You are logged out. The last login error was:
+// invalid key: this auth key has expired" → "this invite code has expired.".
+func JoinFailureText(raw string) string {
+	var meaningful []string
+	for _, part := range strings.Split(raw, "; ") {
+		part = strings.TrimSpace(part)
+		part = strings.TrimSpace(strings.TrimPrefix(part, healthStarting))
+		part = strings.TrimSpace(strings.TrimPrefix(part, healthLoggedOut))
+		part = strings.TrimSpace(strings.TrimPrefix(part, lastLoginError))
+		if part != "" {
+			meaningful = append(meaningful, part)
+		}
+	}
+	text := strings.Join(meaningful, "; ")
+	if text == "" {
+		return strings.TrimSpace(raw)
+	}
+	if strings.Contains(strings.ToLower(text), "expired") {
+		return "this invite code has expired."
+	}
+	if index := strings.Index(text, "invalid key"); index >= 0 {
+		return text[index:]
+	}
+	return text
+}

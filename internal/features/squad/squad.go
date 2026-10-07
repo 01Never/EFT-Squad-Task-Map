@@ -101,6 +101,9 @@ func New(config Config) *Squad {
 	squad.cacheWrites = newThrottle(ChangeInterval, squad.writeCacheNow)
 	squad.mine, squad.friends = readCache(config.CacheFile)
 	delete(squad.friends, settings.PlayerID)
+	if PruneStaleFriends(squad.friends, config.Now()) > 0 {
+		squad.saveCacheLocked()
+	}
 	if changed {
 		config.SaveSettings(settings)
 	}
@@ -243,6 +246,7 @@ func (squad *Squad) writeCacheNow() {
 }
 
 func (squad *Squad) writeCacheNowLocked() {
+	PruneStaleFriends(squad.friends, squad.config.Now()) // the view loses them too
 	squad.writeCount.Add(1)
 	if err := writeCache(squad.config.CacheFile, squad.mine, squad.friends); err != nil {
 		log.Printf("squad: %v", err)
@@ -455,6 +459,13 @@ func (squad *Squad) Leave(ctx context.Context) {
 	squad.mutex.Lock()
 	squad.friends = map[string]CachedFriend{}
 	squad.onlineLinks = map[string]string{}
+	if squad.settings.Joined {
+		// A fresh identity (owner's decision): the next Join is a brand-new stm-<id> machine, so
+		// it can't clash with the old one if the tailnet still lists it (logged out). Friends see
+		// a new friend; the old entry stays offline in their lists until StaleFriendAge.
+		squad.settings.PlayerID = NewPlayerID()
+		squad.restampMineLocked() // same drawings and tasks, new id; rev goes on (+1)
+	}
 	squad.settings.Joined = false
 	squad.state, squad.problem = StateOff, ""
 	settings := squad.settings

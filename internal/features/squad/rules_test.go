@@ -366,3 +366,61 @@ func TestStatusLine(t *testing.T) {
 		}
 	}
 }
+
+func TestFriendsUnseenFor30DaysArePruned(t *testing.T) {
+	cases := []struct {
+		name     string
+		lastSeen time.Time
+		isKept   bool
+	}{
+		{"seen today is kept", noon.Add(-time.Hour), true},
+		{"seen 29 days ago is kept", noon.Add(-29 * 24 * time.Hour), true},
+		{"seen exactly 30 days ago is kept", noon.Add(-StaleFriendAge), true},
+		{"seen 31 days ago is dropped", noon.Add(-31 * 24 * time.Hour), false},
+		{"never seen (0) is dropped", time.UnixMilli(0), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			friends := map[string]CachedFriend{sam.ID: {LastSeen: tc.lastSeen.UnixMilli()}}
+			removed := PruneStaleFriends(friends, noon)
+			_, isKept := friends[sam.ID]
+			wantRemoved := 1
+			if tc.isKept {
+				wantRemoved = 0
+			}
+			if isKept != tc.isKept || removed != wantRemoved {
+				t.Errorf("kept %v (removed %d), want kept %v", isKept, removed, tc.isKept)
+			}
+		})
+	}
+}
+
+func TestJoinErrorsShowOnlyTheMeaningfulPart(t *testing.T) {
+	const starting = "Tailscale is starting. Please wait."
+	const loggedOut = "You are logged out. The last login error was: "
+	cases := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{"an expired code, after tsnet's starting line",
+			starting + "; " + loggedOut + "invalid key: this auth key has expired",
+			"this invite code has expired."},
+		{"an expired code, the lines the other way round",
+			loggedOut + "invalid key: this auth key has expired; " + starting,
+			"this invite code has expired."},
+		{"an unknown code keeps Tailscale's invalid key reason",
+			starting + "; " + loggedOut + "invalid key: unknown auth key",
+			"invalid key: unknown auth key"},
+		{"another login error is kept as it is", loggedOut + "invalid authkey", "invalid authkey"},
+		{"a timeout with no health lines is kept", "context deadline exceeded", "context deadline exceeded"},
+		{"only transient lines: the raw text, not nothing", starting, starting},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := JoinFailureText(tc.raw); got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
