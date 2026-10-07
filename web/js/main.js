@@ -12,6 +12,7 @@ import { showPageForAddress, rerenderPage } from "./app/routing.js";
 import { connectToLiveEvents } from "./app/live-events.js";
 import { renderNav } from "./features/raid/nav.js";
 import { openSettings } from "./features/settings/panel.js";
+import { showExtractsNoticeIfDue } from "./features/extracts/notice.js";
 import { renderUpdateDot, showUpdatedNotice } from "./features/updates/panel.js";
 import { sendShare } from "./features/squad/share-sync.js";
 import { shouldSendShareAtStart } from "./features/squad/rules.js";
@@ -55,6 +56,7 @@ async function start() {
     connectToLiveEvents();
     showPageForAddress();
     showUpdatedNotice();
+    showExtractsNoticeIfDue();
     if (shouldSendShareAtStart(app.squad)) sendShare(true);
   } catch (error) {
     showStartUpError(error);

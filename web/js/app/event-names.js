@@ -5,6 +5,7 @@
 
 export const EVENT_NAMES = Object.freeze({
   task: "task", // deliver: a task was started, finished or failed in the game
+  extracts: "extracts", // deliver: my extracts, read from the first raid screenshot (ticket 06); mark them
   raidEnd: "raidEnd", // deliver: the raid ended; reset bag counts, extract marks and the trail
   gps: "gps", // broadcast: a new position from an in-raid screenshot
   capture: "capture", // broadcast: the list of screenshots captured for a task scan changed

@@ -204,6 +204,7 @@ Friends' copies ◄─(tailnet :7777, peer API; only when joined)─► features
 | `internal/features/taskscan` | Capture mode, serving captured images, the vision read, confirm/cancel. |
 | `internal/features/aicategorize` | AI Categorize (prompt, tool loop, review of the answer), wiki fetch/clean/cache (7 days), jobs. |
 | `internal/features/updates` | "Check for updates" (ticket 04c): signed manifest from GitHub Releases, background download, rename-and-replace with rollback, restart. Starts only from a click: no timers. README has the full API. |
+| `internal/features/extracts` | Ticket 06: the first in-raid screenshot (up to 3 per raid) is shrunk to a 2048 px JPEG, read by the OpenAI vision model for the extract list, matched to the raid map's extracts and transits (Levenshtein ≥ 0.82), and `deliver`ed as `extracts`. Only with a key and the setting on (`readExtracts`; default on after the one-time notice). README has the rules. |
 | `internal/features/squad` | Squad sharing over a private tailnet (ticket 05): your share (rev stamping, tasks dropped unless shared), the peer API on its own listener (`GET /squad/v1/share`, `/squad/v1/stream`), friends found on the IPN bus and held on SSE streams with 1 s → 60 s backoff, everything received validated, friends cached with `lastSeen`; tsnet or dev transport (picked in `internal/app/squad.go`). Starts only when joined. README has the full API for the page. |
 | `cmd/mock` | Offline stand-ins for json.tarkov.dev, OpenAI, the wiki and a fake GitHub Releases (byte-equal to v2's Bun mock for the first three). |
 | `cmd/release` | The owner's release tool: version check, tests, Windows build, signed `latest.json`. See "Publishing an update". |
@@ -277,7 +278,7 @@ Log task events count only when the log's `Session mode` matches the game-mode s
 
 **Pins:** per task. Pinned-only filters the list, the markers and the Bring list.
 
-**Extracts:** semi-transparent until clicked (marked); marks are stored in `prefs[map].extMarked` and cleared at raid end.
+**Extracts:** semi-transparent until clicked (marked); marks are stored in `prefs[map].extMarked` and cleared at raid end. A mark is `true` (a click, and all marks from before ticket 06) or `{auto: true, note}` (ticket 06: read from the first in-raid screenshot with the OpenAI vision model, `internal/features/extracts`; on by default with a key after a one-time notice; up to 3 screenshots per raid, one model call when a list is found). A marked extract is drawn even when its kind chip is off.
 
 **Selection (2.0.1):**
 - Clicking a marker selects the part: its row gets a white outline and scrolls to the centre, and the popup opens.
@@ -318,7 +319,7 @@ See SPEC §12. Fields: `cats`, `tasks{id: {active, source, addedAt, gamePct, sca
 - **Adding a field:** add its default to `freshState()`. `fill()` adds missing defaults when loading. Only bump `version` and add a `migrate` step for structural changes; keep the v1 → v2 path working (fixture: `tests/fixtures/v1-data.json`, the owner's real v1 file).
 
 ### 6.3 Files next to the exe
-`squad-task-map-data.json` (+ `.bak`), `squad-task-map-settings.json` (OpenAI key/model/effort, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`), `squad-task-map-gamedata-<mode>.json`, `squad-task-map-pending.json`, `squad-task-map-wikicache.json`, `squad-task-map-data.v1-backup.json`, `squad-task-map-instance.json` (port of the running copy), `squad-task-map-data.before-<version>.json` (newest 3, made before an update), `squad-task-map-update-notice.json` (release notes for the copy an update starts), `squad-task-map-squad.json` (ticket 05: my last squad share, friends' last shares with `lastSeen`), `squad-task-map-tailscale/` (ticket 05: tsnet's state folder with the node key, secret; deleted by Leave squad); the settings file's `squad` block holds `playerId`, `name`, `color`, `shareTasks`, `joined` (never the invite code); next to the exe, `SquadTaskMap.download.exe` and `SquadTaskMap.previous.exe` during/after an update.
+`squad-task-map-data.json` (+ `.bak`), `squad-task-map-settings.json` (OpenAI key/model/effort, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`, ticket 06: `readExtracts`, `extractsNoticeSeen`), `squad-task-map-gamedata-<mode>.json`, `squad-task-map-pending.json`, `squad-task-map-wikicache.json`, `squad-task-map-data.v1-backup.json`, `squad-task-map-instance.json` (port of the running copy), `squad-task-map-data.before-<version>.json` (newest 3, made before an update), `squad-task-map-update-notice.json` (release notes for the copy an update starts), `squad-task-map-squad.json` (ticket 05: my last squad share, friends' last shares with `lastSeen`), `squad-task-map-tailscale/` (ticket 05: tsnet's state folder with the node key, secret; deleted by Leave squad); the settings file's `squad` block holds `playerId`, `name`, `color`, `shareTasks`, `joined` (never the invite code); next to the exe, `SquadTaskMap.download.exe` and `SquadTaskMap.previous.exe` during/after an update.
 
 ---
 

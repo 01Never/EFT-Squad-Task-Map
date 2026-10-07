@@ -717,10 +717,11 @@ export class Scenario {
   }
 
   /** Drops a GPS-named screenshot (Tarkov writes the position and facing into the name). */
-  dropGps(x, y, z, facing = FACING_45_DEGREES) {
+  dropGps(x, y, z, facing = FACING_45_DEGREES, { realPicture = false } = {}) {
     const number = this.app.gpsCount++;
     const name = `2026-10-05[14-${String(number % 60).padStart(2, "0")}]_${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}_${facing} (${number}).png`;
-    fs.writeFileSync(path.join(this.app.shotsDir, name), "x");
+    // Most scenarios only need the name; the extract reader (ticket 06) opens the picture itself.
+    fs.writeFileSync(path.join(this.app.shotsDir, name), realPicture ? TINY_PNG : "x");
     return name;
   }
 

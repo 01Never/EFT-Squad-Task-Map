@@ -37,7 +37,11 @@ test("AI Categorize: add the key, ask, apply the answer and undo it", async (t) 
     await page.fill("#aikey", OPENAI_TEST_KEY);
     await s.answered("PUT", "/api/ai/key", () => page.click("#aisave"));
     await s.waitForToast("OpenAI key saved");
-    assert.equal(await page.locator(".modal").count(), 0);
+    // Ticket 06: the first key brings the one-time "what is sent" notice for reading extracts.
+    await page.waitForSelector(".modal #exOn");
+    assert.match(await page.textContent(".modal"), /first in-raid screenshot of each raid/);
+    await s.answered("PUT", "/api/settings", () => page.click("#exOn"));
+    await page.waitForFunction(() => !document.querySelector(".modal"));
     assert.match(await page.textContent("#panel .aihead .s"), /gpt-5\.4-mini/);
     const ai = (await s.status()).ai;
     assert.equal(ai.hasKey, true);
@@ -93,7 +97,7 @@ test("Scan: captured screenshots are read, confirming replaces the list and dele
   state.ticks[glory.objs[0].id] = true;
   state.subs.push({ id: "sub-glory", task: glory.id, text: "glory sub", done: false, map: null, x: null, z: null, f: "" });
   state.subs.push({ id: "sub-dandies", task: dandies.id, text: "dandies sub", done: false, map: null, x: null, z: null, f: "" });
-  await withScenario(t, { state, settings: { openaiKey: OPENAI_TEST_KEY } }, async (s) => {
+  await withScenario(t, { state, settings: { openaiKey: OPENAI_TEST_KEY, extractsNoticeSeen: true } }, async (s) => {
     const page = s.page;
     await s.openPicker();
     assert.equal(await page.textContent(".picker .lede"), "2 active tasks. Pick a map.");

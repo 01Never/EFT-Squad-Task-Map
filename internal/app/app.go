@@ -13,6 +13,7 @@ import (
 
 	"squadtaskmap/internal/events"
 	"squadtaskmap/internal/features/aicategorize"
+	"squadtaskmap/internal/features/extracts"
 	"squadtaskmap/internal/features/gamelog"
 	"squadtaskmap/internal/features/gps"
 	"squadtaskmap/internal/features/raid"
@@ -41,6 +42,7 @@ type App struct {
 	raid        *raid.Tracker
 	position    *gps.Tracker
 	scan        *taskscan.Scan
+	extracts    *extracts.Reader // ticket 06: my extracts from the first raid screenshot
 	categorizer *aicategorize.Categorizer
 	jobs        *aicategorize.Jobs
 	ai          *openai.Client
@@ -82,6 +84,7 @@ func newApp(version, updatedFrom string, files storage.Files, builtInGameData fu
 	app.logs = gamelog.NewWatcher(app.onLogEvent)
 	app.screenshots = screenshots.NewWatcher(gps.IsImageFile, app.onScreenshot)
 	app.scan = taskscan.New(app.screenshots, app.ai, app.onCaptureListChanged)
+	app.extracts = newExtractsReader(app)
 	app.updates = newUpdater(app, updatedFrom, userAgent)
 	app.squad = newSquad(app)
 	return app
@@ -122,6 +125,7 @@ func (app *App) onLogEvent(event gamelog.Event) {
 	case gamelog.KindRaidStart:
 		mapKey := app.raid.Start()
 		app.position.ClearTrail()
+		app.extracts.RaidStarted()
 		app.hub.Broadcast(events.New(events.RaidStart, map[string]any{"map": mapKey}))
 	case gamelog.KindRaidLeft, gamelog.KindProfileSelected:
 		if app.raid.ShouldEndOnMenuReturn() {
@@ -152,6 +156,7 @@ func (app *App) onTaskChanged(event gamelog.Event) {
 func (app *App) endRaid() {
 	app.raidAndPosition.Lock()
 	defer app.raidAndPosition.Unlock()
+	app.extracts.RaidEnded() // before the raidEnd below, so a late answer can't mark the next raid's map
 	mapKey, deleted := app.raid.End(gps.IsGPSFileName, app.screenshots.DeleteFile)
 	app.hub.Deliver(events.New(events.RaidEnd, map[string]any{"map": mapKey, "deleted": deleted}))
 	app.position.Clear()
@@ -186,6 +191,7 @@ func (app *App) onScreenshot(file screenshots.File) {
 	app.raidAndPosition.Lock()
 	defer app.raidAndPosition.Unlock()
 	app.raid.NoteGPSShot(file.Name)
+	app.extracts.OnGPSShot(file.Name)
 	position, trail := app.position.Update(fix, app.raid.CurrentMap())
 	app.hub.Broadcast(events.New(events.GPS, map[string]any{"gps": position, "trail": trail}))
 }

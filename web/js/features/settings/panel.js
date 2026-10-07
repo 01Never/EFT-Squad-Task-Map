@@ -5,10 +5,11 @@
 // The texts that depend on a rule are in rules.js.
 import { app } from "../../app/state.js";
 import { escapeHtml, findElement, showToast, openModal } from "../../app/dom.js";
-import { callApi } from "../../app/api.js";
+import { callApi, fetchJson } from "../../app/api.js";
 import { GAME_MODE_NAMES } from "../../app/game-modes.js";
 import { reloadGameData } from "../../app/game-data.js";
 import { rerenderPage } from "../../app/routing.js";
+import { showExtractsNoticeIfDue } from "../extracts/notice.js";
 import { renderUpdatesSectionBox, bindUpdatesSection } from "../updates/panel.js";
 import { renderSquadSettingsBox, bindSquadSection } from "../squad/settings-section.js";
 import { DEFAULT_AI_MODEL, REASONING_EFFORTS, gameDataDescription } from "./rules.js";
@@ -47,6 +48,7 @@ function renderSettings(status) {
     ${renderGameDataStatus(status)}
     <button class="btn sm line" id="sRefresh">${status.data.refreshing ? "Updating…" : "Update game data now"}</button>
     <h4>OpenAI</h4><p class="mnote">${renderAiStatus(status)} <button class="lnk" id="sAI">Change</button></p>
+    ${renderReadExtractsCheckbox(status)}
     ${renderSquadSettingsBox()}
     ${renderUpdatesSectionBox()}
     <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn line" id="sClose">Close</button><button class="btn" id="sSave">Save</button></div>`;
@@ -87,6 +89,19 @@ function renderFollowCheckboxes(status) {
   const settings = status.settings;
   return `<label class="chk frow"><input type="checkbox" id="sFollow" ${settings.followPosition ? "checked" : ""}> Follow my position (switch to the raid's map when a GPS screenshot comes in)</label>
     <label class="chk frow"><input type="checkbox" id="sCenter" ${settings.autoCenter ? "checked" : ""}> Center the map on me when I take a screenshot (keeps your zoom; same as ◎ Follow on the map)</label>`;
+}
+
+/**
+ * "Read my extracts from my first raid screenshot" (ticket 06): only with an OpenAI key, because
+ * the picture goes to OpenAI. Without a key it says so.
+ * @param {Status} status
+ */
+function renderReadExtractsCheckbox(status) {
+  if (!status.ai.hasKey) {
+    return `<p class="mnote">Read my extracts from my first raid screenshot: needs an OpenAI key.</p>`;
+  }
+  return `<label class="chk frow"><input type="checkbox" id="sReadExt" ${status.settings.readExtracts ? "checked" : ""}> Read my extracts from my first raid screenshot</label>
+    <p class="mnote">Open the extract list in the raid (double-tap O) and take a screenshot: the first in-raid screenshot of each raid (shrunk to 2048 px, up to 3 tries) is sent to OpenAI to mark your extracts, about 1&ndash;2k tokens per raid.</p>`;
 }
 
 /** "PvP · 515 tasks · downloaded 2 min ago", and the last update error if there was one. */
@@ -131,6 +146,7 @@ async function onUpdateGameDataClicked(button, close) {
  */
 async function onSaveClicked(dialog, close) {
   const field = (selector) => findElement(selector, dialog);
+  /** @type {Record<string, string | boolean>} */
   const changes = {
     gameMode: field("#sMode").value,
     logsPath: field("#sLogs").value,
@@ -138,6 +154,10 @@ async function onSaveClicked(dialog, close) {
     followPosition: field("#sFollow").checked,
     autoCenter: field("#sCenter").checked,
   };
+  const readExtractsBox = dialog.querySelector("#sReadExt");
+  if (readExtractsBox instanceof HTMLInputElement && readExtractsBox.checked !== app.status.settings.readExtracts) {
+    changes.readExtracts = readExtractsBox.checked; // only when changed: leaves the default alone
+  }
   try {
     const answer = await callApi("/api/settings", { method: "PUT", body: changes });
     app.status = answer.status;
@@ -175,7 +195,7 @@ function renderAiKeyDialog(ai) {
     <div class="row" style="margin-bottom:8px"><label style="font-size:14px;color:var(--muted);width:80px">Model</label><input type="text" id="aimodel" value="${escapeHtml(ai.model || DEFAULT_AI_MODEL)}"></div>
     <div class="row"><label style="font-size:14px;color:var(--muted);width:80px">Reasoning</label><select id="aieffort" style="flex:1">${effortOptions}</select><button class="btn" id="aisave">Save & test</button></div>
     <div class="err" id="aierr"></div>
-    <p class="mnote" style="margin-top:12px">Scanning sends each screenshot (shrunk to 2048 px) to OpenAI; AI Categorize sends task data plus wiki excerpts. Both are billed to this key's account. The key is stored in plain text in <code>squad-task-map-settings.json</code> next to the program and only sent to api.openai.com.</p>
+    <p class="mnote" style="margin-top:12px">Scanning sends each screenshot (shrunk to 2048 px) to OpenAI; reading your extracts sends the first in-raid screenshot of each raid (also shrunk; you can turn that off in Settings); AI Categorize sends task data plus wiki excerpts. Both are billed to this key's account. The key is stored in plain text in <code>squad-task-map-settings.json</code> next to the program and only sent to api.openai.com.</p>
     <div class="row" style="margin-top:14px;justify-content:space-between">${removeButton}<button class="btn line" id="aiclose">Close</button></div>`;
 }
 
@@ -192,9 +212,11 @@ async function onSaveKeyClicked(dialog, close) {
     const body = { key: field("#aikey").value.trim(), model: field("#aimodel").value.trim(), effort: field("#aieffort").value };
     const answer = await callApi("/api/ai/key", { method: "PUT", body });
     app.status.ai = { hasKey: answer.hasKey, key: answer.key, model: answer.model, effort: answer.effort };
+    app.status = await fetchJson("/api/status"); // the one-time extracts notice may now be due
     close();
     showToast("OpenAI key saved");
     rerenderPage();
+    showExtractsNoticeIfDue();
   } catch (error) {
     errorLine.textContent = String(error.message || error);
   }

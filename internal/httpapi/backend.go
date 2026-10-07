@@ -73,9 +73,11 @@ type Backend interface {
 
 // SettingsChange holds the settings fields a PUT /api/settings sent; nil means "not sent".
 type SettingsChange struct {
-	GameMode        *string `json:"gameMode"`
-	LogsPath        *string `json:"logsPath"`
-	ScreenshotsPath *string `json:"screenshotsPath"`
-	FollowPosition  *bool   `json:"followPosition"`
-	AutoCenter      *bool   `json:"autoCenter"`
+	GameMode           *string `json:"gameMode"`
+	LogsPath           *string `json:"logsPath"`
+	ScreenshotsPath    *string `json:"screenshotsPath"`
+	FollowPosition     *bool   `json:"followPosition"`
+	AutoCenter         *bool   `json:"autoCenter"`
+	ReadExtracts       *bool   `json:"readExtracts"`
+	ExtractsNoticeSeen *bool   `json:"extractsNoticeSeen"`
 }

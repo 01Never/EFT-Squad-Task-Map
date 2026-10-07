@@ -73,6 +73,8 @@ During a raid, Tarkov puts your position and facing in each screenshot's **file 
 - The trail of your last few positions is drawn small and faint, so it doesn't compete with the marker.
 - **Closest extract:** after each GPS screenshot, the closest of *your* extracts gets a ring, a dashed line from you with the distance ("~180 m", straight line, not the walking distance), and a "Closest: …" link in the position bar; click it to centre on that extract (zoom stays). "Your" extracts are the ones you marked on this map. With none marked, it picks the closest one the chips show and says "Closest shown"; transits only count once you mark them.
 
+**Your extracts, read from a screenshot (needs an OpenAI key):** at the start of a raid, open Tarkov's extract list (double-tap **O**) and take a screenshot. A few seconds later the app marks your extracts on the map, as if you had clicked them: they turn solid, get an **AI** tag in the panel's list, and a toast says "Marked 4 extracts from your screenshot (1 not recognised: …)". Names it couldn't match are listed so you can mark them by hand. Requirement text (e.g. "Requires paracord") shows in the panel and when you hover the extract. Click a marked extract to unmark it, or mark more yourself. If the first screenshot doesn't show the list, the next ones are tried, up to 3 per raid; once a list is read, no more are sent. Marks clear at raid end. Turn it off in Settings.
+
 When the raid ends, the app deletes that raid's GPS screenshots, resets your bring-list counts and clears extract marks.
 
 You need a **screenshot key** bound in Tarkov's control settings. The app warns you if none is.
@@ -85,6 +87,7 @@ You need a **screenshot key** bound in Tarkov's control settings. The app warns 
 - **Center the map on me when I take a screenshot:** off by default. When on, every new position pans the map so you're in the middle, keeping your zoom, like a minimap. Same as **◎ Follow** on the map toolbar. If you're dragging the map when a screenshot comes in, it waits until you let go.
 - **Game data:** where it came from and **Update game data now**.
 - **OpenAI:** key, model and reasoning level.
+- **Read my extracts from my first raid screenshot:** only shown once you have an OpenAI key. On by default (after a one-time notice that explains what is sent). Untick it to stop sending that screenshot. See "Your extracts, read from a screenshot" below.
 - **Updates:** the version you're on and **Check for updates** (see "Updating" below).
 
 ## Squad (see your friends' drawings and tasks)
@@ -139,8 +142,8 @@ The **🤖 AI Categorize** box in the panel sorts parts by your instructions, e.
   - Wiki pages from **escapefromtarkov.fandom.com** (AI Categorize).
   - Item icons from **assets.tarkov.dev**.
   - **github.com**, only when you click **Check for updates** (or Download and restart). The app contacts GitHub only when you click Check for updates.
-  - Requests to **api.openai.com**: each scanned screenshot (shrunk to 2048 px), and for AI Categorize, task data plus wiki excerpts.
-- OpenAI is billed to your key's account. A scan costs roughly 1–2k input tokens per screenshot; an AI Categorize request roughly 5–30k.
+  - Requests to **api.openai.com**: each scanned screenshot (shrunk to 2048 px); **the first in-raid screenshot of each raid** (also shrunk to 2048 px; up to 3 if the extract list wasn't on the first), so your extracts can be marked for you (Settings: "Read my extracts from my first raid screenshot", only with a key, you can turn it off); and for AI Categorize, task data plus wiki excerpts.
+- OpenAI is billed to your key's account. A scan costs roughly 1–2k input tokens per screenshot; reading your extracts about 1–2k per raid; an AI Categorize request roughly 5–30k.
 - The OpenAI key is stored in plain text in `squad-task-map-settings.json` next to the exe, and only sent to api.openai.com.
 - **Squad (only if you join one):** your friends' copies get your **drawings** (all maps, every line) and your name and colour; your **active tasks with their ticks and progress** only if you turn **Share my tasks** on. Nothing else is shared: not your OpenAI key, folders, screenshots, settings, Bring list counts, categories, or your position. Only copies in your squad can connect (the network accepts only machines you let in with the invite code), and what a friend sends is only ever shown as drawings and text; it can't change your data. The data is encrypted between PCs. Tailscale can see that your PC is on its network and how it connects (it relays traffic through its own servers when two PCs can't connect directly, but it can't read it); log uploads to Tailscale are switched off in this program. If you never join a squad, none of this runs and nothing is sent.
 - The program on 127.0.0.1 only answers its own page: only the app's own page can use it; other websites open in your browser can't.
@@ -153,7 +156,7 @@ While idle the program uses practically no CPU (measured 0.00% of one core over 
 | File | What |
 |---|---|
 | `squad-task-map-data.json` | Your tasks, categories, ticks, pins, drawings (with a `.bak` of the previous save) |
-| `squad-task-map-settings.json` | Settings and OpenAI key |
+| `squad-task-map-settings.json` | Settings and OpenAI key (including whether to read your extracts from the first raid screenshot) |
 | `squad-task-map-gamedata-<mode>.json` | Downloaded game data per mode |
 | `squad-task-map-pending.json` | Game events waiting for the page (usually empty) |
 | `squad-task-map-wikicache.json` | Wiki pages, kept 7 days |
