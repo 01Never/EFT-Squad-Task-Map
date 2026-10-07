@@ -21,7 +21,8 @@ saved" → `rerenderPage()`. ◎ Follow on the map changes the same `autoCenter`
 `PUT /api/ai/key` (or `DELETE`).
 
 **Saved data / settings:** owns no saved data. Settings: `gameMode`, `logsPath`,
-`screenshotsPath`, `followPosition`, `autoCenter`, OpenAI key / model / effort.
+`screenshotsPath`, `followPosition`, `autoCenter`, OpenAI key / model / effort, and (ticket 06, only with a key)
+`readExtracts` ("Read my extracts from my first raid screenshot"; sent only when changed).
 
 **Files:**
 - `rules.js`: the dialog's choices and the game data line.

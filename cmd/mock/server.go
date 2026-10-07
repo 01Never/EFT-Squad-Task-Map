@@ -41,16 +41,29 @@ const defaultVisionRowsJSON = `[
 	{"name": "Some Story Chapter", "trader": null, "progress": null}
 ]`
 
+// What the fake vision model "reads" from a screenshot of the in-game extract list (ticket 06)
+// until a test replaces it with POST /set-extracts. "Administraton Gate" is misread by one letter
+// and "Imaginary Gate" is on no map: both exercise the app's name matching. The preset fits
+// Customs. {"visible": false, "extracts": []} is the "no list on this screenshot" answer.
+const defaultExtractListJSON = `{"visible": true, "extracts": [
+	{"name": "Crossroads", "note": "Available"},
+	{"name": "Old Gas Station Gate", "note": "Requires paracord"},
+	{"name": "Administraton Gate", "note": null},
+	{"name": "Transit to Factory", "note": null},
+	{"name": "Imaginary Gate", "note": null}
+]}`
+
 // mockServer holds what the tests can change and read back. Go serves requests in parallel
 // (Bun didn't), so the mutex guards the three fields below it.
 type mockServer struct {
 	documents map[string][]byte // json.tarkov.dev files by URL name ("tasks_en"); read-only
 
-	mutex      sync.Mutex
-	requestLog []string    // one line per json.tarkov.dev, wiki and /v1/responses request
-	visionRows jsValue     // what the fake vision model answers; POST /set-rows replaces it
-	isFailing  bool        // set by POST /fail: json.tarkov.dev answers 503 while true
-	github     githubState // what the fake GitHub Releases serves (github.go); POST /github-set changes it
+	mutex       sync.Mutex
+	requestLog  []string    // one line per json.tarkov.dev, wiki and /v1/responses request
+	visionRows  jsValue     // what the fake vision model answers; POST /set-rows replaces it
+	extractList jsValue     // what it answers for an extract-list screenshot; POST /set-extracts replaces it
+	isFailing   bool        // set by POST /fail: json.tarkov.dev answers 503 while true
+	github      githubState // what the fake GitHub Releases serves (github.go); POST /github-set changes it
 
 	signingKey ed25519.PrivateKey // the test key manifests are signed with; read-only after start-up
 }
@@ -60,7 +73,11 @@ func newMockServer(documents map[string][]byte) (*mockServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("default vision rows: %w", err)
 	}
-	return &mockServer{documents: documents, visionRows: visionRows, github: defaultGitHubState()}, nil
+	extractList, err := parseJavaScriptJSON([]byte(defaultExtractListJSON))
+	if err != nil {
+		return nil, fmt.Errorf("default extract list: %w", err)
+	}
+	return &mockServer{documents: documents, visionRows: visionRows, extractList: extractList, github: defaultGitHubState()}, nil
 }
 
 // ServeHTTP checks the paths in v2's order. Like v2 it ignores the HTTP method, and it matches
@@ -72,6 +89,8 @@ func (mock *mockServer) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 		mock.handleLog(writer)
 	case path == "/set-rows":
 		mock.handleSetRows(writer, request)
+	case path == "/set-extracts":
+		mock.handleSetExtracts(writer, request)
 	case path == "/fail":
 		mock.handleFail(writer, request)
 	case path == githubControlPath:
@@ -109,6 +128,20 @@ func (mock *mockServer) handleSetRows(writer http.ResponseWriter, request *http.
 	}
 	mock.mutex.Lock()
 	mock.visionRows = rows
+	mock.mutex.Unlock()
+	writeOK(writer)
+}
+
+// handleSetExtracts answers POST /set-extracts: the JSON body ({"visible": bool, "extracts": [...]})
+// becomes what the vision model answers for an extract-list screenshot.
+func (mock *mockServer) handleSetExtracts(writer http.ResponseWriter, request *http.Request) {
+	list, err := readJSONBody(request)
+	if err != nil {
+		writeServerError(writer, err)
+		return
+	}
+	mock.mutex.Lock()
+	mock.extractList = list
 	mock.mutex.Unlock()
 	writeOK(writer)
 }

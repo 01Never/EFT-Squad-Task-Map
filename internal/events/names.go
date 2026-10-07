@@ -12,6 +12,7 @@ package events
 // (web/js/app/live-events.js) maps each one to a handler; names_test.go checks the two lists match.
 const (
 	Task      = "task"      // deliver: a task was started, finished or failed in the game
+	Extracts  = "extracts"  // deliver: my extracts, read from the first raid screenshot (ticket 06); mark them
 	RaidEnd   = "raidEnd"   // deliver: the raid ended; reset bag counts, extract marks and the trail
 	GPS       = "gps"       // broadcast: a new position from an in-raid screenshot
 	Capture   = "capture"   // broadcast: the list of screenshots captured for a task scan changed

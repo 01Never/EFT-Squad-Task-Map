@@ -1,3 +1,10 @@
 /* Extracts: the diamond in each extract-kind chip ("Extracts & labels"). The extracts themselves
    are SVG on the map, coloured in map-layer.js. */
 .dia{width:10px;height:10px;transform:rotate(45deg);display:inline-block;border:1px solid #000}
+
+/* Ticket 06: the extracts you have marked, in the panel; an "AI" tag when the screenshot reader
+   marked it, and the requirement text read beside it. */
+.exlist{list-style:none;margin:0 0 8px;padding:0;font-size:13.5px}
+.exlist li{padding:1px 0}
+.tag.ai{border-color:var(--accent);color:var(--accent);cursor:help}
+.exnote{display:block;color:var(--muted);font-size:12.5px}

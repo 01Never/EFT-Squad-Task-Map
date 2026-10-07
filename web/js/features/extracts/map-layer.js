@@ -18,6 +18,8 @@ import {
   closestExtract,
   approximateDistanceText,
   toggleExtractMark,
+  isExtractMarked,
+  autoMarkNote,
 } from "./rules.js";
 
 /** @import { Extract } from "./rules.js" */
@@ -36,7 +38,7 @@ export function extractsOfOpenMap() {
 
 // ---------------------------------------------------------------- the extracts layer
 
-/** Draw the extracts whose kind is shown, then the closest-extract highlight (marks change it). */
+/** Draw the extracts whose kind is shown (and every marked one), then the closest-extract highlight (marks change it). */
 export function renderExtracts() {
   const mapView = app.mapView;
   const layer = mapView.layers.extracts;
@@ -44,8 +46,10 @@ export function renderExtracts() {
   const prefs = mapPrefs(mapView.key);
   const marked = prefs.extMarked || {};
   for (const extract of extractsOfOpenMap()) {
-    if (!prefs.ext[extract.k]) continue;
-    drawExtract(layer, extract, !!marked[extract.n]);
+    const isMarked = isExtractMarked(marked[extract.n]);
+    // A marked extract is always drawn, so a Scav raid's marks show with the Scav chip off.
+    if (!prefs.ext[extract.k] && !isMarked) continue;
+    drawExtract(layer, extract, isMarked, autoMarkNote(marked[extract.n]));
   }
   applyView();
   renderClosestExtract(); // ticket 03: marks and chips change which extract is closest
@@ -57,8 +61,9 @@ export function renderExtracts() {
  * @param {SVGGElement} layer
  * @param {Extract} extract
  * @param {boolean} isMarked
+ * @param {string} note the requirement text read from your screenshot ("" when none), shown on hover
  */
-function drawExtract(layer, extract, isMarked) {
+function drawExtract(layer, extract, isMarked, note) {
   const color = EXTRACT_KIND_COLORS[extract.k];
   if (extract.ol) drawExtractArea(layer, extract.ol, color, isMarked);
   const [x, y] = app.mapView.projection.toSvg(extract.x, extract.z);
@@ -74,6 +79,7 @@ function drawExtract(layer, extract, isMarked) {
     },
     layer,
   );
+  if (note) createSvgElement("title", {}, group).textContent = `${extract.n}: ${note}`;
   if (isMarked) {
     const frame = { x: -9, y: -9, width: 18, height: 18, transform: "rotate(45)", fill: "none", stroke: "#fff", "stroke-width": 2 };
     createSvgElement("rect", frame, group);

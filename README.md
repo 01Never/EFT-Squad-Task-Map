@@ -20,6 +20,7 @@ Windows SmartScreen may say "Windows protected your PC" the first time, because 
 |---|---|
 | **Your tasks, per map** | Markers for every objective of the tasks you have, grouped into categories you can rename, recolour and reorder. |
 | **Synced from the game** | Tasks you accept or finish in-game are added or removed within seconds, from the game's log files. |
+| **Your extracts, marked for you** | Open the in-game extract list (double-tap O) and take a screenshot: an OpenAI vision model reads it and marks your extracts on the map (optional, uses your own API key). |
 | **Scan your task list** | Screenshot the in-game Tasks screen and an OpenAI vision model reads it, so your list matches the game exactly (optional, uses your own API key). |
 | **Find me** | Your position and facing come from Tarkov's screenshot file names: a stand-out marker, a pulse when it updates, an off-screen pointer, optional auto-centre. |
 | **Closest extract** | The nearest of the extracts you have this raid, with a line and a straight-line distance. |
@@ -31,7 +32,7 @@ The full manual is the **[user guide](docs/USER-GUIDE.md)**: setup, every featur
 
 ## Privacy
 
-The app contacts GitHub only when you click Check for updates. If you join a squad, your drawings (and your tasks, only if you turn that on) go directly to your friends' copies over a private Tailscale network; Tailscale relays traffic when two PCs can't connect directly but can't read it. Never joined, nothing of this runs. Everything else stays on your PC except downloads of game data (json.tarkov.dev), item icons (assets.tarkov.dev), wiki pages for AI Categorize, and, only if you add a key, requests to api.openai.com. Your OpenAI key stays in the settings file on your PC and is sent nowhere else. The app deletes only screenshots you confirmed in a scan, and the GPS screenshots of the raid that just ended.
+The app contacts GitHub only when you click Check for updates. If you join a squad, your drawings (and your tasks, only if you turn that on) go directly to your friends' copies over a private Tailscale network; Tailscale relays traffic when two PCs can't connect directly but can't read it. Never joined, nothing of this runs. Everything else stays on your PC except downloads of game data (json.tarkov.dev), item icons (assets.tarkov.dev), wiki pages for AI Categorize, and, only if you add a key, requests to api.openai.com (the task scan's screenshots, AI Categorize, and **the first in-raid screenshot of each raid** so your extracts can be marked for you; that one can be turned off in Settings). Your OpenAI key stays in the settings file on your PC and is sent nowhere else. The app deletes only screenshots you confirmed in a scan, and the GPS screenshots of the raid that just ended.
 
 ## Building from source
 

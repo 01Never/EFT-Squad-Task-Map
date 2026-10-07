@@ -2,6 +2,8 @@
 // Extracts: their kinds and colours, which extracts count as "yours" and which of them is closest
 // to you. Plain functions only: no DOM, no network. map-layer.js and panel.js draw the result.
 
+import { normalizedName, nameSimilarity, NAME_MATCH_MIN_SIMILARITY } from "../scan/rules.js";
+
 /** @import { MapInfo } from "../../app/types.js" */
 
 /**
@@ -57,8 +59,110 @@ export function countExtractsByKind(extracts) {
   return counts;
 }
 
+// ---------------------------------------------------------------- marks
+//
+// prefs[map].extMarked maps an extract's name to its mark:
+//   true                                a click (every mark saved before ticket 06 is this)
+//   { auto: true, note: string|null }   read from your extract-list screenshot (ticket 06)
+// Anything truthy means "marked", so old data needs no migration.
+
 /**
- * Mark or unmark an extract as one of yours (a click on the map). Marks are per map.
+ * Is this stored value a mark? (`true` from a click, or an auto mark.)
+ * @param {unknown} mark
+ */
+export function isExtractMarked(mark) {
+  return !!mark;
+}
+
+/**
+ * Was this mark made by the screenshot reader (not by a click)?
+ * @param {unknown} mark
+ * @returns {mark is { auto: true, note: string | null }}
+ */
+export function isAutoMark(mark) {
+  return !!mark && typeof mark === "object" && /** @type {any} */ (mark).auto === true;
+}
+
+/**
+ * The requirement text read beside an auto-marked extract ("Requires paracord"), or "".
+ * @param {unknown} mark
+ */
+export function autoMarkNote(mark) {
+  if (!isAutoMark(mark) || typeof mark.note !== "string") return "";
+  return mark.note;
+}
+
+/**
+ * Mark the extracts the screenshot showed. A mark you made by hand stays as it is; an older auto
+ * mark gets the new note.
+ * @param {Record<string, unknown>} markedByName prefs[map].extMarked, changed in place
+ * @param {{ name: string, note: string | null }[]} marked
+ */
+export function applyAutoMarks(markedByName, marked) {
+  for (const { name, note } of marked) {
+    if (markedByName[name] === true) continue;
+    markedByName[name] = { auto: true, note: note || null };
+  }
+}
+
+// Names whose lengths differ by more than this are never compared (as on the server).
+const MAX_NAME_LENGTH_DIFFERENCE = 8;
+
+/**
+ * Which of the names read from the screenshot are extracts or transits of the map: the same rule
+ * the server uses (exact after normalising, else the most similar one at least
+ * NAME_MATCH_MIN_SIMILARITY alike). Only used when the log didn't say which map the raid is on,
+ * so the page matches against the map it has open.
+ * @param {{ name: string, note: string | null }[]} read
+ * @param {string[]} mapNames
+ * @returns {{ marked: { name: string, note: string | null }[], unknown: string[] }}
+ */
+export function matchReadExtracts(read, mapNames) {
+  const marked = [];
+  const unknown = [];
+  const seen = new Set();
+  for (const { name, note } of read) {
+    const wanted = normalizedName(name);
+    let best = null;
+    let bestScore = 0;
+    for (const mapName of mapNames) {
+      const candidate = normalizedName(mapName);
+      if (candidate === wanted) {
+        best = mapName;
+        bestScore = 1;
+        break;
+      }
+      if (Math.abs(candidate.length - wanted.length) > MAX_NAME_LENGTH_DIFFERENCE) continue;
+      const score = nameSimilarity(wanted, candidate);
+      if (score > bestScore) {
+        best = mapName;
+        bestScore = score;
+      }
+    }
+    if (!wanted || best === null || bestScore < NAME_MATCH_MIN_SIMILARITY) unknown.push(name);
+    else if (!seen.has(best)) {
+      seen.add(best);
+      marked.push({ name: best, note });
+    }
+  }
+  return { marked, unknown };
+}
+
+/**
+ * The toast after the screenshot was read: "Marked 4 extracts from your screenshot (1 not
+ * recognised: Foo Gate)".
+ * @param {number} markedCount
+ * @param {string[]} unknown names that matched nothing on the map
+ */
+export function extractsReadMessage(markedCount, unknown) {
+  const noun = markedCount === 1 ? "extract" : "extracts";
+  const notRecognised = unknown.length ? ` (${unknown.length} not recognised: ${unknown.join(", ")})` : "";
+  return `Marked ${markedCount} ${noun} from your screenshot${notRecognised}`;
+}
+
+/**
+ * Mark or unmark an extract as one of yours (a click on the map). Marks are per map. Clicking an
+ * auto mark unmarks it like any other mark.
  * @param {Record<string, unknown>} markedByName prefs[map].extMarked, changed in place
  * @param {string} name
  */
@@ -80,7 +184,7 @@ export function toggleExtractMark(markedByName, name) {
  * @returns {{ candidates: Extract[], basis: "marked" | "shown" }}
  */
 export function extractsThatCount(extracts, markedByName, shownKinds) {
-  const marked = extracts.filter((extract) => !!markedByName[extract.n]);
+  const marked = extracts.filter((extract) => isExtractMarked(markedByName[extract.n]));
   if (marked.length > 0) {
     return { candidates: marked, basis: "marked" };
   }

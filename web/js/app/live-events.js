@@ -23,6 +23,7 @@ import { renderClosestExtract } from "../features/extracts/map-layer.js";
 import { onCaptureChanged } from "../features/scan/panel.js";
 import { onUpdatesChanged, onStreamConnected } from "../features/updates/panel.js";
 import { onSquadChanged } from "../features/squad/live-event.js";
+import { onExtractsRead } from "../features/extracts/live-event.js";
 
 /**
  * @import { LiveEvent, TaskEvent, RaidEndEvent, RaidStartEvent, RaidMapEvent, GpsEvent,
@@ -54,6 +55,7 @@ export function connectToLiveEvents() {
 /** Each event name and its handler. */
 const HANDLER_BY_EVENT_NAME = {
   [EVENT_NAMES.task]: onTaskChangedInGame,
+  [EVENT_NAMES.extracts]: onExtractsRead,
   [EVENT_NAMES.raidEnd]: onRaidEnded,
   [EVENT_NAMES.raidStart]: onRaidStarted,
   [EVENT_NAMES.raidMap]: onRaidMapKnown,

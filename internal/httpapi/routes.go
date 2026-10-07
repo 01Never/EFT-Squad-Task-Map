@@ -142,11 +142,13 @@ func (server *Server) writeState(writer http.ResponseWriter, request *http.Reque
 func (server *Server) updateSettings(writer http.ResponseWriter, request *http.Request) {
 	body := readBody(request)
 	change := SettingsChange{
-		GameMode:        stringField(body, "gameMode"),
-		LogsPath:        stringField(body, "logsPath"),
-		ScreenshotsPath: stringField(body, "screenshotsPath"),
-		FollowPosition:  boolField(body, "followPosition"),
-		AutoCenter:      boolField(body, "autoCenter"),
+		GameMode:           stringField(body, "gameMode"),
+		LogsPath:           stringField(body, "logsPath"),
+		ScreenshotsPath:    stringField(body, "screenshotsPath"),
+		FollowPosition:     boolField(body, "followPosition"),
+		AutoCenter:         boolField(body, "autoCenter"),
+		ReadExtracts:       boolField(body, "readExtracts"),
+		ExtractsNoticeSeen: boolField(body, "extractsNoticeSeen"),
 	}
 	writeJSON(writer, http.StatusOK, map[string]any{"ok": true, "status": server.backend.UpdateSettings(change)})
 }
