@@ -82,14 +82,22 @@ var (
 	colorPattern    = regexp.MustCompile(`^#[0-9a-f]{6}$`)
 	strokeColor     = regexp.MustCompile(`^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$`)
 	keyPattern      = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+	// Task and objective ids as the game data has them (checked in testdata/ and the bundled
+	// snapshot: all 515 task ids and all 1441 objective ids are 24 lower-case hex characters).
+	gameIDPattern = regexp.MustCompile(`^[0-9a-f]{24}$`)
 
 	// A tailnet name that claims a player id: "stm-<id>", or "stm-<id>-1" when Tailscale had to
 	// make it unique because another machine already uses the name.
 	claimedNamePattern = regexp.MustCompile(`^stm-([0-9a-f]{16})(-[0-9]+)?$`)
 
-	// Keys that mean something special to JavaScript objects; refused so the page never has to
-	// worry about them in a friend's draw or tasks.
-	reservedKeys = map[string]bool{"__proto__": true, "constructor": true, "prototype": true}
+	// Map keys (like "streets-of-tarkov") are plain words, so names that mean something special to
+	// JavaScript objects are refused by name. Task and objective ids need no list: hex only.
+	reservedKeys = map[string]bool{
+		"__proto__": true, "constructor": true, "prototype": true, "toString": true, "valueOf": true,
+		"hasOwnProperty": true, "isPrototypeOf": true, "propertyIsEnumerable": true,
+		"toLocaleString": true, "__defineGetter__": true, "__defineSetter__": true,
+		"__lookupGetter__": true, "__lookupSetter__": true,
+	}
 )
 
 // ---------------------------------------------------------------- the share
@@ -274,8 +282,8 @@ func ValidateParts(parts ShareParts) error {
 		return fmt.Errorf("%d tasks, over the %d limit", len(parts.Tasks), maxTasks)
 	}
 	for taskID, progress := range parts.Tasks {
-		if !isValidKey(taskID) {
-			return fmt.Errorf("task id %q isn't a plain short word", taskID)
+		if !gameIDPattern.MatchString(taskID) {
+			return fmt.Errorf("task id %q isn't a game id (24 hex characters)", taskID)
 		}
 		if err := validateTaskProgress(progress); err != nil {
 			return fmt.Errorf("task %s: %w", taskID, err)
@@ -326,8 +334,8 @@ func validateTaskProgress(progress TaskProgress) error {
 		return fmt.Errorf("%d ticks, over the %d limit", len(progress.Ticks), maxTicksPerTask)
 	}
 	for objectiveID, tick := range progress.Ticks {
-		if !isValidKey(objectiveID) {
-			return fmt.Errorf("objective id %q isn't a plain short word", objectiveID)
+		if !gameIDPattern.MatchString(objectiveID) {
+			return fmt.Errorf("objective id %q isn't a game id (24 hex characters)", objectiveID)
 		}
 		if !tick.IsDone && (tick.Count < 0 || tick.Count > maxTickCount) {
 			return fmt.Errorf("tick count %d out of range", tick.Count)
@@ -353,7 +361,20 @@ func IsValidPlayerID(id string) bool { return playerIDPattern.MatchString(id) }
 // IsValidColor: "#rrggbb" in lower case (NormalizeColor lower-cases what the page sends).
 func IsValidColor(color string) bool { return colorPattern.MatchString(color) }
 
-// IsValidName: 1 to 32 characters, no control characters, no spaces at either end.
+// isInvisibleFormatting: zero-width characters and bidi controls, which can flip or hide text.
+func isInvisibleFormatting(character rune) bool {
+	switch {
+	case character >= 0x200B && character <= 0x200F, // zero-width space/joiners, LRM, RLM
+		character >= 0x202A && character <= 0x202E, // embeddings and overrides
+		character >= 0x2060 && character <= 0x2069, // word joiner, isolates
+		character == 0xFEFF:                        // byte order mark / zero-width no-break space
+		return true
+	}
+	return false
+}
+
+// IsValidName: 1 to 32 characters (not bytes), no control characters, no bidi controls or
+// zero-width characters, no spaces at either end, not blank.
 func IsValidName(name string) bool {
 	if !utf8.ValidString(name) || name != strings.TrimSpace(name) {
 		return false
@@ -363,16 +384,24 @@ func IsValidName(name string) bool {
 		return false
 	}
 	for _, character := range name {
-		if unicode.IsControl(character) {
+		if unicode.IsControl(character) || isInvisibleFormatting(character) {
 			return false
 		}
 	}
 	return true
 }
 
-// NormalizeName trims the name the page sends; ok is false when the result isn't a valid name.
+// NormalizeName cleans the name the page sends: invisible formatting characters are removed,
+// then the ends are trimmed. ok is false when nothing valid is left (blank, or over 32
+// characters). Friends' names are not cleaned: a share carrying them is refused (IsValidName).
 func NormalizeName(name string) (string, bool) {
-	trimmed := strings.TrimSpace(name)
+	visible := strings.Map(func(character rune) rune {
+		if isInvisibleFormatting(character) {
+			return -1
+		}
+		return character
+	}, name)
+	trimmed := strings.TrimSpace(visible)
 	return trimmed, IsValidName(trimmed)
 }
 
