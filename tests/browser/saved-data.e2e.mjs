@@ -70,6 +70,20 @@ test("a v2 data file with missing fields is filled in with the defaults", async 
   });
 });
 
+test("a data file over 64 KB still saves (browsers refuse keepalive bodies that big)", async (t) => {
+  const input = readFixture("rich-v2-state.json");
+  // One long drawing: about 100 KB of data in all.
+  const points = Array.from({ length: 9000 }, (_, i) => [i % 500, Math.floor(i / 12)]);
+  input.draw["streets-of-tarkov"].push({ c: "#4dff4d", w: 1.5, pts: points });
+  assert.ok(JSON.stringify(input).length > 90_000, "the test file is big enough");
+  await withScenario(t, { state: input }, async (s) => {
+    await loadAndSaveV2(s, "streets-of-tarkov");
+    assert.ok(!(await s.page.locator("#saved.err").count()), "no \"Save failed\"");
+    assert.equal(await s.page.locator("#saved").textContent(), "Saved ✓");
+    assert.deepStrictEqual(s.savedState(), input, "the file on disk has all of it");
+  });
+});
+
 const realFile = process.env.STM_E2E_STATE;
 test("a copy of a real data file (STM_E2E_STATE) saves back unchanged", { skip: realFile ? false : "set STM_E2E_STATE=<a copy of squad-task-map-data.json> to run this" }, async (t) => {
   const text = fs.readFileSync(realFile, "utf8");

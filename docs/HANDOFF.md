@@ -223,7 +223,7 @@ and `npm run typecheck`. Each feature folder has a README.
   - `state.js`: `app`, the one shared changing state (saved data, game data, status, the open map).
   - `types.js`: JSDoc types (Task, Objective, Part, SavedState, Category, Settings, events…).
   - `saved-data.js`: `freshState()`, `fillMissingFields()`, `migrateSavedData()` (v1 → v2).
-  - `saving.js`: `save()` (500 ms debounce), `flush()`, save on close.
+- `saving.js`: `save()` (500 ms debounce), `flush()`, save on close. Plain `fetch` except the last-chance save on close, which uses `keepalive` only when the body is ≤ 64 KiB (`saving-rules.js`; browsers refuse bigger keepalive bodies). A refused save is retried after 15 s, a network error after 1.5 s.
   - `game-data.js`: lookups (tasks by id, objectives by id, name matcher, map names), reload.
   - `live-events.js`: the live-event router; `event-names.js`: the names.
   - `routing.js`: `#/` picker or `#/map/<key>`, and `rerenderPage()`.
