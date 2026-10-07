@@ -2,9 +2,9 @@
 // Find me: the rules behind the player marker's pulse and the "you're over there" chip.
 // Plain functions only: no DOM, no network. map-layer.js does the drawing and calls these.
 
-// Owner decision (ticket 01): a new position pulses very obviously for about 20 seconds,
+// Owner decision (ticket 01): a new position pulses very obviously for about 6 seconds (owner shortened it from 20 s after 2.7.0),
 // then the marker sits still. No continuous radar, no "stale" pulse.
-export const PULSE_DURATION_MS = 20_000;
+export const PULSE_DURATION_MS = 6_000;
 
 // One ring grows and fades in this time. Three rings start a third of a cycle apart,
 // so a new ring leaves the marker every half second.
@@ -76,7 +76,7 @@ export function pulseRemainingMs(pulseStartedAtMs, nowMs) {
  *
  * The map can be re-drawn (or re-opened) while a pulse runs. Starting each ring with a
  * negative delay of "time already elapsed" picks the animation up where it was, instead of
- * restarting the 20 seconds.
+ * restarting the 6 seconds.
  *
  * @param {number} elapsedMs time since the pulse started
  * @returns {{ delayMs: number, iterations: number }[]} one entry per ring; empty when the pulse is over

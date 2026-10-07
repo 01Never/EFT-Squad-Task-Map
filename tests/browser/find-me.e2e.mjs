@@ -12,7 +12,7 @@ const LOG_WAIT = { timeout: 15_000 };
 const isCentred = (offset) => !!offset && Math.abs(offset.dx) < 3 && Math.abs(offset.dy) < 3;
 const sameNumber = (a, b) => Math.abs(a - b) < 1e-6;
 
-test("Find me: a new position pulses for about 20 s, the off-screen chip brings you back, and Find me keeps the zoom", async (t) => {
+test("Find me: a new position pulses for about 6 s, the off-screen chip brings you back, and Find me keeps the zoom", async (t) => {
   await withScenario(t, { state: stateWithEveryTask() }, async (s) => {
     const page = s.page;
     const ringCount = () => page.locator(".findme-ring").count();
@@ -32,7 +32,7 @@ test("Find me: a new position pulses for about 20 s, the off-screen chip brings 
 
     await page.waitForFunction(() => document.querySelectorAll(".findme-ring").length === 0, null, { timeout: 25_000, polling: 250 });
     const lasted = Date.now() - pulseSeenAt;
-    assert.ok(lasted > 18_500 && lasted < 21_000, `the pulse ends by itself after about 20 s (${lasted} ms)`);
+    assert.ok(lasted > 5_000 && lasted < 7_500, `the pulse ends by itself after about 6 s (${lasted} ms)`);
 
     // Pan away: the chip points at you; clicking it centres on you without changing the zoom.
     for (let i = 0; i < 4; i++) await page.click("#zin");
@@ -138,7 +138,7 @@ test("the closest extract is shown: among the shown ones, then only marked ones,
   await withScenario(t, { state: readFixture("fresh-v2-state.json") }, async (s) => {
     const page = s.page;
     const barText = () => page.textContent("#gpsbar-closest");
-    const dashedLines = () => page.locator('svg.map polyline[stroke-dasharray="9 6"]').count();
+    const dashedLines = () => page.locator('svg.map polyline[stroke-dasharray="7 5"]').count();
     await s.openMap("customs");
     assert.equal(await barText(), "", "no position: nothing");
 

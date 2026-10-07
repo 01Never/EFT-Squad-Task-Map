@@ -43,14 +43,14 @@ test("a pulse that never started has nothing left to run", () => {
   assert.equal(pulseRemainingMs(0, 123456), 0);
 });
 
-test("a pulse runs for 20 seconds from when it started", () => {
-  assert.equal(PULSE_DURATION_MS, 20_000);
-  assert.equal(pulseRemainingMs(1_000, 1_000), 20_000);
-  assert.equal(pulseRemainingMs(1_000, 16_000), 5_000);
-  assert.equal(pulseRemainingMs(1_000, 21_000), 0);
+test("a pulse runs for 6 seconds from when it started", () => {
+  assert.equal(PULSE_DURATION_MS, 6_000);
+  assert.equal(pulseRemainingMs(1_000, 1_000), 6_000);
+  assert.equal(pulseRemainingMs(1_000, 5_000), 2_000);
+  assert.equal(pulseRemainingMs(1_000, 7_000), 0);
 });
 
-test("a fresh pulse starts its rings a third of a cycle apart, all ending at 20 seconds", () => {
+test("a fresh pulse starts its rings a third of a cycle apart, all ending at 6 seconds", () => {
   const timings = pulseRingTimings(0);
   assert.equal(timings.length, PULSE_RING_COUNT);
   timings.forEach((timing, ring) => {
@@ -62,7 +62,7 @@ test("a fresh pulse starts its rings a third of a cycle apart, all ending at 20 
 });
 
 test("a pulse re-drawn halfway carries on instead of restarting", () => {
-  const elapsedMs = 10_000;
+  const elapsedMs = 3_000;
   for (const timing of pulseRingTimings(elapsedMs)) {
     assert.ok(timing.delayMs < 0, "the animation is already under way");
     const endsAtMsFromNow = timing.delayMs + timing.iterations * PULSE_RING_CYCLE_MS;
@@ -71,7 +71,7 @@ test("a pulse re-drawn halfway carries on instead of restarting", () => {
 });
 
 test("a finished pulse has no rings", () => {
-  assert.deepEqual(pulseRingTimings(20_000), []);
+  assert.deepEqual(pulseRingTimings(6_000), []);
   assert.deepEqual(pulseRingTimings(-5), []);
 });
 

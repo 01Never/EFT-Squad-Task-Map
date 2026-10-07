@@ -1,9 +1,9 @@
 # Find me
 
 **What it does (player's view):** your position from the last in-raid screenshot is the first
-thing you see on the map: a disc in its own colour inside a ring, with a heading arrow and a
-"You" label. A new position (or a click on 📍 Find me) pulses with big rings for about
-20 seconds. When you've panned away, a chip on the map edge points toward you with the distance;
+thing you see on the map: a small disc in its own colour, with a heading arrow and a
+"You" label. A new position (or a click on 📍 Find me) pulses with rings for about
+6 seconds. When you've panned away, a chip on the map edge points toward you with the distance;
 clicking it brings you back into view. Find me and the chip never change your zoom.
 
 **Auto-center (ticket 02):** with "Center the map on me" on (◎ Follow on the toolbar, or
@@ -17,12 +17,12 @@ name. The server parses it (`internal/features/gps`), works out the map from the
 `gps` event (live only, not saved) with the position and the last 5 positions (the trail).
 
 **The rules** (`rules.js`):
-- The pulse runs for `PULSE_DURATION_MS` = 20 s after a new position or a Find me click, then
+- The pulse runs for `PULSE_DURATION_MS` = 6 s after a new position or a Find me click, then
   stops completely. Owner decision for ticket 01: one very obvious pulse, no continuous radar and
   no "stale" pulse.
 - 3 rings, each `PULSE_RING_CYCLE_MS` = 1.5 s, started a third of a cycle apart.
   `pulseRingTimings()` gives each ring a negative delay of "time already elapsed", so a map
-  re-render (or re-opening the map) carries the pulse on instead of restarting the 20 s.
+  re-render (or re-opening the map) carries the pulse on instead of restarting the 6 s.
 - You're "on screen" when the marker's centre is at least `ON_SCREEN_MARGIN_PIXELS` = 12 px inside
   the map area. Otherwise the chip shows.
 - The chip sits on the line from the middle of the map area toward you, as far out as it fits
@@ -44,8 +44,8 @@ placeFindMeOverlays()`
 The pulse rings and the chip are HTML over the map (`#findme-fx`, `#findme-chip`), moved with CSS
 `transform` and animated with `transform`/`opacity` only, so the browser runs the pulse on the
 compositor without repainting the map. A trace of 3 s of pulse showed 0 Paint and 0 Layout on the
-main thread. Each ring removes itself when its animation ends; after 20 s nothing animates.
-With "reduce motion" turned on in Windows, the pulse is one still ring for the same 20 s.
+main thread. Each ring removes itself when its animation ends; after 6 s nothing animates.
+With "reduce motion" turned on in Windows, the pulse is one still ring for the same 6 s.
 
 **Saved data / settings:** `autoCenter` (off by default) and `followPosition` in
 `squad-task-map-settings.json`, read from `/api/status` and changed with `PUT /api/settings`
@@ -61,7 +61,7 @@ With "reduce motion" turned on in Windows, the pulse is one still ring for the s
 
 **Tests:** `rules.test.js` covers the pulse timing (fresh, re-drawn halfway, finished), the
 on-screen margin, chip placement on each edge, distance and its rounding. Checked in a browser
-against the mock server: pulse starts on a new position and is gone after 20 s; chip appears when
+against the mock server: pulse starts on a new position and is gone after 6 s; chip appears when
 panned away and clicking it centres at the same zoom; Find me and the bar's Show centre at the same
 zoom and pulse; phone width.
 **Needs an in-game check:** that the marker is easy to find at a glance, half-screen or on a second

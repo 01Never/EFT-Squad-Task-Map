@@ -126,10 +126,10 @@ function drawTrail(layer, trail, mapView) {
 }
 
 /**
- * Your marker: a disc in the player colour with a white ring and a black outer edge (reads on
- * light roads and dark buildings), inside a wider ring no other marker has, so it reads as
- * "you" by shape as well as colour. Plus a heading arrow, the floor badge and a "You" label.
- * It's in the top map layer, above task markers and extracts. Nothing here animates.
+ * Your marker: a disc in the player colour with a white edge and a heading arrow, the size it was
+ * before ticket 01 (owner's change: the ticket 01 marker was too big), plus the floor badge and a
+ * small "You" label. It's in the top map layer, above task markers and extracts. Nothing here
+ * animates.
  */
 function drawPlayerMarker(layer, position, mapView) {
   const [svgX, svgY] = mapView.projection.toSvg(position.x, position.z);
@@ -137,24 +137,21 @@ function drawPlayerMarker(layer, position, mapView) {
 
   // This part turns with your heading.
   const disc = createSvgElement("g", { class: "sc", "data-x": svgX, "data-y": svgY, "data-r": headingDegrees, "pointer-events": "none" }, layer);
-  createSvgElement("circle", { r: 27, fill: "none", stroke: "#000", "stroke-width": 6.5 }, disc);
-  createSvgElement("circle", { r: 27, fill: "none", style: "stroke:var(--player)", "stroke-width": 3.5 }, disc);
-  createSvgElement("circle", { r: 18, fill: "none", stroke: "#000", "stroke-width": 3 }, disc);
-  createSvgElement("circle", { r: 15, style: PLAYER_FILL, stroke: "#fff", "stroke-width": 3 }, disc);
-  createSvgElement("path", { d: "M0,-10L7,2.5H2.2V9.5H-2.2V2.5H-7Z", fill: "#fff", stroke: "#000", "stroke-width": 1.2, "stroke-linejoin": "round" }, disc);
+  createSvgElement("circle", { r: 12, style: PLAYER_FILL, stroke: "#fff", "stroke-width": 2.2 }, disc);
+  createSvgElement("path", { d: "M0,-8L5.5,2H1.8V8H-1.8V2H-5.5Z", fill: "#fff" }, disc);
 
   // This part stays upright.
   const upright = createSvgElement("g", { class: "sc", "data-x": svgX, "data-y": svgY, "pointer-events": "none" }, layer);
   const youLabel = createSvgElement("text", {
-    x: 33, y: 5.5, "font-size": 16, "font-weight": 700, "font-family": SVG_FONT,
-    style: PLAYER_FILL, stroke: "#000", "stroke-width": 4, "paint-order": "stroke",
+    x: 16, y: 4.5, "font-size": 12, "font-weight": 700, "font-family": SVG_FONT,
+    style: PLAYER_FILL, stroke: "#000", "stroke-width": 3, "paint-order": "stroke",
   }, upright);
   youLabel.textContent = "You";
   const floor = floorBadge(mapView.config, position.x, position.y, position.z);
   if (floor) {
-    createSvgElement("circle", { cx: 19, cy: -19, r: 6.5, fill: "#000", stroke: "#fff", "stroke-width": 1.2 }, upright);
+    createSvgElement("circle", { cx: 11, cy: -11, r: 6, fill: "#000", stroke: "#fff", "stroke-width": 1.2 }, upright);
     const floorText = createSvgElement("text", {
-      x: 19, y: -15.6, "text-anchor": "middle", "font-size": 9.5, "font-weight": 700,
+      x: 11, y: -7.7, "text-anchor": "middle", "font-size": 9, "font-weight": 700,
       "font-family": SVG_FONT, fill: "#fff",
     }, upright);
     floorText.textContent = floor;
@@ -233,7 +230,7 @@ function renderPulse(position) {
   }
 }
 
-/** Each ring removes itself when its animation ends, so nothing is left running after 20 s. */
+/** Each ring removes itself when its animation ends, so nothing is left running after 6 s. */
 function onPulseRingEnded(event) {
   const ring = event.target;
   if (ring instanceof HTMLElement && ring.classList.contains("findme-ring")) {
