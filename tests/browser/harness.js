@@ -343,23 +343,27 @@ function portIsFree(port) {
  * Starts the app on scratch folders: data (state + settings), a game Logs folder with one session
  * and empty application / notifications logs, and a screenshots folder. Waits until the game data
  * has been downloaded from the mock, so no "data changed" event reaches the page mid-test.
- * @param {{ slug: string, state?: object | string, settings?: object, dataDir?: string }} options
+ * `env` adds environment variables (the squad scenario uses STM_SQUAD_DEV_LISTEN / STM_SQUAD_DEV_PEERS);
+ * `keepData` starts the app again on the folders it already has (a restart, e.g. a friend coming back).
+ * @param {{ slug: string, state?: object | string, settings?: object, dataDir?: string, env?: Record<string, string>, keepData?: boolean }} options
  */
 export async function startApp(options) {
   const { tools } = await prepareProcess();
   const dataDir = options.dataDir || path.join(tools.runDir, "data", options.slug);
-  fs.rmSync(dataDir, { recursive: true, force: true });
+  if (!options.keepData) fs.rmSync(dataDir, { recursive: true, force: true });
   const logsDir = path.join(dataDir, "logs");
   const sessionDir = path.join(logsDir, LOG_SESSION_FOLDER);
   const shotsDir = path.join(dataDir, "shots");
   fs.mkdirSync(sessionDir, { recursive: true });
   fs.mkdirSync(shotsDir, { recursive: true });
-  fs.writeFileSync(path.join(sessionDir, APPLICATION_LOG), "");
-  fs.writeFileSync(path.join(sessionDir, NOTIFICATIONS_LOG), "");
   const stateFile = path.join(dataDir, "squad-task-map-data.json");
   const settingsFile = path.join(dataDir, "squad-task-map-settings.json");
-  if (options.state !== undefined) fs.writeFileSync(stateFile, typeof options.state === "string" ? options.state : JSON.stringify(options.state));
-  fs.writeFileSync(settingsFile, JSON.stringify({ gameMode: "regular", ...(options.settings || {}) }));
+  if (!options.keepData) {
+    fs.writeFileSync(path.join(sessionDir, APPLICATION_LOG), "");
+    fs.writeFileSync(path.join(sessionDir, NOTIFICATIONS_LOG), "");
+    if (options.state !== undefined) fs.writeFileSync(stateFile, typeof options.state === "string" ? options.state : JSON.stringify(options.state));
+    fs.writeFileSync(settingsFile, JSON.stringify({ gameMode: "regular", ...(options.settings || {}) }));
+  }
 
   for (let attempt = 1; ; attempt++) {
     const { port, release } = await claimPort();
@@ -368,6 +372,7 @@ export async function startApp(options) {
       STM_DATA_DIR: dataDir, STM_LOGS_DIR: logsDir, STM_SCREENSHOTS_DIR: shotsDir, STM_NO_BROWSER: "1", PORT: String(port),
       STM_JSON_BASE: MOCK_BASE, STM_OPENAI_API: MOCK_BASE + "/v1", STM_WIKI_API: MOCK_BASE + "/wiki",
       ...(PAGE_FROM_DISK ? { STM_ASSETS_DIR: REPO_ROOT } : {}),
+      ...(options.env || {}),
     };
     const outputFile = path.join(dataDir, "app-output.txt");
     const output = fs.openSync(outputFile, "w");
@@ -385,7 +390,7 @@ export async function startApp(options) {
         if (child.exitCode !== null) throw new Error(`the app stopped: ${fs.readFileSync(outputFile, "utf8")}`);
         const status = await (await fetch(base + "/api/status", { signal: AbortSignal.timeout(2000) })).json();
         if (path.resolve(status.statePath).toLowerCase() !== path.resolve(stateFile).toLowerCase()) throw new Error("another program answers on port " + port);
-        return status.data.origin === "live";
+        return options.keepData || status.data.origin === "live"; // a restart uses the cached game data
       }, { timeout: 30_000, what: "the app to start and download the game data from the mock" });
       return app;
     } catch (error) {
@@ -513,7 +518,7 @@ function slugOf(text) {
  * context, runs `body`, then checks the page logged no errors, records (in record mode) and cleans
  * up, also when the scenario fails.
  * @param {import("node:test").TestContext} t
- * @param {{ state?: object | string, settings?: object, viewport?: {width:number,height:number}, phone?: boolean, dataDir?: string, recordAs?: string }} options
+ * @param {{ state?: object | string, settings?: object, viewport?: {width:number,height:number}, phone?: boolean, dataDir?: string, recordAs?: string, env?: Record<string, string> }} options
  * @param {(scenario: Scenario) => Promise<void>} body
  */
 export async function withScenario(t, options, body) {
@@ -543,7 +548,7 @@ export class Scenario {
   }
 
   async start() {
-    this.app = await startApp({ slug: this.slug, state: this.options.state, settings: this.options.settings, dataDir: this.options.dataDir });
+    this.app = await startApp({ slug: this.slug, state: this.options.state, settings: this.options.settings, dataDir: this.options.dataDir, env: this.options.env });
     const browser = await launchBrowser();
     const phone = !!this.options.phone;
     this.context = await browser.newContext({

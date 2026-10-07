@@ -12,6 +12,7 @@ import { isObjectiveDone, isObjectiveOnMap, placesNamedByExtractObjective } from
 import { partsOnMap, isShownOnMap } from "./task-list.js";
 import { isObjectivePossible } from "../readiness/rules.js";
 import { subTaskMarkerItems } from "../sub-tasks/map-layer.js";
+import { squadColorsForTask } from "../squad/friends.js";
 
 /** @import { Task, Part, Objective, PartOnMap } from "../../app/types.js" */
 /** @import { MarkerItem } from "../../app/state.js" */
@@ -73,12 +74,13 @@ function spotsOfObjective(task, objective) {
 
 /**
  * The spots of a part's objectives on the open map that aren't done yet, each with its objective.
+ * `ticks` are yours unless the squad layer asks for a friend's.
  * @param {Task} task
  * @param {Part} part
+ * @param {Record<string, true | number>} [ticks]
  * @returns {Spot[]}
  */
-export function spotsOfPart(task, part) {
-  const ticks = app.saved.ticks;
+export function spotsOfPart(task, part, ticks = app.saved.ticks) {
   const spots = [];
   for (const objective of part.objs) {
     if (isObjectiveDone(objective, ticks) || !isObjectiveOnMap(objective, app.mapView.key, task)) continue;
@@ -131,10 +133,11 @@ function partMarkerItems() {
     if (!isShownOnMap(row)) continue;
     const { task, part, cat } = row;
     if (!firstShownRowByTask.has(task.id)) firstShownRowByTask.set(task.id, row);
+    const squadColors = squadColorsForTask(task.id);
     for (const spot of spotsOfPart(task, part)) {
       const isReady = isObjectivePossible(spot.o, bag);
       if (spot.ol) drawZone(spot.ol, cat.color, isReady);
-      items.push({ ...spot, task, part, icon: cat.icon, color: cat.color, ready: isReady, split: part.split });
+      items.push({ ...spot, task, part, icon: cat.icon, color: cat.color, squadColors, ready: isReady, split: part.split });
     }
   }
   return { items, firstShownRowByTask };

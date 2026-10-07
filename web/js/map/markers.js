@@ -18,6 +18,13 @@ const NOT_READY_MARKER_OPACITY = 0.5;
 const TASK_MARKER_RADIUS = 8.5;
 const SUB_TASK_MARKER_RADIUS = 6.5;
 
+// Friends who also have the task: small dots in their colours, bottom left (the slot SPEC §7.3
+// reserved), each a little to the right of the one before so they overlap like a hand of cards.
+const SQUAD_DOT_RADIUS = 3.6;
+const SQUAD_DOT_FIRST_X = -9.5;
+const SQUAD_DOT_Y = 9;
+const SQUAD_DOT_STEP_X = 4.6;
+
 // Taps within this radius around a marker's centre hit it (an invisible circle).
 const MARKER_TAP_RADIUS = 15;
 
@@ -47,6 +54,7 @@ export function drawMarker(layer, marker, markerKey) {
   if (marker.f) drawFloorBadge(group, marker.f);
   if (marker.ready === false) drawNotReadyBadge(group);
   if (marker.split) drawSplitBadge(group);
+  if (marker.squadColors && marker.squadColors.length) drawSquadDots(group, marker.squadColors);
   createSvgElement("circle", { r: MARKER_TAP_RADIUS, fill: "transparent" }, group);
   return group;
 }
@@ -101,4 +109,18 @@ function drawSplitBadge(group) {
   createSvgElement("rect", { x: 3.5, y: 3.5, width: 10, height: 10, rx: 2, fill: BLACK, stroke: WHITE, "stroke-width": 1 }, group);
   const cross = { d: "M8.5,5.5V11.5M5.8,8.5H11.2", stroke: WHITE, "stroke-width": 1.4, "stroke-dasharray": "1.6 1" };
   createSvgElement("path", cross, group);
+}
+
+/**
+ * Friend-colour dots, bottom left: one per friend who also has this task. The colours were
+ * checked (#rrggbb) before they got here.
+ * @param {SVGGElement} group
+ * @param {string[]} colors
+ */
+function drawSquadDots(group, colors) {
+  // Drawn from the last to the first, so the first friend's dot is on top.
+  for (let index = colors.length - 1; index >= 0; index--) {
+    const dot = { cx: SQUAD_DOT_FIRST_X + index * SQUAD_DOT_STEP_X, cy: SQUAD_DOT_Y, r: SQUAD_DOT_RADIUS, fill: colors[index], stroke: BLACK, "stroke-width": 1.2 };
+    createSvgElement("circle", { ...dot, class: "squad-dot" }, group);
+  }
 }
