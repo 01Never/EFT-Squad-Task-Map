@@ -36,7 +36,11 @@ type Cache struct {
 
 	mutex    sync.Mutex
 	inFlight map[string]*download // item id → the download running for it
-	failedAt map[string]time.Time // item id → when its last download failed
+	failedAt map[string]time.Time // item id → when its last download failed (known ids only: bounded by the item count)
+
+	// Known says whether an item id is one the game data lists; nothing else is downloaded.
+	// nil knows nothing.
+	Known func(itemID string) bool
 }
 
 // download is one running fetch; everyone who asked for the same id waits on done.
@@ -78,7 +82,12 @@ func (cache *Cache) Path(ctx context.Context, itemID string) (string, error) {
 	}
 	file := filepath.Join(cache.dir, itemID+".webp")
 	if storage.FileExists(file) {
-		return file, nil
+		return file, nil // kept icons are served even if the id is no longer known: harmless, local
+	}
+	// Only ids the game data knows are fetched, so a page that asks for thousands of made-up ids
+	// causes no downloads and no files. That also bounds failedAt by the number of items.
+	if cache.Known == nil || !cache.Known(itemID) {
+		return "", ErrUnavailable
 	}
 
 	cache.mutex.Lock()

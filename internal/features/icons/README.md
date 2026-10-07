@@ -15,6 +15,12 @@ package, never by the browser. `STM_ASSETS_BASE` replaces the host (the mock ser
 - **Only item ids.** An id is 24 lower-case hex digits (`IsItemID`). The route `GET
   /icons/<id>.webp` accepts nothing else, and nothing but the id goes into the download address, so
   the page can't make the app fetch anything else (no paths, no other host).
+- **Only known items.** An id is fetched only if the game data lists it (`gamedata.ItemIDs`: marker,
+  plant, hand-in, quest (`qiId`), key and gear items; rebuilt whenever the data changes; ticket 08
+  adds the loot and lock-key ids in that one function). Anything else is a 404 at once: no
+  download, no file, nothing remembered. So a web page asking for thousands of made-up ids does
+  nothing, and the remembered failures are bounded by the item count. Icons already on disk are
+  served whatever the id.
 - **Once.** The first request downloads the icon into `squad-task-map-icons/<id>.webp` (next to the
   data files; written atomically). Later requests, also after a restart, are served from there.
 - **Same host only.** A redirect is followed only within the same scheme and host (and at most 3
