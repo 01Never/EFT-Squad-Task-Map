@@ -344,11 +344,17 @@ test("the status line and my own profile are 'settings'; the first view changes 
 // ---------------------------------------------------------------- names that try to reorder or hide
 
 test("a name loses direction overrides and zero-width characters, and is cut by characters", () => {
-  assert.equal(friendDisplayName("‮evil‬ Mike​⁦x⁩﻿"), "evil Mikex");
-  assert.equal(friendDisplayName("‮​⁠ ﻿"), "(no name)");
+  assert.equal(friendDisplayName("\u202eevil\u202c Mike\u200b\u2066x\u2069\ufeff"), "evil Mikex");
+  assert.equal(friendDisplayName("\u202e\u200b\u2060 \ufeff"), "(no name)");
   const emoji = "😀".repeat(40);
   assert.equal(friendDisplayName(emoji), "😀".repeat(32), "32 characters, not 32 UTF-16 units");
   assert.equal(friendDisplayName("W".repeat(32)), "W".repeat(32));
+});
+
+test("zero-width joiners stay (emoji and some names need them), but a name of only them is no name", () => {
+  const family = "Sam \u{1F468}\u200d\u{1F469}\u200d\u{1F467}";
+  assert.equal(friendDisplayName(family), family);
+  assert.equal(friendDisplayName("\u200d \u200c"), "(no name)");
 });
 
 // ---------------------------------------------------------------- keys that are names on Object.prototype
