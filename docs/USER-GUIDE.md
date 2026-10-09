@@ -189,6 +189,7 @@ To back up or move to another PC, copy `squad-task-map-data.json` (and the setti
 
 ## Credits
 - Map art: Shebuka and contributors, the-hideout/tarkov-dev-svg-maps (CC BY-NC-SA 4.0; non-commercial use only).
+- The Labyrinth's map art: the map images from tarkov.dev, stitched from their map tiles.
 - Map projection, palette and Bender font: the tarkov.dev project (the-hideout/tarkov-dev, MIT).
 - Game data: tarkov.dev (community).
 - Log and screenshot formats learned from TarkovMonitor (GPL-3.0); no code copied.

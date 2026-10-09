@@ -15,7 +15,7 @@ A single-user app that runs on the owner's PC and serves a web page on `http://1
 | `server.ts` | Bun HTTP server, bound to 127.0.0.1 only, with ports 7777–7799 tried in order. Serves the page, map SVGs, the Bender font and game data. Saves state to `squad-task-map-data.json` and settings to `squad-task-map-settings.json`, both next to the exe. Has TarkovTracker endpoints (`/api/tt/*`), OpenAI endpoints (`/api/ai/*`) and `/api/refresh` (downloads a newer game-data snapshot). |
 | `ai.ts` | AI Categorize: fetches and cleans Tarkov wiki pages, then calls the OpenAI **Responses API** with a strict JSON schema and a `get_wiki_page` tool. Supports a model name and a reasoning-effort setting. |
 | `web/index.html` | The whole front end in one file: map rendering (SVG pan, zoom and pinch), markers, panel, categories, sub-tasks, drawing, AI chat, TarkovTracker and manual-list task sources. Styled after tarkov.dev (gunmetal/gold, Bender font). |
-| `assets/` | Map SVGs (9 maps), `maps-config.json` (projection, layers and labels from tarkov.dev's `maps.json`), `game-data.json` (a tarkov.dev data snapshot from 2026-09-20, taken from the tarkovtaskmap GitHub project), `fonts.json`. |
+| `assets/` | Map SVGs (10 maps), `maps-config.json` (projection, layers and labels from tarkov.dev's `maps.json`), `game-data.json` (a tarkov.dev data snapshot from 2026-09-20, taken from the tarkovtaskmap GitHub project), `fonts.json`. |
 
 Features that already work and **must keep working**:
 - Map picker

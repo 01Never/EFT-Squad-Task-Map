@@ -10,7 +10,7 @@ import { rerenderPage } from "./routing.js";
 /** @import { Objective } from "./types.js" */
 
 // Maps that have tasks but no map art in this app (so they aren't in maps-config.json).
-const NAMES_OF_MAPS_WITHOUT_ART = { "the-lab": "The Lab", labyrinth: "The Labyrinth" };
+const NAMES_OF_MAPS_WITHOUT_ART = { "the-lab": "The Lab" };
 
 /** Build the lookups for freshly loaded game data. */
 export function indexGameData() {

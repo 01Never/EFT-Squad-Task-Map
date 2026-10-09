@@ -68,7 +68,7 @@ function renderTasksNotOnAMapCard(tasks, mapKeys) {
   const { offMap, onOtherMaps } = tasksNotOnAMapCard(tasks, mapKeys);
   const count = offMap.length + onOtherMaps.length;
   if (!count) return "";
-  const otherMapsNote = onOtherMaps.length ? "; a few are on maps this app doesn't have (Labs, Labyrinth)" : "";
+  const otherMapsNote = onOtherMaps.length ? "; a few are on maps this app doesn't have (Labs)" : "";
   const names = offMap.concat(onOtherMaps).map((task) => `<span class="tag" style="margin:2px">${escapeHtml(task.name)}</span>`);
   return `<details class="offmap"><summary>${count} active task${count > 1 ? "s" : ""} not shown on a map</summary><p class="mnote">Hand-ins, weapon builds and "any location" tasks have no map spot${otherMapsNote}. Their found-in-raid items appear in every map's Bring list.</p><p>${names.join(" ")}</p></details>`;
 }
