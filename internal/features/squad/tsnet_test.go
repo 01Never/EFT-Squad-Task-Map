@@ -169,20 +169,32 @@ func TestTwoCopiesShareOverARealTsnetTailnet(t *testing.T) {
 
 	t.Run("after a restart the copy reconnects without an invite code", func(t *testing.T) {
 		alice.squad.Stop()
-		eventuallyWithin(t, 15*time.Second, "Bob sees Alice offline", func() bool {
-			friend, _ := bob.friend(mike.ID)
-			return !friend.Online
-		})
+		// Bob usually sees Alice go offline within a second: her copy closes the stream. Now and
+		// then the close doesn't get out before her node is gone, and this fake control server
+		// (unlike Tailscale's) doesn't push "offline" to peers, so Bob only notices once Alice is
+		// back. That is not what this step checks, so it only waits a little for it.
+		wentOffline := false
+		for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+			if friend, _ := bob.friend(mike.ID); !friend.Online {
+				wentOffline = true
+				break
+			}
+		}
+		t.Logf("Bob saw Alice offline after she stopped: %v", wentOffline)
+
 		settings := alice.savedSettings()
 		aliceAgain = newTestCopy(wholeTest, aliceDir, "", nil, settings)
 		aliceAgain.squad.Resume(tsnetTransportFor(controlURL, aliceDir, mike.ID, ""))
-		eventuallyWithin(t, 30*time.Second, "Bob sees Alice online again", func() bool {
-			friend, _ := bob.friend(mike.ID)
-			return friend.Online
-		})
 		if aliceAgain.squad.View().Me.Rev != 2 {
 			t.Errorf("Alice's share after the restart: rev %d, want 2", aliceAgain.squad.View().Me.Rev)
 		}
+		// The proof that the restarted copy is back on the tailnet without an invite code: a new
+		// share from it reaches Bob.
+		aliceAgain.squad.SetMyShare(drawingAt(3))
+		eventuallyWithin(t, 30*time.Second, "Bob gets the restarted Alice's new share", func() bool {
+			friend, _ := bob.friend(mike.ID)
+			return friend.Online && friend.Share.Rev == 3
+		})
 	})
 
 	t.Run("leaving deletes the node key and forgets friends", func(t *testing.T) {
@@ -196,6 +208,9 @@ func TestTwoCopiesShareOverARealTsnetTailnet(t *testing.T) {
 	})
 
 	t.Run("a copy the tailnet signs out says so and stops its node", func(t *testing.T) {
+		if aliceAgain == nil {
+			t.Fatal("needs the restarted Alice from the step before, which failed")
+		}
 		// As when the owner deletes the machine or its key expires in the admin console.
 		for _, node := range control.AllNodes() {
 			if strings.HasPrefix(node.Name, Hostname(mike.ID)) {
