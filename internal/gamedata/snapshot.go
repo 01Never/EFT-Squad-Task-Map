@@ -244,12 +244,12 @@ var SceneToMap = map[string]string{
 	"maps/shopping_mall.bundle": "interchange", "maps/laboratory_preset.bundle": "the-lab", "maps/lighthouse_preset.bundle": "lighthouse",
 	"maps/rezerv_base_preset.bundle": "reserve", "maps/sandbox_preset.bundle": "ground-zero", "maps/sandbox_high_preset.bundle": "ground-zero",
 	"maps/shoreline_preset.bundle": "shoreline", "maps/city_preset.bundle": "streets-of-tarkov", "maps/woods_preset.bundle": "woods",
-	"maps/labyrinth_preset.bundle": "labyrinth",
+	"maps/labyrinth_preset.bundle": "the-labyrinth",
 }
 
 // NameIDToMap: the log's "Location: <nameId>" (lower case) → map key.
 var NameIDToMap = map[string]string{
 	"bigmap": "customs", "factory4_day": "factory", "factory4_night": "factory", "interchange": "interchange", "laboratory": "the-lab",
 	"lighthouse": "lighthouse", "rezervbase": "reserve", "sandbox": "ground-zero", "sandbox_high": "ground-zero", "shoreline": "shoreline",
-	"tarkovstreets": "streets-of-tarkov", "woods": "woods", "labyrinth": "labyrinth",
+	"tarkovstreets": "streets-of-tarkov", "woods": "woods", "labyrinth": "the-labyrinth",
 }

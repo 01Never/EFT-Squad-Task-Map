@@ -1,0 +1,100 @@
+{
+ "map": "the-labyrinth",
+ "svg": "Labyrinth.svg",
+ "about": "Where tarkov.dev's tile layer (assets.tarkov.dev/maps/labyrinth/main/{z}/{x}/{y}.png, tile size 256) puts each real game position: tile_pixel = 2^zoom * (2.115*x' + 85.5, -2.115*z' + 128.0) with (x', z') the game position turned by 270 degrees (Leaflet L.CRS.Simple with tarkov.dev's transform). The art is those tiles at zoom 4, stitched and cropped to the map bounds starting at crop.left/top; positions are the real Labyrinth objects in testdata/jsontarkovdev.",
+ "zoom": 4,
+ "crop": {
+  "left": 115,
+  "top": 288
+ },
+ "vectors": [
+  {
+   "name": "Extract labir_exit",
+   "game": {
+    "x": -7.31,
+    "z": 40.13
+   },
+   "tile_pixel": {
+    "x": 2726.0,
+    "y": 1800.63
+   }
+  },
+  {
+   "name": "Extract labyrinth_secret_tagilla_key",
+   "game": {
+    "x": 19.44,
+    "z": 0.5
+   },
+   "tile_pixel": {
+    "x": 1384.92,
+    "y": 2705.85
+   }
+  },
+  {
+   "name": "Loot container 1",
+   "game": {
+    "x": -29.5255222,
+    "z": 64.9401245
+   },
+   "tile_pixel": {
+    "x": 3565.57,
+    "y": 1048.86
+   }
+  },
+  {
+   "name": "Loot container 4",
+   "game": {
+    "x": -7.731301,
+    "z": -32.5366
+   },
+   "tile_pixel": {
+    "x": 266.96,
+    "y": 1786.37
+   }
+  },
+  {
+   "name": "Loot container 20",
+   "game": {
+    "x": 12.6610012,
+    "z": 12.373
+   },
+   "tile_pixel": {
+    "x": 1786.7,
+    "y": 2476.45
+   }
+  },
+  {
+   "name": "Loot container 35",
+   "game": {
+    "x": 2.368,
+    "z": -4.200548
+   },
+   "tile_pixel": {
+    "x": 1225.85,
+    "y": 2128.13
+   }
+  },
+  {
+   "name": "Door lock 1",
+   "game": {
+    "x": -31.01,
+    "z": 58.91
+   },
+   "tile_pixel": {
+    "x": 3361.51,
+    "y": 998.62
+   }
+  },
+  {
+   "name": "Door lock 2",
+   "game": {
+    "x": -2.48,
+    "z": -34.2
+   },
+   "tile_pixel": {
+    "x": 210.67,
+    "y": 1964.08
+   }
+  }
+ ]
+}

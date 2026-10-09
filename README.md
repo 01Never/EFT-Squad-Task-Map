@@ -92,6 +92,7 @@ The icon and version info come from `rsrc_windows_amd64.syso`, made from `winres
 ## Credits
 
 - Map art: Shebuka and contributors, [the-hideout/tarkov-dev-svg-maps](https://github.com/the-hideout/tarkov-dev-svg-maps) (CC BY-NC-SA 4.0; non-commercial use only).
+- The Labyrinth's map art: the map images from [tarkov.dev](https://tarkov.dev) (the-hideout/tarkov-dev, MIT project), stitched from their map tiles.
 - Map projection, palette and Bender font: the [tarkov.dev](https://github.com/the-hideout/tarkov-dev) project (MIT).
 - Game data: tarkov.dev (community).
 - Log and screenshot formats learned from TarkovMonitor (GPL-3.0); no code copied.

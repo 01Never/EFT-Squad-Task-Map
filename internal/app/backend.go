@@ -28,7 +28,7 @@ func (app *App) mapName(key string) string {
 }
 
 // mapDisplayNames is filled from assets/maps-config.json at start-up.
-var mapDisplayNames = map[string]string{"the-lab": "The Lab", "labyrinth": "The Labyrinth", "terminal": "Terminal"}
+var mapDisplayNames = map[string]string{"the-lab": "The Lab", "terminal": "Terminal"}
 
 // Status is /api/status.
 func (app *App) Status() any {
