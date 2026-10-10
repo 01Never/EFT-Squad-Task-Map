@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"squadtaskmap/internal/gamefolders"
 )
 
 // How the watcher stays light while Tarkov runs (same approach as TarkovMonitor): every 5 seconds
@@ -58,7 +60,8 @@ func NewWatcher(onEvent func(Event)) *Watcher {
 }
 
 // Start watches a Logs folder (stopping any previous watch). It starts at the END of the existing
-// files: nothing that happened before the app started is replayed (no catch-up).
+// files: nothing that happened before the app started is replayed (no catch-up). A session folder
+// or the install folder is accepted too and turned into the Logs folder (gamefolders.LogsRoot).
 //
 // Goroutine: one per Start, polling every 5 s (or retrying a missing folder every 60 s). It ends
 // when Stop or the next Start closes its stop channel.
@@ -72,6 +75,7 @@ func (watcher *Watcher) Start(dir string) {
 // Settings change can never interleave.
 func (watcher *Watcher) startLocked(dir string) {
 	watcher.stopLocked()
+	dir = gamefolders.LogsRoot(dir)
 	watcher.dir = dir
 	watcher.files = map[string]*fileState{}
 	watcher.folder = ""
@@ -281,24 +285,9 @@ func (watcher *Watcher) Feed(state *fileState, text string) []Event {
 	return events
 }
 
-// newestSessionFolder: session folders are named log_YYYY.MM.DD_HH-MM-SS_<version>, so the newest
-// sorts last.
+// newestSessionFolder: the newest log_… session folder in the Logs folder (rules in gamefolders).
 func newestSessionFolder(dir string) string {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return ""
-	}
-	var folders []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			folders = append(folders, entry.Name())
-		}
-	}
-	if len(folders) == 0 {
-		return ""
-	}
-	sort.Strings(folders)
-	return folders[len(folders)-1]
+	return gamefolders.NewestSessionFolder(dir)
 }
 
 func sortedNames(files map[string]*fileState) []string {

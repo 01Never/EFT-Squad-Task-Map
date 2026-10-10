@@ -285,3 +285,39 @@ func TestTheRetryForAMissingFolderOnlyStartsTheWatchStillWanted(t *testing.T) {
 		})
 	}
 }
+
+func TestAPictureSavedUnderATemporaryNameAndRenamedIsHandedOn(t *testing.T) {
+	// Sync tools (OneDrive) and some savers write "x.png.tmp" or "~x.tmp", then rename it.
+	dir := t.TempDir()
+	watcher, settled := newTestWatcher(t)
+	watcher.Start(dir)
+
+	picture := []byte(strings.Repeat("png-bytes ", 500))
+	temporary := filepath.Join(dir, "2026-10-01[14-06]_1 (0).png.tmp")
+	appendFile(t, temporary, picture)
+	shot := filepath.Join(dir, "2026-10-01[14-06]_1 (0).png")
+	if err := os.Rename(temporary, shot); err != nil {
+		t.Fatal(err)
+	}
+
+	file := nextFile(t, settled)
+	if file.Name != filepath.Base(shot) || !file.Exists || file.Size != int64(len(picture)) {
+		t.Errorf("got %+v, want the renamed picture", file)
+	}
+	expectNothingMore(t, settled)
+}
+
+func TestAPictureMovedInFromAnotherFolderIsHandedOn(t *testing.T) {
+	dir, elsewhere := t.TempDir(), t.TempDir()
+	watcher, settled := newTestWatcher(t)
+	watcher.Start(dir)
+
+	outside := filepath.Join(elsewhere, "2026-10-01[14-07]_1 (0).png")
+	appendFile(t, outside, []byte("png"))
+	if err := os.Rename(outside, filepath.Join(dir, filepath.Base(outside))); err != nil {
+		t.Skip("can't move between these temp folders:", err)
+	}
+	if file := nextFile(t, settled); file.Name != filepath.Base(outside) || !file.Exists {
+		t.Errorf("got %+v, want the moved picture", file)
+	}
+}
