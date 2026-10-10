@@ -119,7 +119,7 @@ Friends who run the app can see each other's **drawings** live and, if each choo
 
 With a friend's tasks on:
 - A task you both have shows **Also: Mike, Sam** in the list and in the map popup, a small dot in each friend's colour at the bottom left of its markers, and each friend's progress in the popup ("Mike 2/5 · Sam ✓").
-- **👥 Shared with squad** shows only those tasks, in the list and on the map.
+- **👥 Shared with squad** shows only those tasks, in the list and on the map. It is greyed out (and hides nothing) while none of the friends whose tasks you show is sharing them.
 - Tasks a friend has and you don't appear in a **Friends' tasks** block at the bottom of the list, and as smaller markers in their colour. They are only for looking: they never change your list, your Bring list or what is ready.
 
 A friend who is offline still shows what they last shared, with "last seen". No position is shared: your friends never see where you are in a raid.

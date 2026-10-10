@@ -37,7 +37,12 @@ Your choices per friend are in the saved data (below). The page never polls.
   only for the parts still open for them. Read-only: never in your list, readiness, Bring list,
   selection, ticks or saved data.
 - **"Shared with squad"** hides, in the list and on the map, every task no shown friend has
-  (`friends.js: isHiddenBySquadFilter`).
+  (`isHiddenBySharedOnlyFilter`, via `friends.js: isHiddenBySquadFilter`). It only applies while
+  at least one shown friend shares tasks (`isSharedOnlyFilterInEffect`); with nobody like that it
+  would hide every task you have, so it does nothing and its chip is greyed out (disabled, never
+  shown as on, the title says why). Your saved choice is kept and applies again once a shown
+  friend shares. Off by default. (2.8.1: in 2.8.0 a saved "on" with only a friend who shared no
+  tasks emptied every list and map.)
 - **My share** (`buildMyShare`): all drawings (strokes cut to `{c, w, pts}`, anything the server
   would refuse left out) and, only while "Share my tasks" is on, `{ticks, pct}` for every active
   task (`pct` = the whole task's progress). Nothing else leaves the saved data.

@@ -14,6 +14,8 @@ import {
   setFriendPref,
   isSharedOnlyFilterOn,
   setSharedOnlyFilter,
+  isSharedOnlyFilterInEffect,
+  isHiddenBySharedOnlyFilter,
   friendsWithDrawingsOn,
   friendsWithTasksOn,
   friendsAlsoDoing,
@@ -127,6 +129,45 @@ test("which friends show: drawings by their toggle; tasks by their toggle and on
   const friends = [mike, sam, kim];
   assert.deepEqual(friendsWithDrawingsOn(friends, saved).map((one) => one.name), ["Mike", "Sam"]);
   assert.deepEqual(friendsWithTasksOn(friends, saved).map((one) => one.name), ["Sam"]);
+});
+
+// ---------------------------------------------------------------- the "Shared with squad" filter
+
+test("'Shared with squad' is off in a new file and in a file from before the squad", () => {
+  assert.equal(isSharedOnlyFilterOn(freshState()), false);
+  assert.equal(isSharedOnlyFilterOn(migrateSavedData({ version: 2, cats: [], tasks: {}, prefs: {} })), false);
+  assert.equal(isSharedOnlyFilterOn(migrateSavedData({ version: 2, cats: [], tasks: {}, prefs: {}, squad: {} })), false);
+});
+
+test("'Shared with squad' hides none of your tasks while no friend whose tasks you show shares them (2.8.1)", () => {
+  // The owner's 2.8.0 bug: the filter was on, the only friend ("Player", last seen 1 h) shared no
+  // tasks, and every row and marker on every map was gone.
+  const saved = savedWithActive(killScavs, visitTwoPlaces);
+  setSharedOnlyFilter(saved, true);
+  const player = friend("0123456789abcdef", "Player", { online: false, lastSeen: NOW - 60 * 60_000 });
+  const sam = friendSharing("fedcba9876543210", "Sam", { [killScavs.id]: { ticks: {}, pct: 0 } });
+  setFriendPref(saved, player.playerId, "tasks", true); // switched on, but Player shares nothing
+  // Sam shares, but his ☰ Tasks is off (the default)
+  const shown = friendsWithTasksOn([player, sam], saved);
+  assert.equal(shown.length, 0);
+  assert.equal(isSharedOnlyFilterInEffect(saved, shown), false);
+  assert.equal(isHiddenBySharedOnlyFilter(killScavs.id, saved, shown), false);
+  assert.equal(isHiddenBySharedOnlyFilter(visitTwoPlaces.id, saved, shown), false);
+  assert.equal(isSharedOnlyFilterOn(saved), true, "your choice is kept for when a friend shares again");
+});
+
+test("with a shown friend sharing tasks, 'Shared with squad' keeps only the tasks they also have", () => {
+  const saved = savedWithActive(killScavs, visitTwoPlaces);
+  const sam = friendSharing("fedcba9876543210", "Sam", { [killScavs.id]: { ticks: {}, pct: 0 } });
+  setFriendPref(saved, sam.playerId, "tasks", true);
+  const shown = friendsWithTasksOn([sam], saved);
+  assert.equal(isSharedOnlyFilterInEffect(saved, shown), false, "off until you switch it on");
+  assert.equal(isHiddenBySharedOnlyFilter(visitTwoPlaces.id, saved, shown), false);
+
+  setSharedOnlyFilter(saved, true);
+  assert.equal(isSharedOnlyFilterInEffect(saved, shown), true);
+  assert.equal(isHiddenBySharedOnlyFilter(killScavs.id, saved, shown), false, "Sam has it too");
+  assert.equal(isHiddenBySharedOnlyFilter(visitTwoPlaces.id, saved, shown), true, "only yours");
 });
 
 // ---------------------------------------------------------------- shared tasks
