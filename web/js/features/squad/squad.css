@@ -14,6 +14,8 @@
 .squad-toggle[aria-pressed="true"]{background:var(--gold-two);color:#000}
 .squad-toggle.dim{opacity:.55}
 .sec.squad .tools{margin-top:8px}
+/* "Shared with squad" while no friend you show shares tasks: it filters nothing (title says why) */
+.sec.squad .chip:disabled{opacity:.45;cursor:default}
 
 /* "Also: Mike, Sam" under a task row's name */
 .squad-name,.trow .also bdi,.pop .squad-also bdi,.pop .squad-progress bdi,.squad-grouphead bdi{unicode-bidi:isolate}

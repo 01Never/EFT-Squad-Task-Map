@@ -173,6 +173,29 @@ export function setSharedOnlyFilter(saved, isOn) {
   squad.sharedOnly = isOn;
 }
 
+/**
+ * Whether "Shared with squad" actually filters: it is on, and at least one friend whose tasks you
+ * show shares them. With nobody like that (friends who don't share tasks, or whose ☰ Tasks you
+ * left off) it would hide every task you have, so it does nothing until someone shares (2.8.1:
+ * in 2.8.0 every list said "Nothing here" and the maps had no markers). Your choice stays saved.
+ * @param {SavedState} saved
+ * @param {SquadFriend[]} friendsWithTasks friendsWithTasksOn(): shown and sharing
+ */
+export function isSharedOnlyFilterInEffect(saved, friendsWithTasks) {
+  return isSharedOnlyFilterOn(saved) && friendsWithTasks.length > 0;
+}
+
+/**
+ * Whether "Shared with squad" hides this task: the filter is in effect and no shown friend has it.
+ * @param {string} taskId
+ * @param {SavedState} saved
+ * @param {SquadFriend[]} friendsWithTasks friendsWithTasksOn(): shown and sharing
+ */
+export function isHiddenBySharedOnlyFilter(taskId, saved, friendsWithTasks) {
+  if (!isSharedOnlyFilterInEffect(saved, friendsWithTasks)) return false;
+  return friendsAlsoDoing(taskId, friendsWithTasks).length === 0;
+}
+
 // ---------------------------------------------------------------- which friends show
 
 /**

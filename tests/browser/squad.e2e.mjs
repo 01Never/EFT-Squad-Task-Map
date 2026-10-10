@@ -356,3 +356,67 @@ test("a 32-wide name keeps the toggles and rows in the panel; friends with 'toSt
     for (const fake of fakes) fake.stop();
   }
 });
+
+// ---------------------------------------------------------------- 2.8.1: the filter with nobody sharing
+
+test("'Shared with squad' left on while no shown friend shares tasks hides none of your tasks (2.8.1)", { timeout: 180_000 }, async () => {
+  // The owner's 2.8.0 report: one friend "Player", last seen a while ago, sharing no tasks, and the
+  // filter on: every category said "Nothing here" and no map had a task marker.
+  const quiet = new FakeFriend("d4d4d4d4d4d4d4d4", "Player", null);
+  const sharer = new FakeFriend("e5e5e5e5e5e5e5e5", "Sam", { [glory.id]: { ticks: {}, pct: 0 } });
+  const fakes = [quiet, sharer];
+  for (const fake of fakes) await fake.start();
+  const state = stateWithTasks([revision.name, glory.name]);
+  state.squad = { friends: {}, sharedOnly: true }; // saved "on", as in the owner's file
+  const owner = new Player("Owner", "#e03131", await freePort(), fakes.map((fake) => fake.port), state);
+  const ownTasks = () => owner.page.locator("#panel .cat .task").count();
+  const ownMarkers = () => owner.page.locator("svg.map g.mk").count();
+  const filterChip = () => owner.page.locator('[data-act="squadonly"]');
+  try {
+    await owner.start();
+    const [tasksBefore, markersBefore] = [await ownTasks(), await ownMarkers()];
+    assert.ok(tasksBefore > 1 && markersBefore > 1, "the owner has a list and markers");
+
+    await owner.join();
+    await eventually(async () => (await owner.page.locator(".squad-chip").count()) === 2, "both friends show", 20_000);
+    quiet.stop();
+    await eventually(async () => /last seen/.test(await owner.chip(quiet.share.player.id).textContent()), "Player shows 'last seen'", 15_000);
+
+    // nobody whose tasks you show shares them: the filter does nothing and says why
+    assert.equal(await ownTasks(), tasksBefore, "every row is still listed");
+    assert.equal(await ownMarkers(), markersBefore, "every marker is still drawn");
+    assert.equal(await filterChip().isDisabled(), true, "the chip can't be used yet");
+    assert.equal(await filterChip().getAttribute("aria-pressed"), "false", "and doesn't look on");
+    assert.match(await filterChip().getAttribute("title"), /Tasks/);
+    await owner.shot("filter-inactive");
+
+    // Sam's ☰ Tasks on: the saved choice applies again, only Glory is left
+    await owner.page.click(`[data-squad-tasks="${sharer.share.player.id}"]`);
+    assert.equal(await filterChip().isDisabled(), false);
+    assert.equal(await filterChip().getAttribute("aria-pressed"), "true");
+    const listed = await owner.page.locator("#panel .cat .task").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-task")));
+    assert.ok(listed.length > 0 && listed.every((id) => id === glory.id), "only the task Sam also has");
+    const filteredMarkers = await ownMarkers();
+    assert.ok(filteredMarkers > 0 && filteredMarkers < markersBefore, "only Glory's markers");
+
+    // switched off by hand: everything is back
+    await filterChip().click();
+    assert.equal(await ownTasks(), tasksBefore);
+    assert.equal(await ownMarkers(), markersBefore);
+    await eventually(() => owner.scenario.savedState().squad?.sharedOnly === false, "switching it off is saved");
+
+    // Sam's tasks off again with the filter on: nothing hides, also after a reload
+    await filterChip().click();
+    await owner.page.click(`[data-squad-tasks="${sharer.share.player.id}"]`);
+    assert.equal(await ownTasks(), tasksBefore);
+    await owner.page.reload();
+    await owner.scenario.waitForMap(MAP);
+    await eventually(async () => (await owner.page.locator(".squad-chip").count()) === 2, "friends after the reload");
+    assert.equal(await ownTasks(), tasksBefore, "every row after a reload");
+    assert.equal(await ownMarkers(), markersBefore, "every marker after a reload");
+    owner.scenario.assertNoPageErrors();
+  } finally {
+    await owner.scenario.stop().catch(() => {});
+    for (const fake of fakes) fake.stop();
+  }
+});

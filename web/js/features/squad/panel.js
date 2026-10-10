@@ -11,7 +11,14 @@ import { escapeHtml, findElement } from "../../app/dom.js";
 import { save } from "../../app/saving.js";
 import { renderMapPage } from "../../map/map-page.js";
 import { partsOnMap } from "../tasks/task-list.js";
-import { isInSquad, allFriends, friendsShowingTasks, friendsAlsoDoingTask } from "./friends.js";
+import {
+  isInSquad,
+  allFriends,
+  friendsShowingTasks,
+  friendsAlsoDoingTask,
+  canSquadFilterApply,
+  isSquadFilterInEffect,
+} from "./friends.js";
 import { renderFriendDrawingsOf } from "./map-layer.js";
 import { warnOnce } from "./safe.js";
 import {
@@ -31,6 +38,12 @@ import {
 /** @import { Task, Part } from "../../app/types.js" */
 
 const CHIPS_SECTION_ID = "squad-section";
+
+// Why "Shared with squad" can't be used: it would hide every task you have.
+const SHARED_ONLY_UNAVAILABLE_TITLE =
+  "Nobody whose tasks you show is sharing them yet. Switch on a friend's ☰ Tasks " +
+  "(they turn on Share my tasks in their Settings)";
+const SHARED_ONLY_TITLE = "Show only the tasks a friend whose tasks you show also has";
 
 // ---------------------------------------------------------------- the chips and the filter
 
@@ -97,15 +110,21 @@ function renderFriendChip(friend) {
   </div>`;
 }
 
-/** "Shared with squad" and how many of the tasks on this map a shown friend also has. */
+/**
+ * "Shared with squad" and how many of the tasks on this map a shown friend also has. Greyed out
+ * (and never shown as on) while no friend you show shares tasks: then it filters nothing.
+ */
 function renderSharedOnlyChip() {
-  const isOn = isSharedOnlyFilterOn(app.saved);
+  if (!canSquadFilterApply()) {
+    return `<button class="chip" data-act="squadonly" aria-pressed="false" disabled title="${SHARED_ONLY_UNAVAILABLE_TITLE}">👥 Shared with squad</button>`;
+  }
+  const isOn = isSquadFilterInEffect();
   const taskIds = new Set();
   for (const row of partsOnMap(app.mapView.key)) {
     if (friendsAlsoDoingTask(row.task.id).length) taskIds.add(row.task.id);
   }
   const count = taskIds.size ? ` <span class="n">${taskIds.size}</span>` : "";
-  return `<button class="chip" data-act="squadonly" aria-pressed="${isOn}" title="Show only the tasks a friend whose tasks you show also has">👥 Shared with squad${count}</button>`;
+  return `<button class="chip" data-act="squadonly" aria-pressed="${isOn}" title="${SHARED_ONLY_TITLE}">👥 Shared with squad${count}</button>`;
 }
 
 // ---------------------------------------------------------------- the chips' clicks

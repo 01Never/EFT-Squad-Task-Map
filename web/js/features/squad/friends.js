@@ -8,6 +8,8 @@ import {
   friendsWithTasksOn,
   friendsAlsoDoing,
   isSharedOnlyFilterOn,
+  isSharedOnlyFilterInEffect,
+  isHiddenBySharedOnlyFilter,
   safeFriendColor,
 } from "./rules.js";
 
@@ -59,10 +61,24 @@ export function squadColorsForTask(taskId) {
 }
 
 /**
- * Whether "Shared with squad" hides this task: the filter is on and no shown friend has it.
+ * Whether anyone you show shares tasks, so "Shared with squad" has something to filter by.
+ */
+export function canSquadFilterApply() {
+  return friendsShowingTasks().length > 0;
+}
+
+/**
+ * Whether "Shared with squad" filters right now (on, and a shown friend shares tasks).
+ */
+export function isSquadFilterInEffect() {
+  return isInSquad() && isSharedOnlyFilterInEffect(app.saved, friendsShowingTasks());
+}
+
+/**
+ * Whether "Shared with squad" hides this task: the filter is in effect and no shown friend has it.
  * @param {string} taskId
  */
 export function isHiddenBySquadFilter(taskId) {
-  if (!isInSquad() || !isSharedOnlyFilterOn(app.saved)) return false;
-  return friendsAlsoDoingTask(taskId).length === 0;
+  if (!isInSquad() || !isSharedOnlyFilterOn(app.saved)) return false; // quick exit for every row
+  return isHiddenBySharedOnlyFilter(taskId, app.saved, friendsShowingTasks());
 }
