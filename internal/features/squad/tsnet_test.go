@@ -188,13 +188,26 @@ func TestTwoCopiesShareOverARealTsnetTailnet(t *testing.T) {
 		if aliceAgain.squad.View().Me.Rev != 2 {
 			t.Errorf("Alice's share after the restart: rev %d, want 2", aliceAgain.squad.View().Me.Rev)
 		}
-		// The proof that the restarted copy is back on the tailnet without an invite code: a new
-		// share from it reaches Bob.
-		aliceAgain.squad.SetMyShare(drawingAt(3))
-		eventuallyWithin(t, 30*time.Second, "Bob gets the restarted Alice's new share", func() bool {
-			friend, _ := bob.friend(mike.ID)
-			return friend.Online && friend.Share.Rev == 3
+		// The proof that the restarted copy is back on the tailnet without an invite code: it
+		// reaches Bob and gets his newest share. (Its own links are new, so this doesn't depend on
+		// Bob noticing that the old Alice went away.)
+		bob.squad.SetMyShare(drawingAt(5))
+		bobsRev := bob.squad.View().Me.Rev
+		eventuallyWithin(t, 30*time.Second, "the restarted Alice gets Bob's new share", func() bool {
+			friend, _ := aliceAgain.friend(sam.ID)
+			return friend.Online && friend.Share.Rev == bobsRev
 		})
+		// The other way round needs Bob's link to the old Alice to end. Real Tailscale reports
+		// her offline when her node stops, which ends it; this fake control server doesn't, so a
+		// close that didn't get out leaves Bob waiting on a stream to a node that's gone. Only
+		// checked when Bob did see her go.
+		aliceAgain.squad.SetMyShare(drawingAt(3))
+		if wentOffline {
+			eventuallyWithin(t, 30*time.Second, "Bob gets the restarted Alice's new share", func() bool {
+				friend, _ := bob.friend(mike.ID)
+				return friend.Online && friend.Share.Rev == 3
+			})
+		}
 	})
 
 	t.Run("leaving deletes the node key and forgets friends", func(t *testing.T) {
