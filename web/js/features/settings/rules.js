@@ -3,18 +3,39 @@
 // Plain functions only: no DOM, no network. panel.js draws the dialogs.
 import { GAME_MODE_NAMES } from "../../app/game-modes.js";
 
-/** @import { GameDataStatus } from "../../app/types.js" */
+/** @import { GameDataStatus, AiStatus } from "../../app/types.js" */
 
 // The model the OpenAI dialog suggests when none is saved (the server uses the same default).
-export const DEFAULT_AI_MODEL = "gpt-5.4-mini";
+export const DEFAULT_AI_MODEL = "gpt-6-luna";
 
-/** The reasoning effort choices: value sent to the server, and its name. "" = the model's default. */
+/** The reasoning effort choices: value sent to the server, and its name. "" = not chosen: AI Categorize then uses High. */
 export const REASONING_EFFORTS = [
-  ["", "Default"],
+  ["", "Default (High)"],
   ["low", "Low"],
   ["medium", "Medium"],
   ["high", "High"],
 ];
+
+/**
+ * "Key sk-…abcd · gpt-6-luna · high": what the OpenAI line in Settings says. The effort shown is the
+ * one in use (`effortInUse`, so a player who never chose one sees "high"); an older server only
+ * sends the saved `effort`.
+ * @param {AiStatus} ai
+ * @returns {string} plain text
+ */
+export function aiSummary(ai) {
+  const effort = effortShown(ai);
+  return `Key ${ai.key} · ${ai.model}${effort ? " · " + effort : ""}`;
+}
+
+/**
+ * The reasoning effort to show for the AI: the one in use (`effortInUse`), else the saved one
+ * (an older server), else "".
+ * @param {AiStatus} ai
+ */
+export function effortShown(ai) {
+  return ai.effortInUse ?? ai.effort ?? "";
+}
 
 const SECOND_MS = 1000;
 const MINUTE_SECONDS = 60;

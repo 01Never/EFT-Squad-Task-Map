@@ -11,6 +11,7 @@ import { newId } from "../../app/saved-data.js";
 import { renderMapPage } from "../../map/map-page.js";
 import { renderPanel } from "../../panel/panel.js";
 import { openAiKeyDialog } from "../settings/panel.js";
+import { effortShown } from "../settings/rules.js";
 import { activeTasks, partsOf, categoryOf, partsOnMap, taskEntry } from "../tasks/task-list.js";
 import {
   chatHistoryForRequest,
@@ -78,7 +79,8 @@ export function renderAiCategorizeBox() {
 /** The header: the model in use (or "not set up") and ▾ / ▸. */
 function renderHeader(isOpen) {
   const ai = app.status.ai;
-  const model = ai.hasKey ? escapeHtml(ai.model) + (ai.effort ? " · " + escapeHtml(ai.effort) : "") : "not set up";
+  const effort = effortShown(ai);
+  const model = ai.hasKey ? escapeHtml(ai.model) + (effort ? " · " + escapeHtml(effort) : "") : "not set up";
   return `<button class="aihead" data-ai-act="toggle">🤖 AI Categorize<span class="s">${model} ${isOpen ? "▾" : "▸"}</span></button>`;
 }
 

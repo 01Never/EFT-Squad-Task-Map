@@ -1,7 +1,7 @@
 // Tests for the settings rules (rules.js).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { timeAgo, gameDataDescription } from "./rules.js";
+import { timeAgo, gameDataDescription, aiSummary, effortShown, DEFAULT_AI_MODEL, REASONING_EFFORTS } from "./rules.js";
 
 const NOW = Date.UTC(2026, 9, 6, 12, 0, 0);
 const MINUTE_MS = 60_000;
@@ -23,4 +23,23 @@ test("the game data line says the mode, the task count and where the data came f
 
   const builtIn = { ...live, origin: "built-in", generated: "2026-09-30T08:00:00Z" };
   assert.equal(gameDataDescription(builtIn, NOW), "PvP · 515 tasks · built-in copy (2026-09-30)");
+});
+
+test("the default model is GPT-6 Luna and the empty reasoning choice says it means High", () => {
+  assert.equal(DEFAULT_AI_MODEL, "gpt-6-luna");
+  assert.deepEqual(REASONING_EFFORTS[0], ["", "Default (High)"]);
+});
+
+test("the effort shown is the one in use, else the saved one, else empty", () => {
+  assert.equal(effortShown({ effort: "", effortInUse: "high" }), "high");
+  assert.equal(effortShown({ effort: "low" }), "low");
+  assert.equal(effortShown({}), "");
+});
+
+test("the OpenAI line shows the effort in use, else the saved one, else none", () => {
+  const base = { hasKey: true, key: "sk-…abcd", model: "gpt-6-luna" };
+  assert.equal(aiSummary({ ...base, effort: "", effortInUse: "high" }), "Key sk-…abcd · gpt-6-luna · high");
+  assert.equal(aiSummary({ ...base, effort: "low", effortInUse: "low" }), "Key sk-…abcd · gpt-6-luna · low");
+  assert.equal(aiSummary({ ...base, effort: "low" }), "Key sk-…abcd · gpt-6-luna · low");
+  assert.equal(aiSummary({ ...base, effort: "", effortInUse: "" }), "Key sk-…abcd · gpt-6-luna");
 });
