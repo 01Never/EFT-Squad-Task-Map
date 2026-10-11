@@ -14,13 +14,13 @@ import (
 	"unicode/utf16"
 )
 
-// reasoningFor: the user's effort setting; else "medium" for models that support reasoning.
+// reasoningFor: the user's effort setting; else openai.DefaultEffort ("high") for models that support reasoning.
 func reasoningFor(model, effort string) map[string]any {
 	if effort != "" {
 		return map[string]any{"effort": effort}
 	}
 	if openai.SupportsReasoning(model) {
-		return map[string]any{"effort": "medium"}
+		return map[string]any{"effort": openai.DefaultEffort}
 	}
 	return nil
 }

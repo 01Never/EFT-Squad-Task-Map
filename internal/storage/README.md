@@ -37,7 +37,7 @@ temporary build is recognised by `go-build` or `\temp\` in the exe's path.
 - **v1 backup** (`BackupV1IfNeeded`, at start-up): when the saved data exists, there's no backup
   yet, and it isn't `{"version": 2, …}`, copy it once before the page migrates it.
 - **Settings** (`ReadSettings`, `WriteSettings`): the known fields are `openaiKey`, `openaiModel`,
-  `openaiEffort`, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`, and
+  `openaiEffort`, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`, `settingsVersion`, and
   the `squad` block (ticket 05: `playerId`, `name`, `color`, `shareTasks`, `joined`; never the
   invite code; `SquadOrEmpty` gives an empty block when there's none).
   - Defaults: game mode `regular`; Follow my position on; auto-center off; empty folders mean
@@ -47,6 +47,15 @@ temporary build is recognised by `go-build` or `\temp\` in the exe's path.
     newer version's settings survive a save. The exception is v1's TarkovTracker fields (names starting with `tt`), dropped
     on first start because v2 doesn't use TarkovTracker.
   - A missing or broken file gives the defaults.
+  - **Format number** `settingsVersion` (absent = 1, every file up to 2.8.1; now
+    `CurrentSettingsVersion` = 2). `ReadSettings` runs `MigrateSettings` once at start-up: pure
+    steps (`settingsFrom1To2`, …, listed in `settingsMigrations` in `settings_migrations.go`) run in
+    order from the file's number to the current one. If anything changed, the file is written back
+    once and a console line says so (`Settings: AI model gpt-5.4-mini → gpt-6-luna (the new
+    default)`). A file with a higher number is left as it is. Fresh settings (no file) start at the
+    current number, and `WriteSettings` stamps it when it is 0, so old steps never run on a new
+    install. Step 1→2: model `gpt-5.4-mini` with no chosen effort becomes `gpt-6-luna`.
+    To add a step: raise the constant, write `settingsFromNToN+1`, append it to the list, test it.
   - Written indented with one space, as v2 did (keys now in alphabetical order).
 - **API key:** stored in plain text in the settings file (SPEC, CLAUDE.md). The page only ever sees
   `MaskKey`: the first 4 and last 4 characters around "…" (null when there's no key).

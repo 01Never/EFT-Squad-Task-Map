@@ -68,7 +68,15 @@ func (app *App) aiStatus(settings storage.Settings) map[string]any {
 	if model == "" {
 		model = openai.DefaultModel
 	}
-	return map[string]any{"hasKey": settings.OpenAIKey != "", "key": storage.MaskKey(settings.OpenAIKey), "model": model, "effort": settings.OpenAIEffort}
+	// effort is what the player saved (may be ""); effortInUse is what is actually sent.
+	effortInUse := settings.OpenAIEffort
+	if effortInUse == "" && openai.SupportsReasoning(model) {
+		effortInUse = openai.DefaultEffort
+	}
+	return map[string]any{
+		"hasKey": settings.OpenAIKey != "", "key": storage.MaskKey(settings.OpenAIKey),
+		"model": model, "effort": settings.OpenAIEffort, "effortInUse": effortInUse,
+	}
 }
 
 // GameDataJSON is /api/data.

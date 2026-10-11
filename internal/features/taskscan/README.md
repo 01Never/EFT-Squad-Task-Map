@@ -47,7 +47,7 @@ the OpenAI Responses API (vision, with your key), and the task data (for matchin
   `{rows: [{name, trader or null, progress or null}]}`, and instructions: return every row whose
   task name you can read, the name exactly as written, the trader only if it's written as text,
   progress as a whole percent; skip headers and unreadable rows; don't invent rows.
-- Model: the one in Settings (default `gpt-5.4-mini`). Reasoning effort is always `low` for models
+- Model: the one in Settings (default `gpt-6-luna`). Reasoning effort is always `low` for models
   that take one (gpt-5…, gpt-6…, o…), whatever the Reasoning setting says. Kept from v2; SPEC §8
   says to reuse the setting (HANDOFF §11, known gap).
 - Cleaning (`cleanRows`): rows without a name are dropped; the name is trimmed and cut at 120
