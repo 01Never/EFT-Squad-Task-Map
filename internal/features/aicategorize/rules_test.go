@@ -41,7 +41,7 @@ func sortingRequest() (Request, map[string]partInScope) {
 func modelAnswer(answerText string) map[string]any {
 	return map[string]any{
 		"id":    "resp_1",
-		"model": "gpt-5.4-mini-2026-03-01",
+		"model": "gpt-6-luna-2026-03-01",
 		"usage": map[string]any{"total_tokens": 1234.0},
 		"output": []any{
 			map[string]any{"type": "reasoning", "summary": []any{}},
@@ -103,7 +103,7 @@ func TestTheAnswerKeepsOnlyRealPartsAndCategories(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			request, partByID := sortingRequest()
 			answer := `{"reply":"ok","new_categories":[],"assignments":` + testCase.assignments + `}`
-			result, err := reviewAnswer(modelAnswer(answer), request, partByID, 0, "gpt-5.4-mini")
+			result, err := reviewAnswer(modelAnswer(answer), request, partByID, 0, "gpt-6-luna")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -134,7 +134,7 @@ func TestNewCategoriesGetAValidColorAndIcon(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			request, partByID := sortingRequest()
 			answer := `{"reply":"","new_categories":` + testCase.newCategories + `,"assignments":[]}`
-			result, err := reviewAnswer(modelAnswer(answer), request, partByID, 0, "gpt-5.4-mini")
+			result, err := reviewAnswer(modelAnswer(answer), request, partByID, 0, "gpt-6-luna")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -149,14 +149,14 @@ func TestANewCategoryCanBeUsedInTheSameAnswer(t *testing.T) {
 	request, partByID := sortingRequest()
 	answer := `{"reply":"Made Key runs.","new_categories":[{"name":"Key runs","color":"#123456","icon":"diamond"}],
 		"assignments":[{"part_id":"debut","category":"key runs","reason":"Needs a key"}]}`
-	result, err := reviewAnswer(modelAnswer(answer), request, partByID, 2, "gpt-5.4-mini")
+	result, err := reviewAnswer(modelAnswer(answer), request, partByID, 2, "gpt-6-luna")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(result.Assignments) != 1 || result.Assignments[0].Category != "Key runs" {
 		t.Errorf("assignments = %+v, want Debut in Key runs", result.Assignments)
 	}
-	if result.Reply != "Made Key runs." || result.WikiCalls != 2 || result.Model != "gpt-5.4-mini-2026-03-01" {
+	if result.Reply != "Made Key runs." || result.WikiCalls != 2 || result.Model != "gpt-6-luna-2026-03-01" {
 		t.Errorf("reply %q, wiki calls %d, model %v", result.Reply, result.WikiCalls, result.Model)
 	}
 	if !reflect.DeepEqual(result.Usage, map[string]any{"total_tokens": 1234.0}) {
@@ -168,12 +168,12 @@ func TestAnEmptyAnswerGivesEmptyListsAndTheRequestedModel(t *testing.T) {
 	request, partByID := sortingRequest()
 	answer := modelAnswer(`{"reply":"What do you mean?","new_categories":[],"assignments":[]}`)
 	delete(answer, "model")
-	result, err := reviewAnswer(answer, request, partByID, 0, "gpt-5.4-mini")
+	result, err := reviewAnswer(answer, request, partByID, 0, "gpt-6-luna")
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := toJSON(t, map[string]any{"n": result.NewCategories, "a": result.Assignments, "d": result.Dropped, "m": result.Model})
-	if want := `{"a":[],"d":[],"m":"gpt-5.4-mini","n":[]}`; got != want {
+	if want := `{"a":[],"d":[],"m":"gpt-6-luna","n":[]}`; got != want {
 		t.Errorf("got %s, want %s", got, want)
 	}
 }
@@ -194,7 +194,7 @@ func TestAnAnswerThatIsntUsableIsAnError(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			_, err := reviewAnswer(testCase.response, request, partByID, 0, "gpt-5.4-mini")
+			_, err := reviewAnswer(testCase.response, request, partByID, 0, "gpt-6-luna")
 			if err == nil || err.Error() != testCase.want {
 				t.Errorf("err = %v, want %q", err, testCase.want)
 			}
@@ -347,14 +347,14 @@ func TestTheContextListsTheCategoriesThenTheParts(t *testing.T) {
 	}
 }
 
-func TestReasoningEffortIsTheUsersChoiceElseMediumWhereSupported(t *testing.T) {
+func TestReasoningEffortIsTheUsersChoiceElseHighWhereSupported(t *testing.T) {
 	cases := []struct {
 		name, model, effort string
 		want                map[string]any
 	}{
-		{"a reasoning model with no setting", "gpt-5.4-mini", "", map[string]any{"effort": "medium"}},
-		{"an o-series model with no setting", "o3", "", map[string]any{"effort": "medium"}},
-		{"the user's setting wins", "gpt-5.4-mini", "high", map[string]any{"effort": "high"}},
+		{"a reasoning model with no setting", "gpt-6-luna", "", map[string]any{"effort": "high"}},
+		{"an o-series model with no setting", "o3", "", map[string]any{"effort": "high"}},
+		{"the user's setting wins", "gpt-6-luna", "high", map[string]any{"effort": "high"}},
 		{"a model without reasoning gets none", "gpt-4.1", "", nil},
 		{"the user's setting is sent even then", "gpt-4.1", "low", map[string]any{"effort": "low"}},
 	}

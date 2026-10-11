@@ -142,7 +142,7 @@ func TestTheFirstScreenshotOfARaidIsReadAndItsExtractsAreMatchedToTheMap(t *test
 func TestTheRequestAsksForAStrictSchemaLowReasoningAndAShrunkJPEG(t *testing.T) {
 	customs := "customs"
 	fixture := newFixture(t, &customs)
-	fixture.config.Model = "gpt-5.4-mini"
+	fixture.config.Model = "gpt-6-luna"
 	fixture.reader.RaidStarted()
 	fixture.shot(t)
 

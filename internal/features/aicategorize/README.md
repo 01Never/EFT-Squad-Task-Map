@@ -55,7 +55,7 @@ left out; if none are left: "No tasks in scope".
   `PARTS` (JSON), then the earlier turns, then `Instruction: …`.
 - A strict JSON schema: `reply`, `new_categories` (`name`, `color`, `icon`: one of circle, square,
   diamond, triangle, star, hexagon) and `assignments` (`part_id`, `category`, `reason`).
-- Reasoning effort: the Reasoning setting when set; otherwise `medium` for models that take one
+- Reasoning effort: the Reasoning setting when set; otherwise `high` (`openai.DefaultEffort`) for models that take one
   (gpt-5…, gpt-6…, o…); none for other models.
 - The wiki tool: up to `maxToolTurns` = 8 rounds. Each `get_wiki_page` call is answered with the
   full cleaned page, cut at `maxWikiTextForTool` = 7000 characters (or "no wiki page available",
@@ -105,7 +105,7 @@ page: GET /api/ai/job/<id> every second → result → review with checkboxes
 There's no live event: the page asks for the job.
 
 **Saved data / settings:** owns `squad-task-map-wikicache.json` (title → `{t, title, text,
-missing}`). Uses the `openaiKey`, `openaiModel` (default `gpt-5.4-mini`) and `openaiEffort`
+missing}`). Uses the `openaiKey`, `openaiModel` (default `gpt-6-luna`) and `openaiEffort`
 settings. What it changes in the page's saved data (through the page): `cats` and
 `tasks[id].partCats`.
 

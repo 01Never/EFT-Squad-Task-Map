@@ -10,6 +10,10 @@ import (
 // Settings are the user's choices, saved in squad-task-map-settings.json.
 // The OpenAI key is kept here in plain text and is only ever sent to api.openai.com.
 type Settings struct {
+	// Format number of this file (see settings_migrations.go). 0 = not set: a file without it is
+	// version 1; settings written for the first time get the current number.
+	SettingsVersion int `json:"settingsVersion,omitempty"`
+
 	OpenAIKey       string `json:"openaiKey,omitempty"`
 	OpenAIModel     string `json:"openaiModel,omitempty"`
 	OpenAIEffort    string `json:"openaiEffort,omitempty"`
@@ -132,7 +136,7 @@ func (s Settings) NeedsExtractsNotice() bool {
 var knownSettingsFields = map[string]bool{
 	"openaiKey": true, "openaiModel": true, "openaiEffort": true, "gameMode": true, "logsPath": true,
 	"screenshotsPath": true, "followPosition": true, "autoCenter": true, "squad": true,
-	"readExtracts": true, "extractsNoticeSeen": true,
+	"readExtracts": true, "extractsNoticeSeen": true, "settingsVersion": true,
 }
 
 // UnmarshalJSON reads the known fields and keeps the rest untouched.
@@ -171,22 +175,33 @@ func (s Settings) MarshalJSON() ([]byte, error) {
 	return json.Marshal(merged)
 }
 
-// ReadSettings loads the settings file; a missing or broken file gives empty settings.
+// ReadSettings loads the settings file and brings it up to the current format (MigrateSettings).
+// A missing or broken file gives empty settings at the current version, so a fresh install never
+// runs old migrations. When a migration changed something, the file is written back once and one
+// console line per change says what happened.
 // v1's TarkovTracker fields (tt…) are dropped on first start, since v2 doesn't use TarkovTracker.
 func ReadSettings(path string) Settings {
 	var settings Settings
 	data, err := os.ReadFile(path)
 	if err != nil || json.Unmarshal(data, &settings) != nil {
-		return Settings{extra: map[string]json.RawMessage{}}
+		return Settings{SettingsVersion: CurrentSettingsVersion, extra: map[string]json.RawMessage{}}
 	}
-	droppedAny := false
+	needsWrite := false
 	for key := range settings.extra {
 		if strings.HasPrefix(key, "tt") {
 			delete(settings.extra, key)
-			droppedAny = true
+			needsWrite = true
 		}
 	}
-	if droppedAny {
+	migrated, changes := MigrateSettings(settings)
+	if migrated.SettingsVersion != settings.SettingsVersion {
+		needsWrite = true
+	}
+	settings = migrated
+	for _, change := range changes {
+		fmt.Println("Settings: " + change)
+	}
+	if needsWrite {
 		_ = WriteSettings(path, settings)
 	}
 	return settings
@@ -194,6 +209,9 @@ func ReadSettings(path string) Settings {
 
 // WriteSettings saves the settings file (indented, like v2 did).
 func WriteSettings(path string, settings Settings) error {
+	if settings.SettingsVersion == 0 {
+		settings.SettingsVersion = CurrentSettingsVersion
+	}
 	compact, err := json.Marshal(settings)
 	if err != nil {
 		return fmt.Errorf("encoding settings: %w", err)

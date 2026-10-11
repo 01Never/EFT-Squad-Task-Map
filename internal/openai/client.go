@@ -19,7 +19,11 @@ import (
 )
 
 // DefaultModel is used when the user hasn't picked one.
-const DefaultModel = "gpt-5.4-mini"
+const DefaultModel = "gpt-6-luna"
+
+// DefaultEffort is the reasoning effort used when the player hasn't picked one, for models that
+// support reasoning.
+const DefaultEffort = "high"
 
 // requestTimeout: a vision or categorize call can take a while; this only stops a hung connection.
 const requestTimeout = 5 * time.Minute
