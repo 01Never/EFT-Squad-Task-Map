@@ -49,7 +49,7 @@ Join friends with an invite code: a private Tailscale network is built into the 
 
 ### And more
 - **Scan your task list:** screenshot the in-game Tasks screen and an OpenAI vision model reads it, so your list matches the game exactly (optional, your own API key).
-- **AI Categorize:** sort tasks by plain-English instructions, checked against each task's wiki page (optional).
+- **AI Categorize:** sort tasks by plain-English instructions, checked against each task's wiki page (optional). The default AI model is `gpt-6-luna`; you can pick another in Settings (see the [user guide](docs/USER-GUIDE.md#ai-categorize-openai)).
 - **Draw** on the map, **pin** tasks, add **sub-tasks**, and switch between PvP and PvE data.
 - **Check for updates** in Settings: signed releases from this repo, installed with one click.
 
