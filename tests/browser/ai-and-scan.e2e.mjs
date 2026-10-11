@@ -2,10 +2,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  browserSuite, withScenario, readFixture, stateWithTasks, taskNamed, taskNameOf, taskEntry, assertMatchesRecorded, OPENAI_TEST_KEY,
+  browserSuite, withScenario, readFixture, stateWithTasks, taskNamed, taskNameOf, taskEntry, assertMatchesRecorded, OPENAI_TEST_KEY, MOCK_PORT,
 } from "./harness.js";
 
 browserSuite();
+
+/** The mock's log line for the last OpenAI request of one kind ("responses model=… reasoning=…"). */
+async function lastOpenAIRequest(isWanted) {
+  const log = await (await fetch(`http://127.0.0.1:${MOCK_PORT}/log`)).json();
+  return log.filter((line) => line.startsWith("responses ") && isWanted(line)).at(-1);
+}
 
 const ballet = taskNamed("Ballet Lover");
 const audiophile = taskNamed("Audiophile");
@@ -25,6 +31,8 @@ test("AI Categorize: add the key, ask, apply the answer and undo it", async (t) 
 
     await page.click('#panel [data-ai-act="key"]');
     await page.waitForSelector(".modal #aikey");
+    // Ticket 18: the reasoning choice the player hasn't picked says what it means.
+    assert.equal(await page.textContent('.modal #aieffort option[value=""]'), "Default (High)");
     await page.fill("#aikey", "sk-wrong_1234567890abcdefghijkl");
     await s.answered("PUT", "/api/ai/key", () => page.click("#aisave"));
     await page.waitForFunction(() => {
@@ -42,7 +50,8 @@ test("AI Categorize: add the key, ask, apply the answer and undo it", async (t) 
     assert.match(await page.textContent(".modal"), /first in-raid screenshot of each raid/);
     await s.answered("PUT", "/api/settings", () => page.click("#exOn"));
     await page.waitForFunction(() => !document.querySelector(".modal"));
-    assert.match(await page.textContent("#panel .aihead .s"), /gpt-5\.4-mini/);
+    // Ticket 18: the default model, and the effort in use although none was picked.
+    assert.match(await page.textContent("#panel .aihead .s"), /^gpt-6-luna · high /);
     const ai = (await s.status()).ai;
     assert.equal(ai.hasKey, true);
     assert.notEqual(ai.key, OPENAI_TEST_KEY, "the page never gets the whole key back");
@@ -52,6 +61,11 @@ test("AI Categorize: add the key, ask, apply the answer and undo it", async (t) 
     await page.click('#panel [data-ai-act="send"]');
     await page.waitForSelector("#panel .msg.bot[data-mi]", { timeout: 30_000 });
     assert.match(await page.textContent("#panel .msg.bot[data-mi]"), /^Moved 3 parts that need keys\./);
+    assert.equal(
+      await lastOpenAIRequest((line) => line.includes("vision=false")),
+      'responses model=gpt-6-luna vision=false reasoning={"effort":"high"} imgBytes=0',
+      "AI Categorize asks the default model with high reasoning when none was picked",
+    );
     const proposed = await page.$$eval("#panel .msg .ch li", (items) => items.map((item) => item.textContent));
     assert.equal(proposed.length, keyedParts.length);
     assert.ok(proposed.every((line) => /^(Ballet Lover|Audiophile)\b.*: .+ → Key runs/.test(line)), proposed.join("\n"));
@@ -124,6 +138,11 @@ test("Scan: captured screenshots are read, confirming replaces the list and dele
     assert.equal(review.button, "Update list & delete 1 screenshot");
     assert.equal(review.note, "Read 8 rows from 1 screenshot. New tasks are added. Tasks on your list that aren't in these screenshots are removed.");
     assert.equal(review.spellingFixed, 1, "“Seizing the Initative” is matched with its spelling fixed");
+    assert.match(
+      await lastOpenAIRequest((line) => line.includes("vision=true") && !line.includes("extracts=true")),
+      /^responses model=gpt-6-luna vision=true reasoning=\{"effort":"low"\} /,
+      "the scan uses the default model and still asks for low reasoning",
+    );
     assertMatchesRecorded("scan-review", review);
 
     await s.saving(() => page.click("#rvok"));
