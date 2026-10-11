@@ -298,7 +298,8 @@ export {};
  * @property {boolean} hasKey
  * @property {string | null} key masked
  * @property {string} model
- * @property {string} [effort]
+ * @property {string} [effort] the saved reasoning effort ("" = never chosen)
+ * @property {string} [effortInUse] the effort used: the saved one, else "high" if the model reasons, else ""
  */
 
 /**
