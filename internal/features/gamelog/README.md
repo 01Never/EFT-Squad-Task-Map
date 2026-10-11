@@ -82,8 +82,12 @@ in a way that doesn't work (SysReq)…"; if nothing is bound, "No screenshot key
   CLAUDE.md: no faster timers).
 - `folderRescanEvery` = 6 polls (30 s): look for a newer session folder (the game was restarted) and
   for new files in the current one (a rotated `…_001.log`).
-- The newest session folder is the last subfolder in name order: `log_YYYY.MM.DD_HH-MM-SS_…` sorts
-  by time.
+- The newest session folder is the last `log_…` subfolder in name order (any case):
+  `log_YYYY.MM.DD_HH-MM-SS_…` sorts by time. Other subfolders are ignored, so a stray folder whose
+  name sorts after `log_…` can't hide the session (only when there's no `log_…` folder at all is the
+  last name used). The rule is `gamefolders.NewestSessionFolderName`.
+- The folder set in Settings may be one session folder or the install folder (people paste what
+  Explorer shows): `gamefolders.LogsRoot` turns it into the Logs folder, which Settings then shows.
 - Files followed: names ending in `.log` that contain `notifications` or `application` (any case).
 - **No catch-up.** At start-up the existing files are read from their end: nothing that happened
   before the app started is replayed. A session folder that appears while the app runs, and new
@@ -147,9 +151,12 @@ detected folder (tests and the offline mock setup).
   bytes are read; a new session folder is picked up on the 6th poll and read from its start.
 - `TestWatcherHandlesSplitWritesAndAShrinkingFile`.
 - `TestAUTF8CharacterCutBetweenReadsIsKeptWhole`.
+- `TestAWatchSetOnOneSessionFolderFollowsItsLogsFolder`: a session folder set in Settings watches
+  its Logs folder, reads that session and follows the next one.
+- `TestAFolderThatIsNotASessionDoesNotHideTheSession`.
+- `TestALogFileStartedMidSessionIsReadFromItsStart`: a rotated `…_001.log`.
 
-Not covered by tests yet: the missing-folder retry, the 4 MB read cap, rotated files in the same
-session.
+Not covered by tests yet: the missing-folder retry, the 4 MB read cap.
 
 **Needs an in-game check** (HANDOFF §10.2): accept a task → on the list within about 5 s; finish
 one → gone; with the setting on PvP Season, PvE task events are ignored; raid start and end; no

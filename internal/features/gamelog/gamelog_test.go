@@ -214,6 +214,86 @@ func TestWatcherHandlesSplitWritesAndAShrinkingFile(t *testing.T) {
 	}
 }
 
+// makeSession makes a session folder with real-style file names; returns its notifications log.
+func makeSession(t *testing.T, logsDir, stamp string) string {
+	t.Helper()
+	session := filepath.Join(logsDir, "log_"+stamp+"_1.1.5.1.47510")
+	if err := os.MkdirAll(session, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	notifications := filepath.Join(session, stamp+"_1.1.5.1.47510 push-notifications_000.log")
+	os.WriteFile(notifications, nil, 0o644)
+	os.WriteFile(filepath.Join(session, stamp+"_1.1.5.1.47510 application_000.log"), nil, 0o644)
+	return notifications
+}
+
+func pollUntilFolderRescan(watcher *Watcher) {
+	for i := 0; i < folderRescanEvery; i++ {
+		watcher.Poll()
+	}
+}
+
+func TestAWatchSetOnOneSessionFolderFollowsItsLogsFolder(t *testing.T) {
+	logsDir := filepath.Join(t.TempDir(), "Logs")
+	notifications := makeSession(t, logsDir, "2026.10.04_22-11-56")
+	session := filepath.Dir(notifications)
+
+	var got []Event
+	watcher := NewWatcher(func(event Event) { got = append(got, event) })
+	watcher.Start(session) // what Explorer showed when the path was copied
+	defer watcher.Stop()
+	if status := watcher.Status(); status.Dir == nil || *status.Dir != logsDir {
+		t.Fatalf("watching %v, want the Logs folder %q", status.Dir, logsDir)
+	}
+
+	appendTo(t, notifications, notification(12, "dddddddddddddddddddddddd"))
+	watcher.Poll()
+	if len(got) != 1 || got[0].TaskID != "dddddddddddddddddddddddd" {
+		t.Fatalf("got %+v, want the finished task", got)
+	}
+
+	nextNotifications := makeSession(t, logsDir, "2026.10.05_18-00-00")
+	appendTo(t, nextNotifications, notification(12, "eeeeeeeeeeeeeeeeeeeeeeee"))
+	pollUntilFolderRescan(watcher)
+	if got[len(got)-1].TaskID != "eeeeeeeeeeeeeeeeeeeeeeee" {
+		t.Errorf("the next game session wasn't followed: %+v", got)
+	}
+}
+
+func TestAFolderThatIsNotASessionDoesNotHideTheSession(t *testing.T) {
+	logsDir := t.TempDir()
+	notifications := makeSession(t, logsDir, "2026.10.04_22-11-56")
+	os.Mkdir(filepath.Join(logsDir, "traces"), 0o755) // sorts after "log_…"
+
+	var got []Event
+	watcher := NewWatcher(func(event Event) { got = append(got, event) })
+	watcher.Start(logsDir)
+	defer watcher.Stop()
+	appendTo(t, notifications, notification(12, "ffffffffffffffffffffffff"))
+	pollUntilFolderRescan(watcher)
+	if len(got) != 1 || got[0].TaskID != "ffffffffffffffffffffffff" {
+		t.Errorf("got %+v, want the finished task from the session folder", got)
+	}
+}
+
+func TestALogFileStartedMidSessionIsReadFromItsStart(t *testing.T) {
+	logsDir := t.TempDir()
+	notifications := makeSession(t, logsDir, "2026.10.04_22-11-56")
+
+	var got []Event
+	watcher := NewWatcher(func(event Event) { got = append(got, event) })
+	watcher.Start(logsDir)
+	defer watcher.Stop()
+
+	// The game moves on to …_001.log when …_000.log is big enough.
+	rotated := strings.Replace(notifications, "_000.log", "_001.log", 1)
+	os.WriteFile(rotated, []byte(notification(10, "111111111111111111111111")), 0o644)
+	pollUntilFolderRescan(watcher)
+	if len(got) != 1 || got[0].TaskID != "111111111111111111111111" {
+		t.Errorf("got %+v, want the task from the new file", got)
+	}
+}
+
 func TestAUTF8CharacterCutBetweenReadsIsKeptWhole(t *testing.T) {
 	state := &fileState{}
 	word := []byte("Kraków")

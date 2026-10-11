@@ -32,6 +32,22 @@ func DocumentsDir() string {
 	return documentsDir
 }
 
+// documentsCandidates are the Documents folders the game might save screenshots in, the one
+// Windows reports first. With OneDrive's folder backup the old %USERPROFILE%\Documents can still
+// exist next to OneDrive's Documents, and a game that builds the path itself may use either one.
+func documentsCandidates() []string {
+	candidates := []string{DocumentsDir()}
+	if home, err := os.UserHomeDir(); err == nil {
+		candidates = append(candidates, filepath.Join(home, "Documents"))
+	}
+	for _, variable := range []string{"OneDrive", "OneDriveConsumer", "OneDriveCommercial"} {
+		if oneDrive := os.Getenv(variable); oneDrive != "" {
+			candidates = append(candidates, filepath.Join(oneDrive, "Documents"))
+		}
+	}
+	return candidates
+}
+
 // The launcher registers EFT under this uninstall key (in either registry view, per user or machine).
 var uninstallKeys = []string{
 	`SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\EscapeFromTarkov`,

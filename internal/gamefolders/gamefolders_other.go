@@ -16,5 +16,8 @@ func DocumentsDir() string {
 	return filepath.Join(home, "Documents")
 }
 
+// documentsCandidates is just ~/Documents here.
+func documentsCandidates() []string { return []string{DocumentsDir()} }
+
 func launcherInstallFolders() []string { return nil }
 func steamRoots() []string             { return nil }
