@@ -164,7 +164,9 @@ If something goes wrong (no internet, GitHub unreachable, no release yet, "This 
 ## AI Categorize (OpenAI)
 The **🤖 AI Categorize** box in the panel sorts parts by your instructions, e.g. "Make a Key runs category for parts that need a key on this map". It checks each task's objectives and its wiki page, proposes moves with reasons, and you pick which to apply. **Undo** reverts an applied batch.
 
-**Setup:** **Add OpenAI key** and paste a key from platform.openai.com/api-keys (the account needs API credit). The default model is `gpt-5.4-mini`; Reasoning sets how hard it thinks.
+**Setup:** **Add OpenAI key** and paste a key from platform.openai.com/api-keys (the account needs API credit). The default model is `gpt-6-luna`; Reasoning sets how hard it thinks. Left on **Default (High)**, AI Categorize thinks at High; the task scan and the extract reader always use Low. The key line in Settings reads like "Key sk-…abcd · gpt-6-luna · high", and the AI Categorize box shows "gpt-6-luna · high". If your OpenAI account can't use `gpt-6-luna`, scans and AI Categorize fail until you type another model in Settings → OpenAI; **Save & test** checks it.
+
+If you never chose a model, the app switches you from the old default (`gpt-5.4-mini`) to `gpt-6-luna` once, the first time you start this version. A model you picked yourself is kept.
 
 ## Privacy and cost
 - Everything stays on your PC except:
