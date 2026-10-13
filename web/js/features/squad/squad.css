@@ -2,7 +2,7 @@
    and the map's friend layers. A friend's colour reaches CSS only as --friend, set from a value
    that passed the strict #rrggbb check (rules.js: safeFriendColor). Nothing here animates. */
 
-/* the chips: one row per friend, a colour dot, the name and status, and two toggles */
+/* the chips: one row per friend, a colour dot, the name and status, and three toggles */
 .squad-chips{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
 .squad-chip{min-width:0;display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid #3a3a3d;border-left:4px solid var(--friend,var(--muted));background:rgb(255 255 255 / .03)}
 .squad-dot{flex:none;width:12px;height:12px;border-radius:50%;background:var(--friend,var(--muted));border:1px solid #000}
@@ -10,6 +10,8 @@
 .squad-name{unicode-bidi:isolate;color:#fff;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .squad-state{font-size:12.5px;color:var(--muted)}
 .squad-chip.online .squad-state{color:#7fd67f}
+/* " · on Customs": the friend's position is on another map (ticket 17); text only */
+.squad-chip .squad-where{color:var(--gold-one)}
 .squad-toggle{flex:none;background:transparent;border:1px solid var(--gold-two);color:var(--muted);height:26px;padding:0 8px;cursor:pointer;font-weight:700;font-size:13px;white-space:nowrap}
 .squad-toggle[aria-pressed="true"]{background:var(--gold-two);color:#000}
 .squad-toggle.dim{opacity:.55}
@@ -33,6 +35,11 @@
 .squad-task .nm{flex:1;min-width:0;color:var(--gold-one)}
 .squad-task .tr{display:block;font-size:13px;color:var(--muted)}
 .squad-task .pct{color:var(--muted);font-size:13px}
+
+/* friends' positions on the map (ticket 17): drawn with SVG attributes in map-layer.js. Only the
+   disc takes the pointer (its tooltip); a position over 5 min old has a static opacity of .5 */
+.friend-player .friend-player-dot{cursor:help}
+.friend-player-name{unicode-bidi:isolate}
 
 /* Settings → Squad */
 .sq-row{display:flex;gap:10px;align-items:center;margin-top:8px}

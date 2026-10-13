@@ -1,7 +1,8 @@
 // @ts-check
 // Settings → Squad: join with an invite code (it can take up to 90 seconds; the server's error is
-// shown as it is), and once joined: the status line, your name and colour, "Share my tasks" (off
-// by default), and Leave. The program does the work (POST /api/squad/join, PUT /api/squad/profile,
+// shown as it is), and once joined: the status line, your name and colour, "Share my tasks" and
+// "Share my position" (both on by default since ticket 17; the program keeps that setting), and
+// Leave. The program does the work (POST /api/squad/join, PUT /api/squad/profile,
 // POST /api/squad/leave); this file is the form. Nothing here runs on a timer.
 import { app } from "../../app/state.js";
 import { escapeHtml, findElement, showToast } from "../../app/dom.js";
@@ -90,6 +91,7 @@ function renderJoined(view) {
     <label class="frow"><span>Your name</span><input type="text" id="sSquadName" maxlength="32" value="${escapeHtml(view.me.name)}"></label>
     <label class="frow"><span>Your colour</span><input type="color" id="sSquadColor" value="${color}"></label>
     <label class="chk frow"><input type="checkbox" id="sSquadShareTasks" ${view.settings.shareTasks ? "checked" : ""}> Share my tasks (your active tasks and how far you are; friends choose whether to show them)</label>
+    <label class="chk frow"><input type="checkbox" id="sSquadSharePosition" ${view.settings.sharePosition ? "checked" : ""}> Share my position (where your last in-raid screenshot was taken; friends choose whether to show it)</label>
     <div class="row sq-row"><button class="btn sm danger" id="sSquadLeave">Leave squad</button></div>
     ${renderError()}`;
 }
@@ -120,12 +122,17 @@ function onSectionClicked(event) {
   if (button.id === "sSquadLeave") onLeaveClicked();
 }
 
-/** Your name, your colour or "Share my tasks" changed: tell the program. */
+/**
+ * Your name, your colour, "Share my tasks" or "Share my position" changed: tell the program. (The
+ * program puts your position into your share by itself, from each GPS screenshot, so nothing is
+ * sent from here for it.)
+ */
 function onSectionChanged(event) {
   const field = /** @type {HTMLInputElement} */ (event.target);
   if (field.id === "sSquadName") saveProfile({ name: field.value });
   if (field.id === "sSquadColor") saveProfile({ color: field.value });
   if (field.id === "sSquadShareTasks") onShareTasksChanged(field.checked);
+  if (field.id === "sSquadSharePosition") saveProfile({ sharePosition: field.checked });
 }
 
 /** Join: the program asks the tailnet to accept the code, which can take up to 90 seconds. */
@@ -170,7 +177,7 @@ async function onLeaveClicked() {
 /**
  * Save a profile change. A refused value (e.g. an empty name) is shown as the server says it, and
  * the box goes back to what is saved.
- * @param {{ name?: string, color?: string, shareTasks?: boolean }} changes
+ * @param {{ name?: string, color?: string, shareTasks?: boolean, sharePosition?: boolean }} changes
  * @returns {Promise<boolean>} whether it was saved
  */
 async function saveProfile(changes) {

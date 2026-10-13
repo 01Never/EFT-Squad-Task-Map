@@ -27,6 +27,7 @@
  * @property {SVGGElement} loot
  * @property {SVGGElement} friendTasks
  * @property {SVGGElement} taskMarkers
+ * @property {SVGGElement} friendPlayers
  * @property {SVGGElement} player
  */
 
