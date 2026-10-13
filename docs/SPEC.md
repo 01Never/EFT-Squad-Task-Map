@@ -222,7 +222,7 @@ For the boss list, use the boss names in json.tarkov.dev's map `bosses` data, or
 - `S.have[itemId]` is shared across maps. It resets to 0 at raid end (§10). Also add a "Reset all" button.
 
 ### 7.3 Map styling rules
-- **Fully opaque by default.** Only two things are ever semi-transparent: **not-ready** markers and zones, and **unmarked extracts** (§11). Use about 50% opacity, tuned by eye.
+- **Fully opaque by default.** Only three things are ever semi-transparent: **not-ready** markers and zones, **unmarked extracts** (§11), and **a friend's position older than 5 minutes** (ticket 17; it is gone after 30). Use about 50% opacity, tuned by eye.
 - **Not-ready marker:** semi-transparent, plus a **"!" badge at the top-left**.
 - **Badge positions:**
   - top-left: "!"
