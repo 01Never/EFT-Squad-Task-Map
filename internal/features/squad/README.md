@@ -1,33 +1,44 @@
 # Squad (`internal/features/squad`, ticket 05)
 
-**What it does (player's view):** friends running the app see each other's **drawings** live and,
-if each chooses to, each other's **tasks** (with ticks, so "Mike 2/5" works). There's no website
+**What it does (player's view):** friends running the app see each other's **drawings** live,
+each other's **last GPS position** (ticket 17: where you were at your last screenshot in this raid)
+and each other's **tasks** (with ticks, so "Mike 2/5" works). "Share my tasks" and "Share my
+position" are both on by default; each player can switch either off. There's no website
 and no server: the copies connect directly over a private Tailscale network built into the exe
 (tsnet). You join once with an invite code. A friend who is offline still shows with their last
-known data and "last seen". No GPS position is shared (owner's decision).
+known data and "last seen".
 This package is the server side (part 1 of ticket 05). The page (Settings → Squad, chips,
-friends' layers, "Also: …" badges) is part 2, in `web/js/features/squad/`.
+friends' layers, "Also: …" badges, friends' position dots) is part 2, in `web/js/features/squad/`.
 
 **Where the data comes from:**
-- **Your share:** the page builds it from its saved data and sends it with
+- **Your share:** the page builds the drawings and tasks from its saved data and sends them with
   `PUT /api/squad/share` (about 1 s after a save). The server stamps it and keeps the last one in
   `squad-task-map-squad.json`, so friends get it again after a restart.
+- **Your position in it** (ticket 17): the server adds it, never the page. Each GPS screenshot
+  (`internal/features/gps`) on a map the game log named goes into your share
+  (`Squad.SetMyPosition`), so it works with the page closed. It isn't live tracking: it moves only
+  when you take a screenshot.
 - **Friends' shares:** each friend's copy, over the tailnet, from its **peer API** (below).
 - **Who your friends are:** the tailnet's peer list (nodes tagged `tag:stm`, named
   `stm-<player id>`), followed on Tailscale's IPN bus (event-driven, no polling).
 
-**Never shared:** the OpenAI key, folder paths, screenshots, settings, bring-list counts,
-categories, AI chats, your position. The server only ever sends what's in the share below.
+**Never shared:** the OpenAI key, folder paths, screenshots (only the position read from a
+screenshot's name), settings, bring-list counts, categories, AI chats. The server only ever sends
+what's in the share below.
 
 ## The rules (`rules.go`)
 
 | Rule | Function | Numbers and why |
 |---|---|---|
-| A share is `{v, player, rev, updatedAt, draw, tasks, mode}` | `Share` | `v` = 1 (`ShareFormatVersion`); `updatedAt` in ms since 1970; `mode` is optional (below) |
+| A share is `{v, player, rev, updatedAt, draw, tasks, mode, pos?}` | `Share`, `Position` | `v` = 1 (`ShareFormatVersion`); `updatedAt` in ms since 1970; `mode` is optional (below); `pos` (ticket 17) is `{map, x, y, z, yaw, t}`, the same names and meaning as the `gps` event (`t` = ms since 1970 when this copy saw the screenshot), and absent when there is none. **`v` stays 1 with `mode` and `pos`:** 2.8.x copies decode with plain `json.Unmarshal`, so they ignore both and keep working; a new `v` would make every not-yet-updated friend drop your whole share |
 | A share says which game mode its tasks belong to | `Share.Mode`, `IsValidShareMode` | issue #22: each game mode has its own task list. `mode` is `"regular"`, `"pve"` or `"pvp-season"`, or absent/`""` (a copy from before #22, or the page didn't say); anything else refuses the share. Passed through from the page as is, also when "Share my tasks" is off. `v` stays 1: copies before #22 read shares with plain `json.Unmarshal` (no `DisallowUnknownFields`), so they skip `mode` and keep working (tested: an unknown field is ignored) |
-| `rev` goes up only when the content changes | `StampShare` | content = player (id, name, colour) + drawings + tasks + game mode; the same content again keeps rev and updatedAt |
-| Tasks are dropped when "Share my tasks" is off | `StampShare` | enforced by the server, whatever the page sends; turning it off re-stamps at once (rev + 1, `tasks: null`) |
-| Everything received is checked; a bad share is dropped whole and logged once | `DecodeShare`, `ValidateShare`, `ValidateParts` | ≤ 2 MB (`MaxShareBytes`, ticket's cap); player id 16 lower-case hex; name 1–32 characters (not bytes), no control characters, no bidi controls or zero-width spaces, at least one visible character, no spaces at the ends; colour `#rrggbb`; task and objective ids exactly 24 lower-case hex characters (what the real game data has: all 515 task ids and 1441 objective ids in the bundled snapshot; so `toString`, `__proto__` and the like can't get in); `mode` one of `regular`, `pve`, `pvp-season` or empty; map keys `[A-Za-z0-9_-]{1,64}` and never a name of a JavaScript object property (`__proto__`, `constructor`, `prototype`, `toString`, `valueOf`, `hasOwnProperty`, …); ≤ 64 maps, ≤ 5000 strokes a map, 1–10000 `[x, z]` points a stroke, width 0–1000, coordinates within ±1e6, stroke colour `#rgb`/`#rrggbb`; ≤ 2000 tasks, ≤ 200 ticks each, a tick is `true` or a whole number 0–100000, `pct` 0–100 |
+| `rev` goes up only when the content changes | `StampShare` | content = player (id, name, colour) + drawings + tasks + game mode + position; the same content again keeps rev and updatedAt. Each GPS screenshot is a new position (its `t` differs), so each one raises rev |
+| Tasks are dropped when "Share my tasks" is off | `StampShare` (`Sharing.Tasks`) | enforced by the server, whatever the page sends; turning it off re-stamps at once (rev + 1, `tasks: null`) |
+| The position is dropped when "Share my position" is off | `StampShare` (`Sharing.Position`) | enforced by the server; the page never sends a position (a `pos` in `PUT /api/squad/share` is ignored). Turning it off re-stamps at once (rev + 1, no `pos`); turning it on shares the last position at once, if there is one (the server holds it while sharing is off) |
+| "Share my tasks" and "Share my position" are on by default | `internal/storage` (`IsShareTasksOn`, `IsSharePositionOn`) | owner's decision (ticket 17): a missing field means on, and both are always written (`true`/`false`) so an "off" sticks. Settings files from before (version 2) get both turned on once (`settingsFrom2To3`), since they can't tell "off on purpose" from "never on" |
+| My position goes in only while in a squad, and only from a known map | `Squad.SetMyPosition`, `internal/app` (`sharedPositionFrom`) | a GPS fix on a map the game log didn't name isn't shared (a friend couldn't place it); not in a squad, nothing is kept. A position that would fail friends' checks is refused (it would make them drop the whole share) |
+| My position is cleared at raid end, on a raid on another map, on Leave and by a restart | `Squad.ClearMyPosition`, `Squad.ClearMyPositionIfFromAnotherMap`, `IsFromAnotherMap` | issue #17: "cleared when your raid ends or you change maps". Another map = the log's map-loading or raid-start line names a different map, or one it can't name; the same map keeps it. A clear re-stamps (rev + 1, no `pos`) only when the share carried one. Not remembered across a restart, like the GPS position itself: a cached `pos` is dropped when the cache is loaded (rev + 1, so friends drop it too) |
+| Everything received is checked; a bad share is dropped whole and logged once | `DecodeShare`, `ValidateShare`, `ValidateParts` | ≤ 2 MB (`MaxShareBytes`, ticket's cap); player id 16 lower-case hex; name 1–32 characters (not bytes), no control characters, no bidi controls or zero-width spaces, at least one visible character, no spaces at the ends; colour `#rrggbb`; task and objective ids exactly 24 lower-case hex characters (what the real game data has: all 515 task ids and 1441 objective ids in the bundled snapshot; so `toString`, `__proto__` and the like can't get in); `mode` one of `regular`, `pve`, `pvp-season` or empty; map keys `[A-Za-z0-9_-]{1,64}` and never a name of a JavaScript object property (`__proto__`, `constructor`, `prototype`, `toString`, `valueOf`, `hasOwnProperty`, …); ≤ 64 maps, ≤ 5000 strokes a map, 1–10000 `[x, z]` points a stroke, width 0–1000, coordinates within ±1e6, stroke colour `#rgb`/`#rrggbb`; ≤ 2000 tasks, ≤ 200 ticks each, a tick is `true` or a whole number 0–100000, `pct` 0–100; a position (`ValidatePosition`, ticket 17): `map` follows the map-key rule above, `x`, `y`, `z` finite and within ±1e6, `yaw` within ±360, `t` a whole number > 0 (absent or `null` is fine) |
 | A friend's share is new when rev or updatedAt differ | `HasChanged` | not "higher": a friend who reset their data starts again at rev 1 |
 | On the tailnet a share must carry the id its node is named after | `ShareFitsPeer` | so one friend can't pose as another (the dev transport has no names) |
 | Friends are the online `tag:stm` nodes whose MagicDNS name is exactly `stm-<player id>` | `SquadPeers` | the id comes **only from the DNS name's first part**, which the tailnet keeps unique (a clash becomes `stm-<id>-1`, which doesn't count), never from the host name, which each node picks itself; connections are keyed by the node's stable id; when two machines claim one id (`stm-<id>` and `stm-<id>-1`, online or not), **neither** is trusted and one console line says to delete the old machine; IPv4 address preferred; yourself left out |
@@ -50,6 +61,15 @@ page saves → PUT /api/squad/share → Squad.SetMyShare → StampShare → squa
            → shareFeed.publish → every friend's open GET /squad/v1/stream gets the whole share
            → "squad" event to your own page (your rev)
 
+GPS screenshot (ticket 17) → app.onScreenshot → gps.Tracker.Update (map from the game log)
+           → app.shareMyPosition → sharedPositionFrom (no map → not shared)
+           → Squad.SetMyPosition (not in a squad → nothing) → StampShare (pos only if sharing it)
+           → the same path as above: cache file, shareFeed.publish, friends' streams (each friend
+             takes at most one share a second), "squad" event
+game log: map loading / raid start on another map → app.clearSharedPositionIfFromAnotherMap
+           → Squad.ClearMyPositionIfFromAnotherMap → re-stamped without pos (if it had one)
+game log: back in the menus → app.endRaid → Squad.ClearMyPosition → re-stamped without pos
+
 tailnet IPN bus change → TsnetTransport.WatchPeers → SquadPeers → friendLinks.reconcile
   per friend: GET /squad/v1/share, then GET /squad/v1/stream (held open; newest event kept)
            → at most 1/s: DecodeShare + ShareFitsPeer → Squad.onFriendShare
@@ -65,6 +85,8 @@ tailnet IPN bus change → TsnetTransport.WatchPeers → SquadPeers → friendLi
   offline). The only timers are the reconnect backoff (≥ 1 s, ≤ 60 s) while a listed friend's
   copy doesn't answer, and single one-shot timers while a change waits for its second to end
   (none when idle).
+- **Positions (ticket 17)** add no timer: one share update per GPS screenshot (and one when it is
+  cleared), over the same streams, under the same one-a-second limit per friend.
 
 ## Transports (`transport.go`, `tsnet.go`)
 
@@ -99,7 +121,7 @@ All bodies are JSON sent as `application/json` (415 otherwise). Times are ms sin
 {
   "me":        { "playerId": "0123456789abcdef", "name": "Mike", "color": "#4dabf7",
                  "rev": 42, "updatedAt": 1791336708099 },   // rev/updatedAt 0 until a share was sent
-  "settings":  { "shareTasks": false, "joined": true },
+  "settings":  { "shareTasks": true, "sharePosition": true, "joined": true },  // both on by default
   "transport": "tsnet",                                        // or "dev"
   "status":    { "state": "connected",                         // off | starting | needsLogin | connected | error
                  "text": "Connected · 2 of 3 friends online",  // show as is
@@ -111,12 +133,18 @@ All bodies are JSON sent as `application/json` (415 otherwise). Times are ms sin
       "share": { "v": 1, "player": {…}, "rev": 7, "updatedAt": …,
                  "draw":  { "<mapKey>": [ { "c": "#ff4d4d", "w": 2.5, "pts": [[x, z], …] } ] },
                  "tasks": null | { "<taskId>": { "ticks": { "<objId>": true | 3 }, "pct": 40 } },
-                 "mode": "pve" } }   // absent for a friend on a copy before issue #22
+                 "mode":  "pve",   // absent for a friend on a copy before issue #22
+                 "pos":   { "map": "customs", "x": -67.89, "y": 7.79, "z": -153.62,
+                            "yaw": 92.5, "t": 1791336708099 } } }   // absent (or null) when none
   ]
 }
 ```
 - A friend is **online** while their stream is open. Offline friends keep their last share;
   `lastSeen` is when their stream closed or their last share arrived.
+- `share.pos` (ticket 17) is the friend's last GPS position: the same fields as the `gps` event,
+  `map` is a map key, `t` is when their copy saw the screenshot. Show it only on that map. Their
+  copy removes it at raid end and on a raid on another map, but an offline friend's last share
+  keeps it, so the page decides when it is too old (fade, hide).
 - Friends' data is read-only. Draw friends' strokes in the friend's `color` (owner's default),
   not the strokes' own `c`.
 
@@ -124,7 +152,8 @@ All bodies are JSON sent as `application/json` (415 otherwise). Times are ms sin
 - `draw`: the page's `draw` (by map key, strokes `{c, w, pts}`); `tasks`: by task id
   `{ticks, pct}`, or `null`; `mode` (optional): the game mode those tasks are from, `"regular"`,
   `"pve"` or `"pvp-season"` (anything else → 400). Any other field is ignored (the server stamps
-  `v`, `player`, `rev`, `updatedAt`).
+  `v`, `player`, `rev`, `updatedAt`, and adds `pos` itself from your GPS screenshots: a `pos` sent
+  here is ignored).
 - `changed: false` when the content is the same as the last share (rev unchanged). Another `mode`
   counts as a change (rev + 1).
   `tasksShared: false` when "Share my tasks" is off: the tasks were dropped. `inSquad: false`: kept
@@ -144,11 +173,13 @@ Stops the session, logs the node out of the tailnet, deletes `squad-task-map-tai
 friends' shares (the cache keeps only your own share) and sets `joined` to false. Always succeeds
 (a failed log-out is logged; the folder is deleted anyway).
 
-### `PUT /api/squad/profile {name?, color?, shareTasks?}` → `{ok: true, squad: <view>}`
-Only the fields sent change. Name cleaned (bidi controls and zero-width characters removed, then trimmed), 1–32 characters; colour `#rrggbb` (any case, saved
+### `PUT /api/squad/profile {name?, color?, shareTasks?, sharePosition?}` → `{ok: true, squad: <view>}`
+Only the fields sent change (`shareTasks` and `sharePosition` only when they are `true` or
+`false`). Name cleaned (bidi controls and zero-width characters removed, then trimmed), 1–32 characters; colour `#rrggbb` (any case, saved
 lower-case). **400** with "Your name must be 1 to 32 characters" or "Your colour must look like
 #4dabf7". Your share is re-stamped at once, so friends see the new name or colour, and lose your
-tasks as soon as sharing is turned off.
+tasks or position as soon as sharing them is turned off. Turning "Share my position" on shares
+your last position at once, if there is one in this raid.
 
 ### Live event `squad` (broadcast)
 `{"type": "squad", "squad": <the same view as GET /api/squad>}`, whenever the status, a friend's
@@ -174,16 +205,20 @@ SSE event ≤ 2 MB, at most one share a second taken from each friend (the newes
 
 ## Saved data / settings
 - `squad-task-map-settings.json`, block `"squad"` (unknown fields inside it are kept):
-  `playerId` (made once; a new one on Leave), `name`, `color`, `shareTasks` (default false), `joined`. Never the
+  `playerId` (made once; a new one on Leave), `name`, `color`, `shareTasks` and `sharePosition`
+  (ticket 17: missing = on; always written as `true` or `false`, so an "off" sticks; settings
+  version 2 files get both turned on once, see `internal/storage/README.md`), `joined`. Never the
   invite code.
 - `squad-task-map-squad.json`: `{"v": 1, "mine": <my share> | null, "friends": {"<playerId>":
   {"lastSeen": …, "share": …}}}`. Re-checked when read; a friend that fails the checks is left out.
+  My share's `pos` is dropped when the file is loaded (positions aren't remembered across a
+  restart); friends' shares keep theirs (the page judges how old it is).
 - `squad-task-map-tailscale/`: tsnet's state (node key, its logs). Secret. Deleted by Leave, and
   only a folder with exactly this name (`StateFolderName`).
 
 ## Files
-`rules.go`: every rule above (pure). `squad.go`: the `Squad` (settings, my share, friends,
-join/resume/leave/stop, the session). `peerapi.go`: the peer API server and the feed that wakes
+`rules.go`: every rule above (pure). `squad.go`: the `Squad` (settings, my share and my position,
+friends, join/resume/leave/stop, the session). `peerapi.go`: the peer API server and the feed that wakes
 friends' streams. `peers.go`: one connection per friend (fetch, stream, backoff, checks, log once).
 `transport.go`: the `Transport` interface and the dev transport. `tsnet.go`: the tsnet transport.
 `cache.go`: `squad-task-map-squad.json`. `throttle.go`: "at most once a second, last change
@@ -197,6 +232,18 @@ kept" for the page event and the cache file. Wiring: `internal/app/squad.go`; ro
   off, no `mode` field when none was given, an unknown one refused), validation rejects bad peer
   data (about 45 cases, including unknown game modes, and an unknown field is ignored), ticks, backoff schedule, caller checks (loopback, tag, browser), peer list
   rules, identity check, "new share" rule, profile rules, status line.
+- `rules_position_test.go` (ticket 17): the position is shared only while sharing is on (and is
+  a copy); switching it off and on re-stamps; rev goes up for a new position (moved, turned, a new
+  screenshot at the same spot, cleared) and not for the same one; a share with `pos` stays `v` 1,
+  passes this copy's checks and reads fine as a 2.8.x share, and one without `pos` has exactly the
+  2.8.x fields; `pos` validation (26 cases: map keys like `__proto__`, ±1e6, ±360°, `t`); "another
+  map" (same, other, unnamed).
+- `squad_position_test.go` (ticket 17): kept only while in a squad; held while sharing is off and
+  shared the moment it is switched on, dropped the moment it is switched off; cleared at raid end
+  (rev + 1 once, not again) and on a raid on another map (kept on the same map); not remembered
+  across a restart (rev + 1, also in the cache file); a position alone makes a share before the
+  page sent one; a position friends would refuse isn't taken; Leave forgets it; and **two copies on
+  the dev transport**: A's position reaches B, a new one replaces it, and it is gone after A's raid.
 - `rules_peers_test.go`: who a friend is (DNS name only, keyed by node id; `-1` names and host
   names don't count; two machines with the same host name or id → neither trusted), the `Host`
   check, `__proto__`/`constructor`/`prototype`/`toString`… refused, and names with markup accepted (the page
@@ -223,6 +270,12 @@ kept" for the page event and the cache file. Wiring: `internal/app/squad.go`; ro
   unknown game mode); the page's game mode reaches a friend and a change of mode raises the rev;
   join/leave/profile through the routes; the code isn't in the settings file; the peer API isn't
   on the page's server; a joined copy reconnects at launch.
+- `internal/app/squad_position_test.go` (ticket 17): a new player shares tasks and position and the
+  settings file says so; the profile route switches `sharePosition` (and ignores anything but
+  `true`/`false`); **a GPS screenshot through the app, read through the real peer API**: no map
+  yet → not shared; Customs → shared; the log naming Customs again → kept; a raid loading on Woods
+  → cleared; a screenshot on Woods → shared; a `pos` the page sends → ignored; back in the menus →
+  cleared. The shared position has the `gps` event's fields and values.
 - **A simulated tailnet for whole copies:** `cmd/faketailnet` (Tailscale's test control server,
   DERP and STUN on 127.0.0.1, with invite codes, the `tag:stm` policy, unique `-1` names, delete /
   expire, relay-only) and `tests/browser/squad-tailnet.e2e.mjs`, which joins three app binaries to
@@ -233,4 +286,7 @@ kept" for the page event and the cache file. Wiring: `internal/app/squad.go`; ro
 - **Known limits (accepted):** a `tag:stm` machine that names itself like a friend (only someone with the invite code can make one) makes friends trust **neither** it nor the real friend until it is deleted in the admin console ("trust neither" rule; a denial of service, not an impersonation). tsnet logs one `tshttpproxy: using proxy … for URL: "https://controlplane.tailscale.com/"` line at start even with `STM_SQUAD_CONTROL_URL`: a proxy lookup, not a connection.
 - **Needs the owner:** a real tailnet with 2+ PCs (setup in `docs/HANDOFF.md`): join with the
   invite code, see each other online, share live; delete a machine in the admin console and see
-  "Signed out…"; idle CPU with friends connected on Windows.
+  "Signed out…"; idle CPU with friends connected on Windows. Ticket 17, in a raid together: a
+  screenshot shows your dot on your friend's map within a couple of seconds, on the right map
+  only; it disappears from their map when you're back in the menus; "Share my position" off
+  removes it at once.

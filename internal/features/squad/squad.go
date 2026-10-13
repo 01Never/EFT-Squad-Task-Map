@@ -1,8 +1,9 @@
 package squad
 
-// The squad as the rest of the app sees it: your squad settings, your share, your friends' last
-// shares, and the session (transport + peer API + friend connections) while you're in a squad.
-// internal/app creates it, picks the transport, and turns OnChange into the page's "squad" event.
+// The squad as the rest of the app sees it: your squad settings, your share (with your last GPS
+// position, ticket 17), your friends' last shares, and the session (transport + peer API + friend
+// connections) while you're in a squad. internal/app creates it, picks the transport, feeds it
+// your positions and raid ends, and turns OnChange into the page's "squad" event.
 
 import (
 	"context"
@@ -31,11 +32,12 @@ var ErrAlreadyJoined = errors.New("Already in a squad. Leave it first to join an
 // Settings are the player's squad choices, saved by internal/app in the settings file. The invite
 // code is never among them.
 type Settings struct {
-	PlayerID   string
-	Name       string
-	Color      string
-	ShareTasks bool
-	Joined     bool
+	PlayerID      string
+	Name          string
+	Color         string
+	ShareTasks    bool // "Share my tasks"; on unless the player switched it off (internal/storage)
+	SharePosition bool // "Share my position" (ticket 17); the same default
+	Joined        bool
 }
 
 // Config is what New needs.
@@ -55,9 +57,13 @@ type Squad struct {
 	config Config
 	feed   *shareFeed
 
-	mutex       sync.Mutex
-	settings    Settings
-	mine        *Share
+	mutex    sync.Mutex
+	settings Settings
+	mine     *Share
+	// myPosition is my last GPS position while in a squad (ticket 17), held even while "Share my
+	// position" is off so switching it on shares it at once. Memory only, like the GPS position
+	// itself: nil after a restart, a raid end, a raid on another map, or Leave.
+	myPosition  *Position
 	friends     map[string]CachedFriend // by player id
 	onlineLinks map[string]string       // connection key → player id, while its stream is open
 	state       string
@@ -107,7 +113,10 @@ func New(config Config) *Squad {
 	if changed {
 		config.SaveSettings(settings)
 	}
+	// Stamped again with the current profile and no position: a position isn't remembered across
+	// a restart (ticket 17), so a cached one is dropped here (rev + 1, so friends drop it too).
 	squad.restampMineLocked()
+	squad.publishMineLocked() // friends get my share as soon as a session starts
 	return squad
 }
 
@@ -182,20 +191,31 @@ func (squad *Squad) SetMyShare(parts ShareParts) (ShareResult, error) {
 	return result, nil
 }
 
-// SetProfile changes name, colour and "Share my tasks". The share is stamped again at once, so
-// friends see the new name, and tasks disappear from it as soon as sharing is turned off. (Turning
-// it on shares tasks from the page's next PUT /api/squad/share.)
-func (squad *Squad) SetProfile(name, color string, shareTasks bool) error {
-	cleanName, isValidName := NormalizeName(name)
+// Profile is what Settings → Squad changes with PUT /api/squad/profile.
+type Profile struct {
+	Name          string
+	Color         string
+	ShareTasks    bool // "Share my tasks"
+	SharePosition bool // "Share my position" (ticket 17)
+}
+
+// SetProfile changes name, colour, "Share my tasks" and "Share my position". The share is stamped
+// again at once, so friends see the new name, and tasks or the position disappear from it as soon
+// as sharing them is turned off. Turning the position on shares the last one at once, if there is
+// one; turning tasks on shares them from the page's next PUT /api/squad/share (the server never
+// keeps tasks while sharing is off).
+func (squad *Squad) SetProfile(profile Profile) error {
+	cleanName, isValidName := NormalizeName(profile.Name)
 	if !isValidName {
 		return fmt.Errorf("Your name must be 1 to %d characters", MaxNameRunes)
 	}
-	cleanColor, isValidColor := NormalizeColor(color)
+	cleanColor, isValidColor := NormalizeColor(profile.Color)
 	if !isValidColor {
 		return errors.New("Your colour must look like #4dabf7")
 	}
 	squad.mutex.Lock()
-	squad.settings.Name, squad.settings.Color, squad.settings.ShareTasks = cleanName, cleanColor, shareTasks
+	squad.settings.Name, squad.settings.Color = cleanName, cleanColor
+	squad.settings.ShareTasks, squad.settings.SharePosition = profile.ShareTasks, profile.SharePosition
 	settings := squad.settings
 	squad.restampMineLocked()
 	squad.mutex.Unlock()
@@ -204,34 +224,118 @@ func (squad *Squad) SetProfile(name, color string, shareTasks bool) error {
 	return nil
 }
 
-// restampMineLocked stamps my share again with the current profile (keeping its drawings and
-// tasks; tasks are dropped when sharing is off), saves it if it changed, and publishes it.
-func (squad *Squad) restampMineLocked() {
+// restampMineLocked stamps my share again with the current profile, sharing choices and position
+// (keeping its drawings and tasks; tasks are dropped when sharing is off), and when it changed,
+// saves it and sends it to friends. Before the page ever sent a share, a shared position makes
+// one on its own (no drawings, no tasks), so friends see you even with the page closed.
+// It returns whether the share changed.
+func (squad *Squad) restampMineLocked() bool {
+	hasNothingToShare := squad.mine == nil && !squad.isPositionSharedLocked()
+	if hasNothingToShare {
+		return false
+	}
+	parts := ShareParts{}
+	if squad.mine != nil {
+		parts = ShareParts{Draw: squad.mine.Draw, Tasks: squad.mine.Tasks, Mode: squad.mine.Mode}
+	}
+	next, changed := squad.stampLocked(parts)
+	if !changed {
+		return false
+	}
+	squad.mine = &next
+	squad.saveCacheLocked()
+	squad.publishMineLocked()
+	return true
+}
+
+// stampLocked applies StampShare with the current profile, sharing choices, position and time.
+func (squad *Squad) stampLocked(parts ShareParts) (Share, bool) {
+	now := squad.config.Now()
+	sharing := Sharing{Tasks: squad.settings.ShareTasks, Position: squad.settings.SharePosition}
+	return StampShare(squad.mine, squad.playerLocked(), parts, squad.myPosition, sharing, now)
+}
+
+// isPositionSharedLocked: "Share my position" is on and there is a position to share.
+func (squad *Squad) isPositionSharedLocked() bool {
+	return squad.settings.SharePosition && squad.myPosition != nil
+}
+
+// publishMineLocked hands my share to the feed that wakes friends' streams (nothing before the
+// first share).
+func (squad *Squad) publishMineLocked() {
 	if squad.mine == nil {
 		return
 	}
-	parts := ShareParts{Draw: squad.mine.Draw, Tasks: squad.mine.Tasks, Mode: squad.mine.Mode}
-	next, changed := squad.stampLocked(parts)
-	squad.mine = &next
-	if changed {
-		squad.saveCacheLocked()
-	}
-	squad.publishMineLocked()
-}
-
-// stampLocked applies StampShare with the current profile, task-sharing choice and time.
-func (squad *Squad) stampLocked(parts ShareParts) (Share, bool) {
-	now := squad.config.Now()
-	return StampShare(squad.mine, squad.playerLocked(), parts, squad.settings.ShareTasks, now)
-}
-
-func (squad *Squad) publishMineLocked() {
 	encoded, err := json.Marshal(squad.mine)
 	if err != nil {
 		return
 	}
 	squad.feed.publish(encoded)
 }
+
+// ---------------------------------------------------------------- my position (ticket 17)
+
+// SetMyPosition puts my latest GPS position (from a new screenshot) into my share, so friends see
+// where I was. Only while in a squad: otherwise nothing is kept. With "Share my position" off it
+// is held but not sent (StampShare drops it), so switching it on shares it at once. A position
+// that fails the checks friends make is refused (it would make them drop my whole share).
+// A new screenshot is a new position (its time differs), so rev goes up and friends get it
+// through the usual path (cache file, streams, at most one share a second taken by each friend).
+func (squad *Squad) SetMyPosition(position Position) error {
+	if err := ValidatePosition(position); err != nil {
+		return err
+	}
+	squad.mutex.Lock()
+	if !squad.settings.Joined {
+		squad.mutex.Unlock()
+		return nil
+	}
+	squad.myPosition = &position
+	changed := squad.restampMineLocked()
+	squad.mutex.Unlock()
+	if changed {
+		squad.notifyPage()
+	}
+	return nil
+}
+
+// ClearMyPosition forgets my position: the raid ended. My share is stamped again (rev + 1, no
+// position) only when it carried one.
+func (squad *Squad) ClearMyPosition() {
+	squad.mutex.Lock()
+	changed := squad.clearMyPositionLocked()
+	squad.mutex.Unlock()
+	if changed {
+		squad.notifyPage()
+	}
+}
+
+// ClearMyPositionIfFromAnotherMap forgets my position when the game log reports a raid (loading or
+// started) on another map than the position's (IsFromAnotherMap; raidMap "" = a map it couldn't
+// name). On the same map the position stays.
+func (squad *Squad) ClearMyPositionIfFromAnotherMap(raidMap string) {
+	squad.mutex.Lock()
+	changed := false
+	if squad.myPosition != nil && IsFromAnotherMap(*squad.myPosition, raidMap) {
+		changed = squad.clearMyPositionLocked()
+	}
+	squad.mutex.Unlock()
+	if changed {
+		squad.notifyPage()
+	}
+}
+
+// clearMyPositionLocked drops my position and, when my share carried it, stamps the share again.
+func (squad *Squad) clearMyPositionLocked() bool {
+	wasShared := squad.mine != nil && squad.mine.Pos != nil
+	squad.myPosition = nil
+	if !wasShared {
+		return false
+	}
+	return squad.restampMineLocked()
+}
+
+// ---------------------------------------------------------------- the cache file
 
 // saveCacheLocked asks for the cache file to be written (within ChangeInterval; see cacheWrites).
 func (squad *Squad) saveCacheLocked() {
@@ -337,8 +441,9 @@ type MeView struct {
 
 // SettingsView is the squad settings the page can change (name and colour are in MeView).
 type SettingsView struct {
-	ShareTasks bool `json:"shareTasks"`
-	Joined     bool `json:"joined"`
+	ShareTasks    bool `json:"shareTasks"`
+	SharePosition bool `json:"sharePosition"` // ticket 17
+	Joined        bool `json:"joined"`
 }
 
 // StatusView is the connection line.
@@ -366,8 +471,12 @@ func (squad *Squad) View() View {
 	defer squad.mutex.Unlock()
 	settings := squad.settings
 	view := View{
-		Me:        MeView{PlayerID: settings.PlayerID, Name: settings.Name, Color: settings.Color},
-		Settings:  SettingsView{ShareTasks: squad.settings.ShareTasks, Joined: squad.settings.Joined},
+		Me: MeView{PlayerID: settings.PlayerID, Name: settings.Name, Color: settings.Color},
+		Settings: SettingsView{
+			ShareTasks:    settings.ShareTasks,
+			SharePosition: settings.SharePosition,
+			Joined:        settings.Joined,
+		},
 		Transport: squad.config.TransportName,
 		Friends:   []FriendView{},
 	}
@@ -459,12 +568,13 @@ func (squad *Squad) Leave(ctx context.Context) {
 	squad.mutex.Lock()
 	squad.friends = map[string]CachedFriend{}
 	squad.onlineLinks = map[string]string{}
+	squad.myPosition = nil // not in a squad: no position is kept (ticket 17)
 	if squad.settings.Joined {
 		// A fresh identity (owner's decision): the next Join is a brand-new stm-<id> machine, so
 		// it can't clash with the old one if the tailnet still lists it (logged out). Friends see
 		// a new friend; the old entry stays offline in their lists until StaleFriendAge.
 		squad.settings.PlayerID = NewPlayerID()
-		squad.restampMineLocked() // same drawings and tasks, new id; rev goes on (+1)
+		squad.restampMineLocked() // same drawings and tasks, new id, no position; rev goes on (+1)
 	}
 	squad.settings.Joined = false
 	squad.state, squad.problem = StateOff, ""

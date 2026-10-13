@@ -1,5 +1,6 @@
-// Package squad shares your drawings (and, if you choose, your tasks) with friends running the
-// app, over a private Tailscale network built into the exe (tsnet), with no server in between.
+// Package squad shares your drawings, your last GPS position and your tasks (the last two only if
+// you choose; both are on by default) with friends running the app, over a private Tailscale
+// network built into the exe (tsnet), with no server in between.
 // This file holds the rules as plain functions; the network and file code calls them.
 package squad
 
@@ -24,6 +25,8 @@ import (
 
 const (
 	// ShareFormatVersion is the "v" of every share. A friend on another format is ignored (logged once).
+	// It stays 1 with ticket 17's "pos": copies before it decode shares with plain json.Unmarshal,
+	// so they ignore "pos" and keep working; a new number would make each of them drop your share.
 	ShareFormatVersion = 1
 
 	// MaxShareBytes caps one share, both the one the page sends and one a friend sends (ticket 05:
@@ -48,6 +51,10 @@ const (
 	maxTickCount        = 100000
 	maxPercent          = 100
 	maxStrokeColorBytes = 7 // "#rrggbb"
+
+	// A position's heading is in degrees. This app's are within ±180 (an atan2); ±360 also lets a
+	// copy that writes 0 to 360 through.
+	maxYawDegrees = 360
 
 	// DefaultName and DefaultColor are your profile until you change it (ticket's example colour).
 	DefaultName  = "Player"
@@ -103,7 +110,7 @@ var (
 // ---------------------------------------------------------------- the share
 
 // Share is what one player shows the squad ("my share"). The page builds Draw and Tasks from its
-// saved data; the server stamps the rest.
+// saved data; the server stamps the rest and adds the position (the page never sends one).
 type Share struct {
 	Version   int                     `json:"v"`
 	Player    Player                  `json:"player"`
@@ -114,6 +121,20 @@ type Share struct {
 	// Mode is the game mode the tasks belong to ("regular", "pve", "pvp-season"; issue #22). Empty
 	// in shares from copies before it; those copies ignore it (unknown fields are skipped).
 	Mode string `json:"mode,omitempty"`
+	// Pos is my last GPS position (ticket 17). Absent when there is none, when "Share my position"
+	// is off, and once the raid ended or the game reported a raid on another map.
+	Pos *Position `json:"pos,omitempty"`
+}
+
+// Position is my last GPS position, read from a screenshot's name, as friends see it: the same
+// names and meaning as the page's "gps" event. Not live tracking: it moves only with a screenshot.
+type Position struct {
+	Map string  `json:"map"` // the raid's map key, e.g. "customs" (a position on an unknown map isn't shared)
+	X   float64 `json:"x"`
+	Y   float64 `json:"y"` // height
+	Z   float64 `json:"z"`
+	Yaw float64 `json:"yaw"` // heading in degrees
+	T   int64   `json:"t"`   // when this copy saw the screenshot, ms since 1970
 }
 
 // Player is who a share belongs to.
@@ -186,13 +207,21 @@ func IsValidShareMode(mode string) bool {
 	return validShareModes[mode]
 }
 
-// StampShare makes my next share from the page's parts. Tasks are dropped when "Share my tasks"
-// is off (the server enforces this, not only the page); the game mode is passed through either
-// way. rev goes up by one and updatedAt is set only when the content (player, drawings, tasks,
-// game mode) differs from the previous share; otherwise the previous share is returned unchanged,
+// Sharing is what the player chose to share besides drawings (Settings → Squad). Both are on by
+// default (ticket 17). The server enforces them: what is switched off never leaves this copy.
+type Sharing struct {
+	Tasks    bool // "Share my tasks"
+	Position bool // "Share my position"
+}
+
+// StampShare makes my next share from the page's parts and my last position (nil = none). Tasks
+// are dropped when "Share my tasks" is off, the position when "Share my position" is off (the
+// server enforces this, not only the page); the game mode is passed through either way. rev goes
+// up by one and updatedAt is set only when the content (player, drawings, tasks, game mode,
+// position) differs from the previous share; otherwise the previous share is returned unchanged,
 // with changed = false.
 func StampShare(
-	previous *Share, player Player, parts ShareParts, shareTasks bool, now time.Time,
+	previous *Share, player Player, parts ShareParts, position *Position, sharing Sharing, now time.Time,
 ) (Share, bool) {
 	next := Share{
 		Version: ShareFormatVersion,
@@ -204,8 +233,12 @@ func StampShare(
 	if next.Draw == nil {
 		next.Draw = map[string][]Stroke{}
 	}
-	if !shareTasks {
+	if !sharing.Tasks {
 		next.Tasks = nil
+	}
+	if sharing.Position && position != nil {
+		sharedPosition := *position
+		next.Pos = &sharedPosition
 	}
 	if previous == nil {
 		next.Rev = 1
@@ -220,11 +253,19 @@ func StampShare(
 	return next, true
 }
 
-// hasSameContent compares what a friend sees: player, drawings, tasks and game mode.
+// hasSameContent compares what a friend sees: player, drawings, tasks, game mode and position.
 func hasSameContent(a, b Share) bool {
-	contentA, errA := json.Marshal([]any{a.Player, a.Draw, a.Tasks, a.Mode})
-	contentB, errB := json.Marshal([]any{b.Player, b.Draw, b.Tasks, b.Mode})
+	contentA, errA := json.Marshal([]any{a.Player, a.Draw, a.Tasks, a.Mode, a.Pos})
+	contentB, errB := json.Marshal([]any{b.Player, b.Draw, b.Tasks, b.Mode, b.Pos})
 	return errA == nil && errB == nil && bytes.Equal(contentA, contentB)
+}
+
+// IsFromAnotherMap: the game log reported a raid on raidMap ("" = a map it couldn't name). A
+// position on any other map belongs to an earlier raid, so it stops being shared; on the same map
+// it stays (ticket 17: "cleared when your raid ends or you change maps"). A map the log couldn't
+// name counts as another map, as the GPS trail treats a known and an unknown map as different.
+func IsFromAnotherMap(position Position, raidMap string) bool {
+	return raidMap == "" || position.Map != raidMap
 }
 
 // HasChanged: a friend's share is new to us when its rev or updatedAt differ from the one we have.
@@ -257,7 +298,8 @@ func DecodeShare(data []byte) (Share, error) {
 	return share, nil
 }
 
-// ValidateShare checks a whole share: format version, player, rev, drawings, tasks and game mode.
+// ValidateShare checks a whole share: format version, player, rev, drawings, tasks, game mode and
+// position.
 func ValidateShare(share Share) error {
 	if share.Version != ShareFormatVersion {
 		return fmt.Errorf("share format v%d, this copy reads v%d", share.Version, ShareFormatVersion)
@@ -268,7 +310,34 @@ func ValidateShare(share Share) error {
 	if share.Rev < 1 || share.UpdatedAt < 0 {
 		return errors.New("share has no valid rev or updatedAt")
 	}
-	return ValidateParts(ShareParts{Draw: share.Draw, Tasks: share.Tasks, Mode: share.Mode})
+	if err := ValidateParts(ShareParts{Draw: share.Draw, Tasks: share.Tasks, Mode: share.Mode}); err != nil {
+		return err
+	}
+	if share.Pos != nil {
+		return ValidatePosition(*share.Pos)
+	}
+	return nil
+}
+
+// ValidatePosition checks a position: a map key like the drawings' (a plain short word, never the
+// name of a JavaScript object property), x, y and z within ±1e6, a heading within ±360° and a
+// time after 1970.
+func ValidatePosition(position Position) error {
+	if !isValidKey(position.Map) {
+		return fmt.Errorf("position map key %q isn't a plain short word", position.Map)
+	}
+	for _, coordinate := range []float64{position.X, position.Y, position.Z} {
+		if !isFiniteIn(coordinate, -maxCoordinateAbs, maxCoordinateAbs) {
+			return errors.New("a position coordinate isn't a number within ±1e6")
+		}
+	}
+	if !isFiniteIn(position.Yaw, -maxYawDegrees, maxYawDegrees) {
+		return errors.New("a position heading isn't -360 to 360 degrees")
+	}
+	if position.T <= 0 {
+		return errors.New("a position has no time")
+	}
+	return nil
 }
 
 // ValidatePlayer: a valid player id, a name of 1 to 32 characters and a "#rrggbb" colour.
