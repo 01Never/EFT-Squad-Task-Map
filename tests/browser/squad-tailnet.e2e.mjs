@@ -335,11 +335,14 @@ test("three copies on a simulated Tailscale network", { skip: skip || false, tim
     });
 
     await t.test("tasks are shared from Alice only: 'Also:', badges and the filter", async () => {
-      await bob.page.click(`[data-squad-tasks="${alice.id}"]`);
-      assert.equal(await bob.page.locator(".also").count(), 0, "Alice isn't sharing tasks yet");
+      // "Share my tasks" is on by default (ticket 17): Bob switches it off, Alice keeps it on
+      await bob.openSettings();
+      await bob.scenario.answered("PUT", "/api/squad/profile", () => bob.page.uncheck("#sSquadShareTasks"));
+      await bob.closeSettings();
       await alice.openSettings();
-      await alice.page.check("#sSquadShareTasks");
+      assert.equal(await alice.page.isChecked("#sSquadShareTasks"), true, "Share my tasks is on by default");
       await alice.closeSettings();
+      await bob.page.click(`[data-squad-tasks="${alice.id}"]`);
       const bobRow = `#panel .task[data-task="${revision.id}"]`;
       await eventually(async () => (await bob.page.locator(bobRow + " .also").count()) === 1, "Bob's Revision row says 'Also: Alice'");
       assert.equal((await bob.page.textContent(bobRow + " .also")).trim(), "Also: Alice");

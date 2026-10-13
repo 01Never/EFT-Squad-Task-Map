@@ -67,6 +67,13 @@ export const FACING_135_DEGREES = "0.00000, 0.92388, 0.00000, 0.38268";
 
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Your own marker on the map (its disc, `data-r` = the arrow's turn). A friend's position
+ * (ticket 17, `g.friend-player`) has a disc with `data-r` too and is drawn before yours, so a plain
+ * `svg.map g[data-r]` would find a friend's first.
+ */
+export const OWN_MARKER = "svg.map g[data-r]:not(.friend-player *)";
+
 function portRange(text) {
   const [first, last] = text.split("-").map(Number);
   const ports = [];
@@ -410,10 +417,13 @@ function portIsFree(port) {
  * has been downloaded from the mock, so no "data changed" event reaches the page mid-test.
  * `env` adds environment variables (the squad scenario uses STM_SQUAD_DEV_LISTEN / STM_SQUAD_DEV_PEERS);
  * `keepData` starts the app again on the folders it already has (a restart, e.g. a friend coming back).
- * @param {{ slug: string, state?: object | string, settings?: object, dataDir?: string, env?: Record<string, string>, keepData?: boolean }} options
+ * `exe` runs another build of the app instead of the one built from this tree (e.g. an older
+ * release next to this one, for the squad's mixed-versions check).
+ * @param {{ slug: string, state?: object | string, settings?: object, dataDir?: string, env?: Record<string, string>, keepData?: boolean, exe?: string }} options
  */
 export async function startApp(options) {
   const { tools } = await prepareProcess();
+  const appExe = options.exe || tools.appExe;
   const dataDir = options.dataDir || path.join(tools.runDir, "data", options.slug);
   if (!options.keepData) fs.rmSync(dataDir, { recursive: true, force: true });
   const logsDir = path.join(dataDir, "logs");
@@ -441,11 +451,11 @@ export async function startApp(options) {
     };
     const outputFile = path.join(dataDir, "app-output.txt");
     const output = fs.openSync(outputFile, "w");
-    const child = spawn(tools.appExe, [], { cwd: dataDir, env: environment, stdio: ["ignore", output, output], windowsHide: true });
+    const child = spawn(appExe, [], { cwd: dataDir, env: environment, stdio: ["ignore", output, output], windowsHide: true });
     fs.closeSync(output);
     childProcesses.add(child);
     const base = `http://127.0.0.1:${port}`;
-    const app = { base, port, dataDir, logsDir, sessionDir, shotsDir, stateFile, settingsFile, process: child, gpsCount: 0 };
+    const app = { base, port, dataDir, logsDir, sessionDir, shotsDir, stateFile, settingsFile, outputFile, process: child, gpsCount: 0 };
     app.stop = async () => {
       await stopProcess(child);
       release();
@@ -583,7 +593,7 @@ function slugOf(text) {
  * context, runs `body`, then checks the page logged no errors, records (in record mode) and cleans
  * up, also when the scenario fails.
  * @param {import("node:test").TestContext} t
- * @param {{ state?: object | string, settings?: object, viewport?: {width:number,height:number}, phone?: boolean, dataDir?: string, recordAs?: string, env?: Record<string, string> }} options
+ * @param {{ state?: object | string, settings?: object, viewport?: {width:number,height:number}, phone?: boolean, dataDir?: string, recordAs?: string, env?: Record<string, string>, exe?: string }} options
  * @param {(scenario: Scenario) => Promise<void>} body
  */
 export async function withScenario(t, options, body) {
@@ -613,7 +623,7 @@ export class Scenario {
   }
 
   async start() {
-    this.app = await startApp({ slug: this.slug, state: this.options.state, settings: this.options.settings, dataDir: this.options.dataDir, env: this.options.env });
+    this.app = await startApp({ slug: this.slug, state: this.options.state, settings: this.options.settings, dataDir: this.options.dataDir, env: this.options.env, exe: this.options.exe });
     const browser = await launchBrowser();
     const phone = !!this.options.phone;
     this.context = await browser.newContext({
@@ -800,14 +810,14 @@ export class Scenario {
    * (the player marker is re-created for each position).
    */
   async dropGpsAndWait(x, y, z, facing = FACING_45_DEGREES) {
-    await this.page.evaluate(() => {
-      for (const marker of document.querySelectorAll("svg.map g[data-r]")) marker.__stmOld = true;
-    });
+    await this.page.evaluate((selector) => {
+      for (const marker of document.querySelectorAll(selector)) marker.__stmOld = true;
+    }, OWN_MARKER);
     this.dropGps(x, y, z, facing);
-    await this.page.waitForFunction(() => {
-      const marker = document.querySelector("svg.map g[data-r]");
+    await this.page.waitForFunction((selector) => {
+      const marker = document.querySelector(selector);
       return marker && !marker.__stmOld;
-    }, null, { timeout: 10_000 });
+    }, OWN_MARKER, { timeout: 10_000 });
     await this.nextFrame();
   }
 
@@ -835,13 +845,13 @@ export class Scenario {
 
   /** Your marker's centre relative to the middle of the map area, in pixels (null when it isn't drawn). */
   playerOffset() {
-    return this.page.evaluate(() => {
-      const marker = document.querySelector("svg.map g[data-r]");
+    return this.page.evaluate((selector) => {
+      const marker = document.querySelector(selector);
       const area = document.getElementById("findme-fx").getBoundingClientRect();
       if (!marker) return null;
       const box = marker.getBoundingClientRect();
       return { dx: box.left + box.width / 2 - (area.left + area.width / 2), dy: box.top + box.height / 2 - (area.top + area.height / 2) };
-    });
+    }, OWN_MARKER);
   }
 
   /** The text of the toast, or "" when none is showing. */
