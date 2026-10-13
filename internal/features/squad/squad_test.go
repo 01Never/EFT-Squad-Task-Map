@@ -203,8 +203,8 @@ func TestThreeCopiesShareOverTheDevTransport(t *testing.T) {
 func TestTheCacheKeepsMyShareAndFriendsAcrossARestart(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "squad-task-map-squad.json")
-	mine, _ := StampShare(nil, mike, someParts(), true, noon)
-	friendShare, _ := StampShare(nil, sam, someParts(), false, noon)
+	mine, _ := StampShare(nil, mike, someParts(), nil, shareEverything, noon)
+	friendShare, _ := StampShare(nil, sam, someParts(), nil, Sharing{}, noon)
 	bad := friendShare
 	bad.Player.Color = "red"
 
@@ -260,9 +260,10 @@ func TestMyShareKeepsItsRevAfterARestart(t *testing.T) {
 }
 
 func TestANewCopyGetsAPlayerIdOnceAndDefaults(t *testing.T) {
+	// The sharing switches come as given: their default (on) is the settings file's (internal/storage).
 	copy := newTestCopy(t, t.TempDir(), "", nil, Settings{})
 	saved := copy.savedSettings()
-	if !IsValidPlayerID(saved.PlayerID) || saved.Name != DefaultName || saved.Color != DefaultColor || saved.ShareTasks || saved.Joined {
+	if !IsValidPlayerID(saved.PlayerID) || saved.Name != DefaultName || saved.Color != DefaultColor || saved.Joined {
 		t.Errorf("saved %+v", saved)
 	}
 	again := newTestCopy(t, t.TempDir(), "", nil, saved)
@@ -274,7 +275,7 @@ func TestANewCopyGetsAPlayerIdOnceAndDefaults(t *testing.T) {
 func TestTurningTaskSharingOffDropsTasksFromTheStoredShare(t *testing.T) {
 	copy := newTestCopy(t, t.TempDir(), "", nil, Settings{PlayerID: mike.ID, Name: "Mike", Color: "#4dabf7", ShareTasks: true})
 	copy.squad.SetMyShare(drawingAt(1))
-	if err := copy.squad.SetProfile("Mike", "#4DABF7", false); err != nil {
+	if err := copy.squad.SetProfile(Profile{Name: "Mike", Color: "#4DABF7", ShareTasks: false}); err != nil {
 		t.Fatal(err)
 	}
 	var shared Share
@@ -301,7 +302,7 @@ func TestLeaveDeletesTheNetworkStateAndForgetsFriends(t *testing.T) {
 	os.WriteFile(filepath.Join(stateDir, "tailscaled.state"), []byte("node key"), 0o600)
 	copy.join()
 	copy.squad.SetMyShare(drawingAt(1))
-	friendShare, _ := StampShare(nil, sam, someParts(), false, noon)
+	friendShare, _ := StampShare(nil, sam, someParts(), nil, Sharing{}, noon)
 	copy.squad.onFriendShare(PeerAddress{Key: "x"}, friendShare, false)
 	if len(copy.squad.View().Friends) != 1 {
 		t.Fatal("setup: the friend wasn't added")
@@ -370,7 +371,7 @@ func TestFriendsNotSeenFor30DaysAreDroppedWhenTheCacheIsLoaded(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "squad-task-map-squad.json")
 	now := time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
-	samShare, _ := StampShare(nil, sam, someParts(), false, now)
+	samShare, _ := StampShare(nil, sam, someParts(), nil, Sharing{}, now)
 	writeCache(path, nil, map[string]CachedFriend{
 		sam.ID: {LastSeen: now.Add(-31 * 24 * time.Hour).UnixMilli(), Share: samShare},
 	})

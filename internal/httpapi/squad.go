@@ -16,9 +16,10 @@ import (
 
 // SquadProfileChange holds the profile fields a PUT /api/squad/profile sent; nil means "not sent".
 type SquadProfileChange struct {
-	Name       *string
-	Color      *string
-	ShareTasks *bool
+	Name          *string
+	Color         *string
+	ShareTasks    *bool
+	SharePosition *bool // ticket 17
 }
 
 var (
@@ -81,14 +82,15 @@ func (server *Server) leaveSquad(writer http.ResponseWriter, request *http.Reque
 	writeJSON(writer, http.StatusOK, map[string]any{"ok": true, "squad": view})
 }
 
-// setSquadProfile: PUT /api/squad/profile {name?, color?, shareTasks?} → {ok, squad}; 400 with the
-// reason for a bad name or colour.
+// setSquadProfile: PUT /api/squad/profile {name?, color?, shareTasks?, sharePosition?} →
+// {ok, squad}; 400 with the reason for a bad name or colour.
 func (server *Server) setSquadProfile(writer http.ResponseWriter, request *http.Request) {
 	body := readBody(request)
 	change := SquadProfileChange{
-		Name:       stringField(body, "name"),
-		Color:      stringField(body, "color"),
-		ShareTasks: boolField(body, "shareTasks"),
+		Name:          stringField(body, "name"),
+		Color:         stringField(body, "color"),
+		ShareTasks:    boolField(body, "shareTasks"),
+		SharePosition: boolField(body, "sharePosition"),
 	}
 	view, err := server.backend.SetSquadProfile(change)
 	if err != nil {

@@ -123,11 +123,13 @@ func (app *App) onLogEvent(event gamelog.Event) {
 	case gamelog.KindMapLoading:
 		mapKey := app.gameData.MapFromScene(event.Scene)
 		app.raid.MapLoading(mapKey)
+		app.clearSharedPositionIfFromAnotherMap(mapKey)
 		app.hub.Broadcast(events.New(events.RaidMap, map[string]any{"map": mapKey}))
 	case gamelog.KindMapLoaded:
 		app.raid.MapLoaded(app.gameData.MapFromNameID(event.NameID))
 	case gamelog.KindRaidStart:
 		mapKey := app.raid.Start()
+		app.clearSharedPositionIfFromAnotherMap(mapKey)
 		app.position.ClearTrail()
 		app.extracts.RaidStarted()
 		app.hub.Broadcast(events.New(events.RaidStart, map[string]any{"map": mapKey}))
@@ -155,8 +157,9 @@ func (app *App) onTaskChanged(event gamelog.Event) {
 	app.hub.Deliver(events.New(events.Task, map[string]any{"taskId": event.TaskID, "status": event.Status}))
 }
 
-// endRaid: back in the menus after a raid. Delete that raid's GPS screenshots, forget the position,
-// and tell the page (queued, so it resets bag counts and extract marks even if it was closed).
+// endRaid: back in the menus after a raid. Delete that raid's GPS screenshots, forget the position
+// (also the one in my squad share), and tell the page (queued, so it resets bag counts and extract
+// marks even if it was closed).
 func (app *App) endRaid() {
 	app.raidAndPosition.Lock()
 	defer app.raidAndPosition.Unlock()
@@ -164,6 +167,7 @@ func (app *App) endRaid() {
 	mapKey, deleted := app.raid.End(gps.IsGPSFileName, app.screenshots.DeleteFile)
 	app.hub.Deliver(events.New(events.RaidEnd, map[string]any{"map": mapKey, "deleted": deleted}))
 	app.position.Clear()
+	app.squad.ClearMyPosition() // ticket 17
 }
 
 func (app *App) onScreenshotKeyChecked(event gamelog.Event) {
@@ -181,7 +185,8 @@ func (app *App) onScreenshotKeyChecked(event gamelog.Event) {
 // ---------------------------------------------------------------- screenshots
 
 // onScreenshot: a picture appeared (or disappeared) in the screenshots folder. In-raid shots carry
-// a position in their name; everything else may belong to a task scan.
+// a position in their name (shown on the page, and put in my squad share); everything else may
+// belong to a task scan.
 func (app *App) onScreenshot(file screenshots.File) {
 	if !file.Exists {
 		app.scan.OnScreenshot(file)
@@ -198,6 +203,7 @@ func (app *App) onScreenshot(file screenshots.File) {
 	app.extracts.OnGPSShot(file.Name)
 	position, trail := app.position.Update(fix, app.raid.CurrentMap())
 	app.hub.Broadcast(events.New(events.GPS, map[string]any{"gps": position, "trail": trail}))
+	app.shareMyPosition(position) // ticket 17
 }
 
 func (app *App) onCaptureListChanged(files []taskscan.CapturedFile) {

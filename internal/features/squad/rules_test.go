@@ -14,6 +14,8 @@ var (
 	noon     = time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
 	oneLine  = Stroke{Color: "#ff4d4d", Width: 2.5, Points: [][]float64{{10, 20}, {30, 40}}}
 	twoTicks = TaskProgress{Ticks: map[string]Tick{"65732ac3c67dcd96adffa3c7": {IsDone: true}, "65732ac3c67dcd96adffa3c8": {Count: 3}}, Percent: 40}
+
+	shareEverything = Sharing{Tasks: true, Position: true}
 )
 
 func someParts() ShareParts {
@@ -24,7 +26,7 @@ func someParts() ShareParts {
 }
 
 func TestRevStamping(t *testing.T) {
-	first, _ := StampShare(nil, mike, someParts(), true, noon)
+	first, _ := StampShare(nil, mike, someParts(), nil, shareEverything, noon)
 	movedLine := someParts()
 	movedLine.Draw["customs"][0].Points = [][]float64{{11, 20}, {30, 40}}
 	renamed := mike
@@ -47,7 +49,7 @@ func TestRevStamping(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			later := noon.Add(time.Minute)
-			got, changed := StampShare(tc.previous, tc.player, tc.parts, true, later)
+			got, changed := StampShare(tc.previous, tc.player, tc.parts, nil, shareEverything, later)
 			if got.Rev != tc.wantRev || changed != tc.wantChanged {
 				t.Errorf("rev %d changed %v, want rev %d changed %v", got.Rev, changed, tc.wantRev, tc.wantChanged)
 			}
@@ -77,7 +79,7 @@ func TestTasksAreStrippedWhenSharingIsOff(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			share, _ := StampShare(nil, mike, someParts(), tc.shareTasks, noon)
+			share, _ := StampShare(nil, mike, someParts(), nil, Sharing{Tasks: tc.shareTasks}, noon)
 			if len(share.Tasks) != tc.wantTaskCount {
 				t.Errorf("%d tasks, want %d", len(share.Tasks), tc.wantTaskCount)
 			}
@@ -90,8 +92,8 @@ func TestTasksAreStrippedWhenSharingIsOff(t *testing.T) {
 	}
 
 	t.Run("turning sharing off raises the rev, so friends drop the tasks at once", func(t *testing.T) {
-		shared, _ := StampShare(nil, mike, someParts(), true, noon)
-		hidden, changed := StampShare(&shared, mike, someParts(), false, noon.Add(time.Second))
+		shared, _ := StampShare(nil, mike, someParts(), nil, shareEverything, noon)
+		hidden, changed := StampShare(&shared, mike, someParts(), nil, Sharing{Tasks: false}, noon.Add(time.Second))
 		if !changed || hidden.Rev != 2 || hidden.Tasks != nil {
 			t.Errorf("changed %v rev %d tasks %v", changed, hidden.Rev, hidden.Tasks)
 		}
