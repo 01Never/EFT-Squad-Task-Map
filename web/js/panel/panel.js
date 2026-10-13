@@ -56,6 +56,7 @@ import {
   renderFriendsTasksSection,
   onFriendDrawingsToggled,
   onFriendTasksToggled,
+  onFriendPositionToggled,
 } from "../features/squad/panel.js";
 
 /** @import { PartOnMap } from "../app/types.js" */
@@ -167,6 +168,7 @@ const PANEL_BUTTONS_BY_ATTRIBUTE = [
   ["data-have", onBagStepClicked],
   ["data-squad-drawings", onFriendDrawingsToggled],
   ["data-squad-tasks", onFriendTasksToggled],
+  ["data-squad-position", onFriendPositionToggled],
 ];
 
 const ANY_PANEL_BUTTON = "[data-act]," + PANEL_BUTTONS_BY_ATTRIBUTE.map(([attribute]) => `[${attribute}]`).join(",");

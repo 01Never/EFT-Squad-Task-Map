@@ -18,6 +18,7 @@ const MAP_LAYERS_BOTTOM_TO_TOP = [
   "loot", // loot spots: small, under everything about tasks (features/loot/map-layer.js)
   "friendTasks", // friends' other tasks: small markers in their colour (features/squad/map-layer.js)
   "taskMarkers", // task and sub-task markers (features/tasks/map-layer.js)
+  "friendPlayers", // friends' positions: smaller than yours, under it (features/squad/map-layer.js)
   "player", // you: marker, trail, "You" (features/find-me/map-layer.js)
 ];
 

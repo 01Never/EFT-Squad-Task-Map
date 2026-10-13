@@ -18,7 +18,7 @@ import { renderExtracts } from "../features/extracts/map-layer.js";
 import { renderLoot } from "../features/loot/map-layer.js";
 import { renderDrawings, renderDrawingBar, bindDrawing } from "../features/drawing/map-layer.js";
 import { renderPlayer, bindFindMe } from "../features/find-me/map-layer.js";
-import { renderFriendDrawings, renderFriendTaskMarkers } from "../features/squad/map-layer.js";
+import { renderFriendDrawings, renderFriendTaskMarkers, renderFriendPlayers } from "../features/squad/map-layer.js";
 
 /** @import { MapConfig, MapInfo } from "../app/types.js" */
 
@@ -165,6 +165,7 @@ export function renderMapPage() {
   renderFriendDrawings();
   renderDrawings();
   renderFriendTaskMarkers();
+  renderFriendPlayers(); // friends' positions (ticket 17)
   renderTaskMarkers(); // also puts every marker at screen size, friends' included
   renderPlayer();
   renderPopup();
