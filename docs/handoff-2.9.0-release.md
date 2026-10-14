@@ -127,4 +127,12 @@ If something fails, stop here and ask the owner. The fix goes on `release-2.9.0`
 - The mode card's task count counts every active entry. The picker drops tasks missing from the current game data, so the numbers can differ slightly.
 
 ## Final full browser-suite run (cloud, after the QA fix)
-Pending when this was first pushed; see the next commit.
+Full suite on `release-2.9.0` with the QA fix: **69 tests, 65 pass, 3 fail, 1 skip**.
+- All 3 failures are in `squad-tailnet.e2e.mjs`:
+  - "with the normal policy the copies talk directly, not through the relay"
+  - "relay-only: … through the relay" (90 s timeout)
+  - their parent test
+- Every other file passed.
+- Run alone right after, that file went **15/15 twice** on `release-2.9.0`. On `main` (2.8.1) it failed 2 tests in both runs.
+- So this is the existing load and timing sensitivity of the simulated tailnet, not a regression. This release changes only one line in that file, an address.
+- On Windows: if it fails in the full suite, run that file alone before reporting.
