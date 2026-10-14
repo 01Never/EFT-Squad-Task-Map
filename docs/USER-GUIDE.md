@@ -16,7 +16,7 @@ The site only listens on your own PC (127.0.0.1). Nobody else on your network ca
 ### Upgrading from v1
 Put the new exe in the same folder as the old one, next to your `squad-task-map-data.json`. On first start:
 - A copy of your old file is saved as `squad-task-map-data.v1-backup.json`.
-- Tasks on your manual list become your active tasks.
+- Tasks on your manual list become your active tasks, in the list of the game mode Settings has.
 - Your own categories (and AI-made ones) are kept, with their tasks. The old built-in categories are replaced by the new defaults (below).
 - Sub-tasks, drawings and per-map settings are kept.
 - TarkovTracker is gone; its token in `squad-task-map-settings.json` is ignored.
@@ -43,9 +43,9 @@ The top bar shows where you are, like `PvE / Maps / Customs`. Click **Maps** to 
 ### One task list per game mode
 PvP, PvE and PvP Season are separate characters in Tarkov, with separate tasks, so the app keeps a separate list for each: tasks, ticks, pins, sub-tasks and Bring list counts. The page shows the list of the mode in **Settings → Game mode**; switch the mode (there, or with **Switch data** in the top bar) and the picker, the map, the task list and the Bring list show that mode's list. The other lists stay as they are. Categories, drawings, extract marks and map choices are shared by all modes.
 
-A scan adds to (or replaces) the list of the mode shown, so switch to the right mode before scanning. Raid end resets the Bring list counts of the mode you played.
+A scan makes the list of the mode shown match the game (see Scan tasks above) and leaves the other modes alone, so switch to the right mode before scanning. Raid end resets the Bring list counts of the mode you played.
 
-**Upgrading from an earlier 2.x:** your one list was kept as the list of the mode Settings had when you first opened the new version; the other two modes start empty (scan to fill them). The program also keeps a copy of your old file.
+**Upgrading from an earlier 2.x:** your one list was kept as the list of the mode Settings had when you first opened the new version; the other two modes start empty (scan to fill them). The program also keeps an untouched copy of your old file as `squad-task-map-data.v2-backup.json`. Going back to an older version won't read the new file correctly; use that copy for that.
 
 ## Parts and categories
 Tasks that mix kinds of work are split into **parts**, and each part goes in its own category. For example, Dandies is "kills" (Scav / any kills) plus "placing" (Plant / stash). A split row shows **◫ part 1/2**. Tasks marked "(In one raid)" are never split, and **Don't split** in a task's details keeps one whole.
@@ -69,7 +69,7 @@ The **Bring list** tab lists what the tasks currently shown on the map need: key
 - A task's spot is "possible" when you have at least 1 of each thing it still needs. With 2 markers and 5 spots to mark, all 5 count as possible.
 - When you have none of something, those spots get a **"!"** and fade, and their zones get dotted borders.
 - Ticking a marker or placed-item objective takes 1 off "have" (unticking gives it back).
-- All counts reset to 0 after each raid. **Reset counts** clears them by hand.
+- The counts of the game mode you played reset to 0 after each raid. **Reset counts** clears them by hand.
 
 ## Pins and extracts
 - **📌** on a task row or map popup pins the task. **Pinned only** (panel and map toolbar) shows only pinned tasks everywhere, bring list included. **Clear pins** unpins all. Finished tasks unpin themselves.
@@ -104,7 +104,7 @@ During a raid, Tarkov puts your position and facing in each screenshot's **file 
 
 **Your extracts, read from a screenshot (needs an OpenAI key):** at the start of a raid, open Tarkov's extract list (double-tap **O**) and take a screenshot. A few seconds later the app marks your extracts on the map, as if you had clicked them: they turn solid, get an **AI** tag in the panel's list, and a toast says "Marked 4 extracts from your screenshot (1 not recognised: …)". Names it couldn't match are listed so you can mark them by hand. Requirement text (e.g. "Requires paracord") shows in the panel and when you hover the extract. Click a marked extract to unmark it, or mark more yourself. If the first screenshot doesn't show the list, the next ones are tried, up to 3 per raid; once a list is read, no more are sent. Marks clear at raid end. Turn it off in Settings.
 
-When the raid ends, the app deletes that raid's GPS screenshots, resets your bring-list counts and clears extract marks.
+When the raid ends, the app deletes that raid's GPS screenshots, resets the bring-list counts of the mode you played and clears extract marks.
 
 You need a **screenshot key** bound in Tarkov's control settings. The app warns you if none is.
 
@@ -192,6 +192,7 @@ While idle the program uses practically no CPU (measured 0.00% of one core over 
 | `squad-task-map-wikicache.json` | Wiki pages, kept 7 days |
 | `squad-task-map-icons/` | Item icons (one small `<id>.webp` each), downloaded once from assets.tarkov.dev. Safe to delete: they download again when needed |
 | `squad-task-map-data.v1-backup.json` | Your v1 file, from the upgrade |
+| `squad-task-map-data.v2-backup.json` | Your file from before the one-list-per-game-mode update (2.9.0), kept once |
 | `squad-task-map-data.before-<version>.json` | Your saved data as it was just before updating to that version (newest 3 kept) |
 | `squad-task-map-squad.json` | Squad: your last share, and your friends' last shares with "last seen" (cleared by Leave squad) |
 | `squad-task-map-tailscale/` | Squad network: this PC's key for the private network. **Keep it private.** Deleted by Leave squad |

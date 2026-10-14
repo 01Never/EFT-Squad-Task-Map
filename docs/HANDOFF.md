@@ -184,7 +184,7 @@ Friends' copies ◄─(tailnet :7777, peer API; only when joined)─► features
 
 - **The page owns the saved data.** It loads `GET /api/state`, migrates it, and saves the whole object with `PUT /api/state` (500 ms debounce, `flush()` on tab hide/unload). The server just stores it (atomic write plus a `.bak`).
 - **Server → page events use Server-Sent Events** (`/api/events`). There are two kinds (`server/events.ts`):
-  - `deliver(ev)`: events that change saved data (`task` started/finished/failed, `raidEnd`). They're queued in `squad-task-map-pending.json` and resent until the page acks (`POST /api/events/ack`). That way a task accepted while the browser was closed still lands.
+  - `deliver(ev)`: events that change saved data (`task` started/finished/failed and `raidEnd`, both with the `mode` whose list they change). They're queued in `squad-task-map-pending.json` and resent until the page acks (`POST /api/events/ack`). That way a task accepted while the browser was closed still lands.
   - `broadcast(ev)`: transient events (`gps`, `capture`, `raidStart`, `raidMap`, `mode`, `keybind`, `data`, `updates`, `squad`). They're dropped if no page is open.
 - The page handles events in `web/js/app/live-events.js`: one named handler per event name (`app/event-names.js`, checked against `internal/events/names.go` by `names_test.go`).
 - **Only the app's own page is answered** (ticket 04d, `internal/httpapi/guard.go`). Every request goes through `httpapi.Guard` with the allowed hosts `internal/app` builds for the bound port (`127.0.0.1:<port>`, `localhost:<port>`): another Host → 421 (blocks DNS rebinding); a state-changing request (not GET/HEAD/OPTIONS) whose `Origin` isn't `http://` + an allowed host, or, without `Origin`, whose `Sec-Fetch-Site` isn't `same-origin`/`none` → 403 (blocks cross-site POSTs); a body not sent as `application/json` on a JSON-body route → 415. Clients that send neither header (curl, tests, the single-copy check) pass. The page sends every JSON body with `Content-Type: application/json` (`app/api.js`, `app/saving.js`, `features/updates/panel.js`). Ticket 05's peer API is not on this server: it is a separate listener (the tailnet, or a 127.0.0.1 port with the dev transport) with its own checks (`Host` must be its own IP address and port, which blocks DNS rebinding; `tag:stm` nodes via tsnet `WhoIs`, or loopback only; never a request carrying `Origin` or `Sec-Fetch-Site`; ≤ 2 streams per machine; at most one share a second taken from each friend), in `internal/features/squad/peerapi.go`.
@@ -226,7 +226,7 @@ and `npm run typecheck`. Each feature folder has a README.
 - `web/js/app/`: the shared parts.
   - `state.js`: `app`, the one shared changing state (saved data, game data, status, the open map).
   - `types.js`: JSDoc types (Task, Objective, Part, SavedState, Category, Settings, events…).
-  - `saved-data.js`: `freshState()`, `fillMissingFields()`, `migrateSavedData()` (v1 → v2).
+  - `saved-data.js`: `freshState()`, `fillMissingFields()`, `migrateSavedData()` (v1 → v2 → v3). `current-list.js`: `currentList()`, the one way to the task list on screen (the mode shown); features never read `app.saved.tasks` any more.
 - `saving.js`: `save()` (500 ms debounce), `flush()`, save on close. Plain `fetch` except the last-chance save on close, which uses `keepalive` only when the body is ≤ 64 KiB (`saving-rules.js`; browsers refuse bigger keepalive bodies). A refused save is retried after 15 s, a network error after 1.5 s.
   - `game-data.js`: lookups (tasks by id, objectives by id, name matcher, map names), reload.
   - `live-events.js`: the live-event router; `event-names.js`: the names.
@@ -254,8 +254,8 @@ and `npm run typecheck`. Each feature folder has a README.
 
 ## 5. Domain rules (what the code implements)
 
-**Task list.** A task is active when `S.tasks[id].active`. Sources:
-- **Scan:** replaces the list (see Scan below); deletes the confirmed screenshots.
+**Task list.** One list per game mode (issue #22): `S.modes[mode]` holds `tasks`, `ticks`, `used`, `have` and `subs`; the page works on the list of the mode shown through `currentList()`. In this section `S.tasks`, `S.ticks`, `S.have` and `S.used` mean that list. A task is active when `S.tasks[id].active`. Sources:
+- **Scan:** replaces the shown mode's list (see Scan below); deletes the confirmed screenshots.
 - **Log:** `type` 10 = started → add; 11/12 = failed/finished → `finish()` quietly (inactive, ticks cleared, unpinned; categories and sub-tasks kept).
 - **Add by name**, and **Remove task** by hand.
 
@@ -275,7 +275,7 @@ Log task events carry the game mode they belong to (issue #22: one task list per
 **Ticks and "have".**
 - `S.ticks[objId]` is `true` or a count.
 - `setTick` takes 1 off `S.have[item]` when a marker or plant objective is ticked, and records it in `S.used[objId]`, so unticking only gives back what that tick took.
-- `have` and extract marks reset at raid end.
+- `have` and extract marks reset at raid end (`have` and `used` only for the raid's mode; extract marks are per map and shared).
 
 **Readiness:** possible when you have at least 1 of every requirement still needed (2 markers and 5 marker spots means all 5 are possible). Not ready means the marker is at 50% opacity with a "!" badge (top-left) and its zone has a dotted border.
 - Wear requirements are a heuristic: up to 4 single-item groups = all needed; anything else = any one outfit (`requirementsOf`).
@@ -320,9 +320,10 @@ Log task events carry the game mode they belong to (issue #22: one task list per
 
 The raw json.tarkov.dev format (`{mode}/tasks`, `tasks_en`, `maps`, `maps_en`, `traders`, `traders_en`, `items_en`; names are translation keys) was first **inferred**, then **checked against the real files on 2026-10-05**: the assumptions hold, nothing is left untranslated, 515 tasks with the same ids as the snapshot, payload ~1.8 MB. The real files are kept (gzip) in `testdata/jsontarkovdev/`, and the Go converter is JSON-equal to v2 on them (`internal/gamedata/convert_test.go`).
 
-### 6.2 Saved state (`squad-task-map-data.json`, `version: 2`)
-See SPEC §12. Fields: `cats`, `tasks{id: {active, source, addedAt, gamePct, scannedAt, noSplit, pinned, partCats}}`, `ticks`, `have`, `used`, `subs`, `draw`, `prefs{map: {ext, extMarked, labels, drawOn, loot?}}` (`loot` only once you change a loot chip, ticket 08), `pinnedOnly`, `panelTab`, `panelHidden`, `collapsed`, `dcolor`, `dwidth`, `aiOpen`, `showScanBanner`, `migratedFrom`.
-- **Adding a field:** add its default to `freshState()`. `fill()` adds missing defaults when loading. Only bump `version` and add a `migrate` step for structural changes; keep the v1 → v2 path working (fixture: `tests/fixtures/v1-data.json`, the owner's real v1 file).
+### 6.2 Saved state (`squad-task-map-data.json`, `version: 3`)
+See SPEC §12. Fields: `cats`, `modes{regular, pve, "pvp-season": {tasks{id: {active, source, addedAt, gamePct, scannedAt, noSplit, pinned, partCats}}, ticks, have, used, subs}}` (issue #22: one list per game mode), then shared by all modes: `draw`, `prefs{map: {ext, extMarked, labels, drawOn, loot?}}` (`loot` only once you change a loot chip, ticket 08), `pinnedOnly`, `panelTab`, `panelHidden`, `collapsed`, `dcolor`, `dwidth`, `aiOpen`, `showScanBanner`, `migratedFrom`. Categories, drawings, map settings and the other choices are shared; only a field that belongs to one character's progress goes in `emptyTaskList()`.
+- **v2 → v3 (issue #22):** the old top-level `tasks`, `ticks`, `used`, `have`, `subs` become the list of the game mode in Settings when the page first loads 2.9.0; the other two modes start empty. Before the page saves, the server keeps the untouched v2 file once as `squad-task-map-data.v2-backup.json` (`internal/storage/state.go`; never overwritten). A v2 file is recognised by its `version`; a v1 file goes v1 → v2 → v3. An older app (2.8.x) reading a v3 file does not find the old fields, so going back is not supported without the backup.
+- **Adding a field:** add its default to `freshState()`. `fill()` adds missing defaults when loading. Only bump `version` and add a `migrate` step for structural changes; keep the v1 → v2 → v3 path working (fixture: `tests/fixtures/v1-data.json`, the owner's real v1 file).
 
 ### 6.3 Files next to the exe
 `squad-task-map-data.json` (+ `.bak`), `squad-task-map-settings.json` (OpenAI key/model/effort, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`, ticket 06: `readExtracts`, `extractsNoticeSeen`), `squad-task-map-gamedata-<mode>.json`, `squad-task-map-pending.json`, `squad-task-map-wikicache.json`, `squad-task-map-data.v1-backup.json`, `squad-task-map-data.v2-backup.json` (issue #22: untouched v2 file before the page's v3 migration), `squad-task-map-instance.json` (port of the running copy), `squad-task-map-data.before-<version>.json` (newest 3, made before an update), `squad-task-map-update-notice.json` (release notes for the copy an update starts), `squad-task-map-squad.json` (ticket 05: my last squad share, friends' last shares with `lastSeen`), `squad-task-map-tailscale/` (ticket 05: tsnet's state folder with the node key, secret; deleted by Leave squad); the settings file's `squad` block holds `playerId`, `name`, `color`, `shareTasks`, `joined` (never the invite code); next to the exe, `SquadTaskMap.download.exe` and `SquadTaskMap.previous.exe` during/after an update.
@@ -389,7 +390,7 @@ Measured idle cost with the page open (2 min, 2026-10-05): **Go 2.4.0: 0.000% of
   `docs/handoff-05-tailscale-test.md`; only real PCs show NAT traversal, the real console and
   Windows Firewall.
 
-**Page:** `npm test` (`node --test`): every `*.test.js` next to the rules it tests: `map/projection.test.js` (tarkov.dev vectors), `app/saved-data.test.js` (v1 → v2, missing fields), and `features/<name>/rules.test.js` (parts, categories, readiness and the Bring list, name matching, drawing, extracts, find-me, raid, picker, settings, AI Categorize, sub-tasks). Shared test data loading is in `tests/support/game-data.js`. `npm run typecheck` type-checks the page.
+**Page:** `npm test` (`node --test`): every `*.test.js` next to the rules it tests: `map/projection.test.js` (tarkov.dev vectors), `app/saved-data.test.js` (v1 → v2 → v3, missing fields), `app/addresses.test.js`, `app/current-list.test.js`, and `features/<name>/rules.test.js` (parts, categories, readiness and the Bring list, name matching, drawing, extracts, find-me, raid, picker, settings, AI Categorize, sub-tasks). Shared test data loading is in `tests/support/game-data.js`. `npm run typecheck` type-checks the page.
 
 **Golden files** (`testdata/golden/`) were captured from the v2 TypeScript code before it was removed: converter outputs, the mock's raw documents, log events, GPS names. If a rule changes on purpose, regenerate the affected golden and say so in the commit.
 
@@ -426,12 +427,20 @@ Create `<scratch>\logs\log_2026.10.01_10-00-00_1.1.5.1\` containing empty `x pus
 ## 10. Unverified: needs the owner in-game
 
 Verified on the owner's PC since 2.3.0: folder detection (registry → `E:\Games\tarkov\Logs`; Documents via the Windows API); the real log formats and the order of raid lines; real screenshot names; live json.tarkov.dev data. Still open:
-1. **Log events live:** accept a task → added within ~5 s; finish one → removed; PvE events ignored while the setting is PvP Season.
+1. **Log events live:** accept a task → added within ~5 s; finish one → removed, in the list of the mode being played (no events are ignored any more; see item 9).
 2. **GPS arrow direction:** two screenshots facing along a straight road. If it's off by 90° or 180°, fix the component order in `gps.YawFromQuaternion` or the correction in `arrowRotation`. Keep the projection itself untouched.
 3. **Raid end:** the toast appears, `have` is 0, and only that raid's GPS shots are gone.
 4. **Scan accuracy** with real screenshots and a real model (default `gpt-5.4-mini`), and that a full scan leaves exactly the in-game list.
 5. **The Go exe on the owner's PC:** replace the exe, data and settings still there; one raid with logs, GPS, raid end and a scan.
 6. **Squad on a real tailnet (ticket 05):** the setup in §3c, then two or more PCs join with the invite code and see each other online and each other's shares live; Leave deletes `squad-task-map-tailscale/`; deleting a machine in the admin console shows "Signed out…" on it; idle CPU and working set on Windows with tsnet up and 2 friends connected (Linux measurement in §7). Windows Firewall may ask once about the exe's network access when tsnet starts (UDP for direct connections; it works through Tailscale's relays either way).
+7. **Scan in a raid (issue #21):** Scan tasks, then take screenshots while in a raid (also with a position in the name) and when the game still thinks it is in a raid: all of them appear as thumbnails, none is deleted as a GPS shot, no false "Raid over".
+8. **Scan in the menus:** a normal scan still reads, matches and replaces the shown mode's list; Confirm deletes the files.
+9. **Per-mode lists and live events (issue #22):** switch Settings → Game mode between PvE, PvP and PvP Season: each shows its own list; accept and finish a task in the game while the page shows another mode: the change lands in the mode being played (the log's session mode), not the one shown; a scan changes only the shown mode's list.
+10. **First start after the update:** the old list is under the mode Settings had, the other two are empty, `squad-task-map-data.v2-backup.json` exists and a second start doesn't overwrite it.
+11. **Raid end resets only that mode:** after a raid in one mode the Bring counts of that mode are 0 and the other modes' counts are untouched.
+12. **Squad mode filter:** a friend on another mode shows no tasks ("Also: …") on your map but their drawings do; on the same mode their tasks show.
+13. **Game mode page (issue #23):** `#/` shows PvE, PvP and PvP Season cards with task counts and Last used; the card of the mode the game is in says "Game is in this mode" and follows the log; opening a card saves it as the Settings mode.
+14. **Breadcrumbs and Back:** "PvE / Maps / Customs" links lead back, the browser's Back button follows the pages, on a phone the "‹ Maps" link shows, and an old `#/map/customs` address opens the map of the Settings mode.
 
 ---
 
@@ -469,6 +478,7 @@ Verified on the owner's PC since 2.3.0: folder detection (registry → `E:\Games
 - **2.7.0 (ticket 05):** Squad over Tailscale (tsnet): Settings → Squad, friends' drawings, shared tasks.
 - **2.8.0 (tickets 06–08, owner changes):** AI extract marks from the first raid screenshot; item icons on markers (icon cache, known ids only); loot spots (`/api/loot/{map}`); smaller player marker and 6 s pulse, thin closest-extract line; saves over 64 KB fixed (keepalive); a new squad identity on Leave; `cmd/faketailnet` for end-to-end squad tests; Windows + Linux CI. First published as a GitHub pre-release.
 - **2.8.1 (fix):** "Shared with squad" only filters while at least one friend whose tasks you show shares them (`isSharedOnlyFilterInEffect` in `web/js/features/squad/rules.js`); otherwise its chip is disabled and nothing is hidden. In 2.8.0 a saved "on" with only a friend who shared no tasks (e.g. offline, or "Share my tasks" off) emptied every list and map. The saved choice is kept (no migration). Also ships ticket 11 (The Labyrinth).
+- **2.9.0 (issues #21–#23):** Scan tasks takes every screenshot while capturing, also in a raid (`internal/app/screenshot_routing.go`); one task list per game mode, saved data v3 (`modes`), v2 backup, task and raidEnd events carry `mode`, squad shares carry an optional `mode` and friends' tasks show only in the same mode; the start page is a game mode select (`#/`), then `#/<mode>/maps` and `#/<mode>/map/<key>`, with breadcrumbs.
 - **2.6.1 (tickets 04d, 04e):** the local API answers only the app's own page (Host check, Origin / Sec-Fetch-Site check on state-changing requests, JSON Content-Type on JSON routes). The Settings checkboxes are normal size again; deselecting (Esc, empty map, popup ×) also closes the task's row.
 - **Ticket 11 (The Labyrinth, no version bump yet):** `assets/Labyrinth.svg` is tarkov.dev's tile pyramid (`assets.tarkov.dev/maps/labyrinth/main/{z}/{x}/{y}.png`, no SVG exists for it) at zoom 4, stitched, cropped to the map bounds (crop origin 115, 288 of the zoom-4 pixel space), saved as WebP (quality 85, ~1 MB) in one `<image>` inside `<g id="Ground_Level">`. The viewBox is the exact bounds rectangle times 16 (so `makeProj` is unchanged and one SVG unit is one zoom-4 pixel). Config entry copied from tarkov.dev's maps.json (`transform [2.115, 85.5, 2.115, 128.0]`, rotation 270, bounds `[[-52,-37],[53,76]]`, no floors, no labels). Key is `the-labyrinth` everywhere (tasks, extracts, loot and the data's scene path already used it; only the log fallback tables and display names said `labyrinth`, now fixed). No saved-data migration: no map page existed under either key, so nothing could have been saved. Test vectors: `tests/fixtures/projection-vectors.labyrinth.json`. To redo the art: fetch the tiles politely, stitch, crop at the same origin; if the zoom or crop changes, update the fixture and the SVG header together.
 - **Roadmap (`docs/ROADMAP.md`):** tickets 01 → 10, one branch each. Progress is tracked in `docs/FEATURES.md` and below.
