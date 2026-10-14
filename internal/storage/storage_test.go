@@ -83,6 +83,11 @@ func TestSavingThePagesDataRefusesAnythingButJSONAndKeepsABackup(t *testing.T) {
 		{"broken JSON is refused and the data stays", ptr(`{"version":2}`), `{"version":`, true, `{"version":2}`, nil},
 		{"an empty body is refused", ptr(`{"version":2}`), ``, true, `{"version":2}`, nil},
 		{"null is JSON, so it's saved (as v2 did)", ptr(`{"version":2}`), `null`, false, `null`, ptr(`{"version":2}`)},
+		{"a page from an older version can't turn v3 data back into v2", ptr(`{"version":3}`), `{"version":2}`, true, `{"version":3}`, nil},
+		{"nor into v1 (no version)", ptr(`{"version":3}`), `{"cats":[]}`, true, `{"version":3}`, nil},
+		{"the same version is saved", ptr(`{"version":3,"n":1}`), `{"version":3,"n":2}`, false, `{"version":3,"n":2}`, ptr(`{"version":3,"n":1}`)},
+		{"a migration to a newer version is saved", ptr(`{"version":2}`), `{"version":3}`, false, `{"version":3}`, ptr(`{"version":2}`)},
+		{"v1 data (no version) is migrated", ptr(`{"cats":[]}`), `{"version":3}`, false, `{"version":3}`, ptr(`{"cats":[]}`)},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

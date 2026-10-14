@@ -33,7 +33,10 @@ temporary build is recognised by `go-build` or `\temp\` in the exe's path.
 - **Atomic writes** (`WriteFileAtomic`): write `<file>.tmp`, then rename it over the file, so a
   crash mid-write never leaves half a file.
 - **Saved data** (`WriteStateText`): refused unless it's valid JSON ("the saved data isn't valid
-  JSON"), so a broken request can't wipe your data. The previous file is copied to `.bak` first.
+  JSON"), so a broken request can't wipe your data. Data with a lower `version` than the file
+  (no version counts as 0) is refused too ("this page is from an older version of the program:
+  reload it to keep saving"): a 2.8.x tab left open after updating can't turn the v3 file (one
+  task list per mode) back into v2. The previous file is copied to `.bak` first.
   `ReadStateText` returns `null` when there's no file yet; the page then starts fresh.
 - **v1 backup** (`BackupV1IfNeeded`, at start-up): when the saved data exists, there's no backup
   yet, and it has no `version` or a version below 2, copy it once before the page migrates it.
