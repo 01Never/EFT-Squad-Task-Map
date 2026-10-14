@@ -3,16 +3,22 @@
 // reports a game mode. Plain functions only: no DOM, no network. nav.js shows the raid and the
 // prompt in the top bar; app/live-events.js calls these when the events arrive.
 
+import { taskListOf } from "../../app/saved-data.js";
+
 /** @import { SavedState } from "../../app/types.js" */
 
 /**
  * After a raid: the bag is empty again and no extract is marked on any map (owner's rules, v2).
- * Changes the saved data in place.
+ * Only the bag of the raid's game mode is emptied: the other modes are other characters, with
+ * their own bags (ticket 22). Extract marks are shared, so they all go. Changes the saved data
+ * in place.
  * @param {SavedState} saved
+ * @param {string} raidMode the game mode the raid was played in
  */
-export function resetAfterRaid(saved) {
-  saved.have = {};
-  saved.used = {};
+export function resetAfterRaid(saved, raidMode) {
+  const list = taskListOf(saved, raidMode);
+  list.have = {};
+  list.used = {};
   for (const mapKey of Object.keys(saved.prefs)) {
     saved.prefs[mapKey].extMarked = {};
   }

@@ -30,10 +30,17 @@ A banner suggests running **Scan tasks** once, so the list matches exactly what 
    3. Back in the app, the captured shots show as thumbnails (× drops one). Click **Done**.
    4. The model reads the task names; the app matches them to the game data and shows a review: new tasks (with how many land on each map), hand-in-only tasks, tasks already on your list, and names it couldn't match (type the right name, or leave blank to skip).
    5. **Update list & delete screenshots** makes your list match the scan: new tasks are added, and any task on your list that isn't in the screenshots is removed completely (its categories, pin, ticks and sub-tasks go too). Then it deletes those screenshot files. **Capture every page**, or tasks on a missed page are dropped. If a screenshot couldn't be read, or no task names were recognised, nothing is removed and the button says **Add tasks** instead. **Cancel** changes nothing and deletes nothing.
-2. **The game's logs.** While the app runs, a task you accept in-game is added within about 5 seconds. A task you finish or fail is removed quietly. Only events from the game mode you picked in Settings count. Events that happen while the app is closed are not caught up; scan again to catch up.
+2. **The game's logs.** While the app runs, a task you accept in-game is added within about 5 seconds. A task you finish or fail is removed quietly. Each event changes the list of the game mode you were playing, even if Settings shows another mode (see "One task list per game mode" below). Events that happen while the app is closed are not caught up; scan again to catch up.
 3. **Add a task by name** (search box in the panel).
 
 **Remove task** in a task's details takes it off by hand.
+
+### One task list per game mode
+PvP, PvE and PvP Season are separate characters in Tarkov, with separate tasks, so the app keeps a separate list for each: tasks, ticks, pins, sub-tasks and Bring list counts. The page shows the list of the mode in **Settings → Game mode**; switch the mode (there, or with **Switch data** in the top bar) and the picker, the map, the task list and the Bring list show that mode's list. The other lists stay as they are. Categories, drawings, extract marks and map choices are shared by all modes.
+
+A scan adds to (or replaces) the list of the mode shown, so switch to the right mode before scanning. Raid end resets the Bring list counts of the mode you played.
+
+**Upgrading from an earlier 2.x:** your one list was kept as the list of the mode Settings had when you first opened the new version; the other two modes start empty (scan to fill them). The program also keeps a copy of your old file.
 
 ## Parts and categories
 Tasks that mix kinds of work are split into **parts**, and each part goes in its own category. For example, Dandies is "kills" (Scav / any kills) plus "placing" (Plant / stash). A split row shows **◫ part 1/2**. Tasks marked "(In one raid)" are never split, and **Don't split** in a task's details keeps one whole.
@@ -97,7 +104,7 @@ When the raid ends, the app deletes that raid's GPS screenshots, resets your bri
 You need a **screenshot key** bound in Tarkov's control settings. The app warns you if none is.
 
 ## Settings (⚙, top-right)
-- **Game mode:** PvP, PvE or PvP Season. Picks the task data and which log events count. If the game reports a different mode, the top bar offers to switch.
+- **Game mode:** PvP, PvE or PvP Season. Picks the task data and which of your task lists is shown (one per mode, see above). If the game reports a different mode, the top bar offers to switch.
 - **Game logs folder:** found automatically from the launcher's install entry or Steam. Paste it if not, e.g. `C:\Battlestate Games\EFT\Logs`.
 - **Screenshots folder:** `Documents\Escape From Tarkov\Screenshots`, found automatically even if OneDrive moved Documents.
 - **Follow my position:** switch to the raid's map when a GPS screenshot comes in.
@@ -115,7 +122,7 @@ Friends who run the app can see each other's **drawings** live and, if each choo
 
 **In the task list:** a **Squad** box with a chip per friend: a colour dot, their name, "online" or "last seen 2 h", and two switches:
 - **✎ Draw**: show that friend's drawings on the map, in their colour, under your own. On by default. They are read-only.
-- **☰ Tasks**: show that friend's tasks (only if they share them). Off by default.
+- **☰ Tasks**: show that friend's tasks (only if they share them). Off by default. You share the list of the game mode you have shown, and you see a friend's tasks only when they have the same mode shown (their copy must be this version or newer; older copies don't say their mode and always show). A friend on another mode still shows their drawings; hover their ☰ Tasks to see which mode they're on.
 
 With a friend's tasks on:
 - A task you both have shows **Also: Mike, Sam** in the list and in the map popup, a small dot in each friend's colour at the bottom left of its markers, and each friend's progress in the popup ("Mike 2/5 · Sam ✓").
@@ -173,7 +180,7 @@ While idle the program uses practically no CPU (measured 0.00% of one core over 
 ## Files next to the exe
 | File | What |
 |---|---|
-| `squad-task-map-data.json` | Your tasks, categories, ticks, pins, drawings (with a `.bak` of the previous save) |
+| `squad-task-map-data.json` | Your tasks (one list per game mode), categories, ticks, pins, drawings (with a `.bak` of the previous save) |
 | `squad-task-map-settings.json` | Settings and OpenAI key (including whether to read your extracts from the first raid screenshot) |
 | `squad-task-map-gamedata-<mode>.json` | Downloaded game data per mode |
 | `squad-task-map-pending.json` | Game events waiting for the page (usually empty) |

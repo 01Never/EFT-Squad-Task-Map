@@ -5,6 +5,7 @@
 import { app } from "../../app/state.js";
 import { escapeHtml } from "../../app/dom.js";
 import { save } from "../../app/saving.js";
+import { currentList } from "../../app/current-list.js";
 import { renderMapPage } from "../../map/map-page.js";
 import { isObjectiveOnMap } from "../tasks/rules.js";
 import { partsOnMap, isShownOnMap, activeOffMapTasks } from "../tasks/task-list.js";
@@ -30,7 +31,7 @@ const ALTERNATIVES_NAMED_IN_TAG = 3;
 /** The Bring list for what's shown on the open map, plus found-in-raid items for off-map tasks. */
 export function bringListForShownParts() {
   const mapView = app.mapView;
-  const saved = app.saved;
+  const list = currentList();
   const shownRows = partsOnMap(mapView.key).filter(isShownOnMap);
   const entries = [];
   for (const row of shownRows) {
@@ -43,7 +44,7 @@ export function bringListForShownParts() {
     ...shownRows.map((row) => /** @type {[string, Task]} */ ([row.task.id, row.task])),
     ...activeOffMapTasks().map((task) => /** @type {[string, Task]} */ ([task.id, task])),
   ]);
-  return bringList(entries, saved.ticks, saved.have, [...firTasks.values()]);
+  return bringList(entries, list.ticks, list.have, [...firTasks.values()]);
 }
 
 /**
@@ -131,7 +132,7 @@ function renderBagCount(line) {
  * @param {Objective} objective
  */
 export function renderRequirementTags(objective) {
-  const bag = app.saved.have;
+  const bag = currentList().have;
   return requirementsOf(objective)
     .map((requirement) => {
       const isInBag = hasAtLeastOne(bag, requirement.key);
@@ -159,7 +160,7 @@ function tagItemsName(items) {
  */
 export function onBagStepClicked(button) {
   const key = button.closest("[data-key]").getAttribute("data-key");
-  stepBagCount(app.saved.have, key, +button.dataset.have);
+  stepBagCount(currentList().have, key, +button.dataset.have);
   save();
   renderMapPage();
 }
@@ -170,15 +171,16 @@ export function onBagStepClicked(button) {
  */
 export function onBagCountChanged(input) {
   const key = input.closest("[data-key]").getAttribute("data-key");
-  setBagCount(app.saved.have, key, input.value);
+  setBagCount(currentList().have, key, input.value);
   save();
   renderMapPage();
 }
 
-/** "Reset counts": the bag is empty again (also what raid end does). */
+/** "Reset counts": the bag of the shown game mode is empty again (also what raid end does). */
 function onResetCountsClicked() {
-  app.saved.have = {};
-  app.saved.used = {};
+  const list = currentList();
+  list.have = {};
+  list.used = {};
   save();
   renderMapPage();
 }

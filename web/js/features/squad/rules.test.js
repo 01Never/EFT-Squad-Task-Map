@@ -29,6 +29,8 @@ import {
   shouldSendShareAtStart,
   describeSquadChange,
   progressPieces,
+  friendTasksOf,
+  friendTasksButtonTitle,
 } from "./rules.js";
 
 // ---------------------------------------------------------------- fixtures
@@ -55,7 +57,7 @@ function friendSharing(playerId, name, tasks, extra = {}) {
 
 function savedWithActive(...tasks) {
   const saved = freshState();
-  for (const task of tasks) saved.tasks[task.id] = { active: true };
+  for (const task of tasks) saved.modes.regular.tasks[task.id] = { active: true };
   return saved;
 }
 
@@ -128,7 +130,7 @@ test("which friends show: drawings by their toggle; tasks by their toggle and on
   setFriendPref(saved, "mike", "tasks", true); // Mike shares no tasks (null)
   const friends = [mike, sam, kim];
   assert.deepEqual(friendsWithDrawingsOn(friends, saved).map((one) => one.name), ["Mike", "Sam"]);
-  assert.deepEqual(friendsWithTasksOn(friends, saved).map((one) => one.name), ["Sam"]);
+  assert.deepEqual(friendsWithTasksOn(friends, saved, "regular").map((one) => one.name), ["Sam"]);
 });
 
 // ---------------------------------------------------------------- the "Shared with squad" filter
@@ -148,7 +150,7 @@ test("'Shared with squad' hides none of your tasks while no friend whose tasks y
   const sam = friendSharing("fedcba9876543210", "Sam", { [killScavs.id]: { ticks: {}, pct: 0 } });
   setFriendPref(saved, player.playerId, "tasks", true); // switched on, but Player shares nothing
   // Sam shares, but his ☰ Tasks is off (the default)
-  const shown = friendsWithTasksOn([player, sam], saved);
+  const shown = friendsWithTasksOn([player, sam], saved, "regular");
   assert.equal(shown.length, 0);
   assert.equal(isSharedOnlyFilterInEffect(saved, shown), false);
   assert.equal(isHiddenBySharedOnlyFilter(killScavs.id, saved, shown), false);
@@ -160,7 +162,7 @@ test("with a shown friend sharing tasks, 'Shared with squad' keeps only the task
   const saved = savedWithActive(killScavs, visitTwoPlaces);
   const sam = friendSharing("fedcba9876543210", "Sam", { [killScavs.id]: { ticks: {}, pct: 0 } });
   setFriendPref(saved, sam.playerId, "tasks", true);
-  const shown = friendsWithTasksOn([sam], saved);
+  const shown = friendsWithTasksOn([sam], saved, "regular");
   assert.equal(isSharedOnlyFilterInEffect(saved, shown), false, "off until you switch it on");
   assert.equal(isHiddenBySharedOnlyFilter(visitTwoPlaces.id, saved, shown), false);
 
@@ -207,7 +209,7 @@ test("friends' other tasks: theirs, not on your list, with something on this map
     [onlyOnWoods.id]: { ticks: {}, pct: 0 }, // not on Customs
     "task-unknown-to-your-game-data": { ticks: {}, pct: 0 },
   });
-  const found = friendsOwnTasksOnMap(mike, saved, taskById, "customs");
+  const found = friendsOwnTasksOnMap(mike, saved, "regular", taskById, "customs");
   assert.deepEqual(found.map((one) => one.task.id), [visitTwoPlaces.id]);
   assert.equal(found[0].percent, 50);
   assert.deepEqual(friendsOwnTasksOnMap(friend("sam", "Sam"), saved, taskById, "customs"), [], "no shared tasks, none shown");
@@ -229,7 +231,7 @@ function stroke(extra = {}) {
 test("my share holds my drawings on every map, and no tasks while sharing is off", () => {
   const saved = freshState();
   saved.draw = { customs: [stroke()], woods: [stroke({ c: "#fff" })], empty: [] };
-  const share = buildMyShare(saved, taskById, false);
+  const share = buildMyShare(saved, "regular", taskById, false);
   assert.deepEqual(Object.keys(share.draw), ["customs", "woods"], "a map with no lines is left out");
   assert.equal(share.tasks, null);
   assert.deepEqual(share.draw.customs, [stroke()]);
@@ -237,22 +239,22 @@ test("my share holds my drawings on every map, and no tasks while sharing is off
 
 test("my share holds my active tasks with their ticks and progress when sharing is on", () => {
   const saved = savedWithActive(killScavs, visitTwoPlaces);
-  saved.tasks[onlyOnWoods.id] = { active: false };
-  saved.tasks["task-not-in-game-data"] = { active: true };
-  saved.ticks = { "bbbbbbbbbbbbbbbbbbbb0001": 2, "bbbbbbbbbbbbbbbbbbbb000a": true, "bbbbbbbbbbbbbbbbbbbb000c": true, "not-an-objective-of-these": true };
-  const share = buildMyShare(saved, taskById, true);
+  saved.modes.regular.tasks[onlyOnWoods.id] = { active: false };
+  saved.modes.regular.tasks["task-not-in-game-data"] = { active: true };
+  saved.modes.regular.ticks = { "bbbbbbbbbbbbbbbbbbbb0001": 2, "bbbbbbbbbbbbbbbbbbbb000a": true, "bbbbbbbbbbbbbbbbbbbb000c": true, "not-an-objective-of-these": true };
+  const share = buildMyShare(saved, "regular", taskById, true);
   assert.deepEqual(share.tasks, {
     [killScavs.id]: { ticks: { "bbbbbbbbbbbbbbbbbbbb0001": 2 }, pct: 40 },
     [visitTwoPlaces.id]: { ticks: { "bbbbbbbbbbbbbbbbbbbb000a": true }, pct: 50 },
   });
 });
 
-test("my share never carries anything but drawings and tasks", () => {
+test("my share never carries anything but the game mode, drawings and tasks", () => {
   const saved = savedWithActive(killScavs);
-  saved.have = { "some-item": 3 };
+  saved.modes.regular.have = { "some-item": 3 };
   saved.cats = [{ id: "secret-category" }];
   saved.prefs = { customs: { secret: true } };
-  const text = JSON.stringify(buildMyShare(saved, taskById, true));
+  const text = JSON.stringify(buildMyShare(saved, "regular", taskById, true));
   for (const privateThing of ["some-item", "secret-category", "secret", "have", "cats", "prefs", "dcolor"]) {
     assert.equal(text.includes(privateThing), false, privateThing);
   }
@@ -272,7 +274,7 @@ test("a stroke the server would refuse is left out, and the rest is still sent",
     ],
     "bad map key!": [stroke()],
   };
-  const share = buildMyShare(saved, taskById, false);
+  const share = buildMyShare(saved, "regular", taskById, false);
   assert.deepEqual(Object.keys(share.draw), ["customs"]);
   assert.equal(share.draw.customs.length, 2);
   assert.equal(share.draw.customs[1].c, "#ff4d4d");
@@ -281,16 +283,16 @@ test("a stroke the server would refuse is left out, and the rest is still sent",
 test("a stroke carries only its colour, width and points", () => {
   const saved = freshState();
   saved.draw = { customs: [{ ...stroke(), extra: "nope" }] };
-  assert.deepEqual(Object.keys(buildMyShare(saved, taskById, false).draw.customs[0]).sort(), ["c", "pts", "w"]);
+  assert.deepEqual(Object.keys(buildMyShare(saved, "regular", taskById, false).draw.customs[0]).sort(), ["c", "pts", "w"]);
 });
 
 test("the same content gives the same fingerprint, so an unchanged share is not sent again", () => {
   const saved = savedWithActive(killScavs);
-  const first = shareFingerprint(buildMyShare(saved, taskById, true));
-  assert.equal(shareFingerprint(buildMyShare(saved, taskById, true)), first);
-  saved.ticks["bbbbbbbbbbbbbbbbbbbb0001"] = 1;
-  assert.notEqual(shareFingerprint(buildMyShare(saved, taskById, true)), first);
-  assert.notEqual(shareFingerprint(buildMyShare(saved, taskById, false)), first, "turning sharing off is a change");
+  const first = shareFingerprint(buildMyShare(saved, "regular", taskById, true));
+  assert.equal(shareFingerprint(buildMyShare(saved, "regular", taskById, true)), first);
+  saved.modes.regular.ticks["bbbbbbbbbbbbbbbbbbbb0001"] = 1;
+  assert.notEqual(shareFingerprint(buildMyShare(saved, "regular", taskById, true)), first);
+  assert.notEqual(shareFingerprint(buildMyShare(saved, "regular", taskById, false)), first, "turning sharing off is a change");
 });
 
 test("at start-up the share is sent only when joined and the server never had one", () => {
@@ -409,7 +411,7 @@ test("a friend's task ids named like Object.prototype members are ignored, not c
     // JSON.parse makes "__proto__" a real own key, as a share coming off the wire does
     const tasks = JSON.parse(`{"${key}":{"ticks":{"${key}":3},"pct":10},"${visitTwoPlaces.id}":{"ticks":{"bbbbbbbbbbbbbbbbbbbb000a":true},"pct":50}}`);
     const mike = friend("mike", "Mike", { share: { rev: 1, updatedAt: 1, draw: {}, tasks } });
-    const found = friendsOwnTasksOnMap(mike, saved, taskById, "customs");
+    const found = friendsOwnTasksOnMap(mike, saved, "regular", taskById, "customs");
     assert.deepEqual(found.map((one) => one.task.id), [visitTwoPlaces.id], `${key}: only the real task`);
     assert.deepEqual(friendsAlsoDoing(killScavs.id, [mike]), [], `${key}: does not have Kill Scavs`);
     assert.equal(progressSummaryText(killsPart, killScavs.id, [mike]), "Mike 0/5", `${key}: no progress on Kill Scavs`);
@@ -427,13 +429,13 @@ test("asking for a task id like 'toString' finds nothing when the friend has no 
 
 test("a friend's task entries that are not objects are skipped", () => {
   const sam = friendSharing("sam", "Sam", { [visitTwoPlaces.id]: null, [killScavs.id]: 5 });
-  const found = friendsOwnTasksOnMap(sam, freshState(), taskById, "customs");
+  const found = friendsOwnTasksOnMap(sam, freshState(), "regular", taskById, "customs");
   assert.deepEqual(found.map((one) => one.task.id).sort(), [killScavs.id, visitTwoPlaces.id].sort());
 });
 
 test("the game's task lookup, even a plain object, does not answer for 'toString'", () => {
   const sam = friendSharing("sam", "Sam", JSON.parse('{"toString":{},"constructor":{},"valueOf":null}'));
-  assert.deepEqual(friendsOwnTasksOnMap(sam, freshState(), taskById, "customs"), []);
+  assert.deepEqual(friendsOwnTasksOnMap(sam, freshState(), "regular", taskById, "customs"), []);
 });
 
 test("objective ids named like Object.prototype members count as no progress", () => {
@@ -460,7 +462,7 @@ test("drawings under map keys like 'toString' don't break the share or the chang
   for (const key of PROTOTYPE_KEYS) {
     const saved = freshState();
     saved.draw = JSON.parse(`{"${key}":[${JSON.stringify(stroke)}],"customs":[${JSON.stringify(stroke)}]}`);
-    assert.ok(Object.hasOwn(buildMyShare(saved, taskById, false).draw, "customs"));
+    assert.ok(Object.hasOwn(buildMyShare(saved, "regular", taskById, false).draw, "customs"));
     const before = viewOf([friend("mike", "Mike")]);
     const after = viewOf([friend("mike", "Mike", { share: { rev: 2, updatedAt: 2, draw: {}, tasks: null } })]);
     assert.deepEqual(describeSquadChange(before, after, key).drawingsChanged, [], `${key}: nothing drawn, no change`);
@@ -476,11 +478,89 @@ test("progress pieces give each name and progress separately", () => {
 test("my share carries only the game's own ids (24 lowercase hex characters)", () => {
   const odd = { id: "toString", name: "Odd", trader: "Prapor", map: "customs", objs: [objective("bbbbbbbbbbbbbbbbbbbb000d"), objective("not-hex")] };
   const saved = savedWithActive(odd);
-  saved.ticks = { bbbbbbbbbbbbbbbbbbbb000d: true, "not-hex": true };
-  assert.deepEqual(buildMyShare(saved, { toString: odd }, true).tasks, {}, "a task with an odd id is left out");
+  saved.modes.regular.ticks = { bbbbbbbbbbbbbbbbbbbb000d: true, "not-hex": true };
+  assert.deepEqual(buildMyShare(saved, "regular", { toString: odd }, true).tasks, {}, "a task with an odd id is left out");
   const task = { ...odd, id: "aaaaaaaaaaaaaaaaaaaa0009" };
   const saved2 = savedWithActive(task);
-  saved2.ticks = saved.ticks;
-  const shared = buildMyShare(saved2, { [task.id]: task }, true).tasks;
+  saved2.modes.regular.ticks = saved.modes.regular.ticks;
+  const shared = buildMyShare(saved2, "regular", { [task.id]: task }, true).tasks;
   assert.deepEqual(Object.keys(shared[task.id].ticks), ["bbbbbbbbbbbbbbbbbbbb000d"], "an odd objective id is left out");
+});
+
+// ---------------------------------------------------------------- game modes (ticket 22)
+
+/** A friend sharing Kill Scavs, with their copy saying which game mode it's for (or nothing). */
+function friendOnMode(playerId, name, mode) {
+  const tasks = { [killScavs.id]: { ticks: { bbbbbbbbbbbbbbbbbbbb0001: 2 }, pct: 40 } };
+  const share = { rev: 1, updatedAt: 1, draw: { customs: [stroke()] }, tasks };
+  if (mode !== undefined) share.mode = mode;
+  return friend(playerId, name, { share });
+}
+
+test("a friend's tasks show only when they're for your game mode, or their copy doesn't say", () => {
+  const saved = freshState();
+  const onPve = friendOnMode("mike", "Mike", "pve");
+  const onSeason = friendOnMode("sam", "Sam", "pvp-season");
+  const olderCopy = friendOnMode("kim", "Kim", undefined);
+  const emptyMode = friendOnMode("lee", "Lee", "");
+  const friends = [onPve, onSeason, olderCopy, emptyMode];
+  for (const one of friends) setFriendPref(saved, one.playerId, "tasks", true);
+
+  const shown = friendsWithTasksOn(friends, saved, "pvp-season");
+
+  assert.deepEqual(shown.map((one) => one.name), ["Sam", "Kim", "Lee"]);
+  assert.equal(friendTasksOf(onPve, "pvp-season"), null);
+  assert.notEqual(friendTasksOf(onPve, "pve"), null);
+  assert.deepEqual(friendsAlsoDoing(killScavs.id, shown).map((one) => one.name), ["Sam", "Kim", "Lee"]);
+});
+
+test("a friend on another game mode adds no tasks to your map, but their drawings still show", () => {
+  const saved = freshState();
+  const onPve = friendOnMode("mike", "Mike", "pve");
+  assert.deepEqual(friendsOwnTasksOnMap(onPve, saved, "regular", taskById, "customs"), []);
+  assert.deepEqual(friendsOwnTasksOnMap(onPve, saved, "pve", taskById, "customs").map((one) => one.task.id), [killScavs.id]);
+  assert.deepEqual(friendsWithDrawingsOn([onPve], saved).map((one) => one.name), ["Mike"]);
+});
+
+test("friends' other tasks are compared with your list of the game mode shown", () => {
+  const saved = freshState();
+  saved.modes.pve.tasks[killScavs.id] = { active: true };
+  const onPve = friendOnMode("mike", "Mike", "pve");
+  assert.deepEqual(friendsOwnTasksOnMap(onPve, saved, "pve", taskById, "customs"), [], "you have it in PvE");
+  const olderCopy = friendOnMode("kim", "Kim", undefined);
+  assert.equal(friendsOwnTasksOnMap(olderCopy, saved, "regular", taskById, "customs").length, 1, "not in your PvP list");
+});
+
+test("my share says the game mode shown and carries that mode's tasks only", () => {
+  const saved = freshState();
+  saved.modes.pve.tasks[killScavs.id] = { active: true };
+  saved.modes.pve.ticks = { bbbbbbbbbbbbbbbbbbbb0001: 2 };
+  saved.modes["pvp-season"].tasks[visitTwoPlaces.id] = { active: true };
+
+  const share = buildMyShare(saved, "pve", taskById, true);
+  assert.equal(share.mode, "pve");
+  assert.deepEqual(Object.keys(share.tasks), [killScavs.id]);
+
+  const afterSwitching = buildMyShare(saved, "pvp-season", taskById, true);
+  assert.equal(afterSwitching.mode, "pvp-season");
+  assert.deepEqual(Object.keys(afterSwitching.tasks), [visitTwoPlaces.id]);
+  assert.notEqual(shareFingerprint(afterSwitching), shareFingerprint(share), "switching mode sends the share again");
+  assert.equal(buildMyShare(saved, "pve", taskById, false).mode, "pve", "the mode is sent even without tasks");
+});
+
+test("a friend switching game mode is a task change and redraws their chip", () => {
+  const before = viewOf([friendOnMode("mike", "Mike", "pve")]);
+  const switched = friendOnMode("mike", "Mike", "regular");
+  switched.share.rev = 2;
+  const change = describeSquadChange(before, viewOf([switched]), "customs");
+  assert.deepEqual(change.tasksChanged, ["mike"]);
+  assert.equal(change.chipsChanged, true);
+});
+
+test("the ☰ Tasks title says why a friend's tasks don't show", () => {
+  assert.equal(friendTasksButtonTitle(friendOnMode("mike", "Mike", "pve"), "pve"), "Show Mike's tasks");
+  assert.equal(friendTasksButtonTitle(friendOnMode("mike", "Mike", "pve"), "regular"), "Mike's tasks are for PvE");
+  assert.equal(friendTasksButtonTitle(friendOnMode("mike", "Mike", "<odd>"), "regular"), "Mike's tasks are for <odd>");
+  assert.equal(friendTasksButtonTitle(friend("sam", "Sam"), "regular"), "Sam isn't sharing tasks");
+  assert.equal(friendTasksButtonTitle(friendOnMode("kim", "Kim", undefined), "pve"), "Show Kim's tasks");
 });

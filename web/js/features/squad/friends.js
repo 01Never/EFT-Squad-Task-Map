@@ -3,6 +3,7 @@
 // sent), which of them you chose to show, and what the tasks, the markers and the filter need to
 // know about them. Reads app.squad and app.saved; changes nothing. The decisions are in rules.js.
 import { app } from "../../app/state.js";
+import { shownGameMode } from "../../app/current-list.js";
 import {
   friendsWithDrawingsOn,
   friendsWithTasksOn,
@@ -36,9 +37,9 @@ export function friendsShowingDrawings() {
   return friendsWithDrawingsOn(allFriends(), app.saved);
 }
 
-/** Friends whose tasks you show (and who share them). */
+/** Friends whose tasks you show (and who share them, for the game mode you're shown). */
 export function friendsShowingTasks() {
-  return friendsWithTasksOn(allFriends(), app.saved);
+  return friendsWithTasksOn(allFriends(), app.saved, shownGameMode());
 }
 
 /**

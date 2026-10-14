@@ -14,8 +14,10 @@ import {
   tickTarget,
   isObjectiveDone,
 } from "../tasks/rules.js";
+import { taskListOf } from "../../app/saved-data.js";
+import { GAME_MODE_NAMES } from "../../app/game-modes.js";
 
-/** @import { SavedState, Task, Part, Stroke, SquadView, SquadFriend, MyShare, FriendPrefs } from "../../app/types.js" */
+/** @import { SavedState, TaskList, Task, Part, Stroke, SquadView, SquadFriend, MyShare, FriendPrefs } from "../../app/types.js" */
 
 // ---------------------------------------------------------------- numbers the server enforces
 
@@ -106,6 +108,23 @@ export function lastSeenAgo(lastSeenMs, nowMs) {
   if (elapsed < HOUR_MS) return `${Math.floor(elapsed / MINUTE_MS)} min`;
   if (elapsed < DAY_MS) return `${Math.floor(elapsed / HOUR_MS)} h`;
   return `${Math.floor(elapsed / DAY_MS)} d`;
+}
+
+/**
+ * The title of a friend's "☰ Tasks" button (plain text: escape it): "Show Mike's tasks", or why
+ * there's nothing to show: "Mike isn't sharing tasks", "Mike's tasks are for PvE" (ticket 22).
+ * @param {SquadFriend} friend
+ * @param {string} myMode the game mode you're shown
+ */
+export function friendTasksButtonTitle(friend, myMode) {
+  const name = friendDisplayName(friend.name);
+  if (isFriendOnOtherGameMode(friend, myMode) && sharedTasksOf(friend) !== null) {
+    const theirMode = friendGameMode(friend);
+    const modeName = Object.hasOwn(GAME_MODE_NAMES, theirMode) ? GAME_MODE_NAMES[theirMode] : theirMode;
+    return `${name}'s tasks are for ${modeName}`;
+  }
+  if (friendTasksOf(friend, myMode) === null) return `${name} isn't sharing tasks`;
+  return `Show ${name}'s tasks`;
 }
 
 /**
@@ -208,20 +227,57 @@ export function friendsWithDrawingsOn(friends, saved) {
 }
 
 /**
- * Friends whose tasks you want to see and who share them (their tasks aren't null).
+ * Friends whose tasks you want to see and who share them for your game mode (friendTasksOf).
  * @param {SquadFriend[]} friends
  * @param {SavedState} saved
+ * @param {string} myMode the game mode you're shown
  */
-export function friendsWithTasksOn(friends, saved) {
-  return friends.filter((friend) => friendPrefsOf(saved, friend.playerId).tasks && friendTasksOf(friend) !== null);
+export function friendsWithTasksOn(friends, saved, myMode) {
+  return friends.filter(
+    (friend) => friendPrefsOf(saved, friend.playerId).tasks && friendTasksOf(friend, myMode) !== null,
+  );
 }
 
 /**
- * A friend's shared tasks, or null when they don't share them (or nothing arrived yet).
+ * The game mode a friend's shared tasks belong to, or "" when their copy doesn't say (older
+ * copies, before ticket 22). Untrusted text: escape it wherever it's shown.
+ * @param {SquadFriend} friend
+ * @returns {string}
+ */
+export function friendGameMode(friend) {
+  const mode = friend.share && friend.share.mode;
+  return typeof mode === "string" ? mode : "";
+}
+
+/**
+ * Whether a friend's tasks are for another game mode than yours: another character's tasks, so
+ * they aren't shown (ticket 22). A copy that doesn't say its mode counts as yours, as before.
+ * @param {SquadFriend} friend
+ * @param {string} myMode
+ */
+export function isFriendOnOtherGameMode(friend, myMode) {
+  const theirMode = friendGameMode(friend);
+  return theirMode !== "" && theirMode !== myMode;
+}
+
+/**
+ * A friend's shared tasks for your game mode, or null when they don't share them, nothing
+ * arrived yet, or they're for another game mode.
+ * @param {SquadFriend} friend
+ * @param {string} myMode
+ * @returns {Record<string, { ticks?: Record<string, true | number>, pct?: number }> | null}
+ */
+export function friendTasksOf(friend, myMode) {
+  if (isFriendOnOtherGameMode(friend, myMode)) return null;
+  return sharedTasksOf(friend);
+}
+
+/**
+ * Whatever tasks a friend shares, whatever their game mode; null when none.
  * @param {SquadFriend} friend
  * @returns {Record<string, { ticks?: Record<string, true | number>, pct?: number }> | null}
  */
-export function friendTasksOf(friend) {
+function sharedTasksOf(friend) {
   const tasks = friend.share && friend.share.tasks;
   return tasks && typeof tasks === "object" ? tasks : null;
 }
@@ -229,10 +285,10 @@ export function friendTasksOf(friend) {
 /**
  * Of the friends you show, the ones who also have this task active.
  * @param {string} taskId
- * @param {SquadFriend[]} friendsWithTasks
+ * @param {SquadFriend[]} friendsWithTasks friendsWithTasksOn(): already only your game mode's
  */
 export function friendsAlsoDoing(taskId, friendsWithTasks) {
-  return friendsWithTasks.filter((friend) => !!ownValue(friendTasksOf(friend), taskId));
+  return friendsWithTasks.filter((friend) => !!ownValue(sharedTasksOf(friend), taskId));
 }
 
 /**
@@ -283,7 +339,7 @@ export function progressSummaryText(part, taskId, friends) {
  */
 export function progressPieces(part, taskId, friends) {
   return friends.map((friend) => {
-    const ticks = ticksOfSharedTask(ownValue(friendTasksOf(friend), taskId));
+    const ticks = ticksOfSharedTask(ownValue(sharedTasksOf(friend), taskId));
     return { name: friendDisplayName(friend.name), text: friendPartProgress(part, ticks).text };
   });
 }
@@ -302,20 +358,23 @@ function ticksOfSharedTask(sharedTask) {
 
 /**
  * What one friend has that you don't: their active tasks that exist in your game data, aren't on
- * your own list, and have something on this map. Shown read-only; they never touch your list.
+ * your own list (of the game mode you're shown), and have something on this map. Nothing when
+ * their tasks are for another game mode. Shown read-only; they never touch your list.
  * @param {SquadFriend} friend
  * @param {SavedState} saved
+ * @param {string} myMode
  * @param {Record<string, Task>} taskById
  * @param {string} mapKey
  * @returns {{ task: Task, ticks: Record<string, true | number>, percent: number }[]}
  */
-export function friendsOwnTasksOnMap(friend, saved, taskById, mapKey) {
-  const shared = friendTasksOf(friend);
+export function friendsOwnTasksOnMap(friend, saved, myMode, taskById, mapKey) {
+  const shared = friendTasksOf(friend, myMode);
   if (!shared) return [];
+  const myList = taskListOf(saved, myMode);
   const found = [];
   for (const taskId of Object.keys(shared)) {
     const task = ownValue(taskById, taskId);
-    const mine = ownValue(saved.tasks, taskId);
+    const mine = ownValue(myList.tasks, taskId);
     const isOnMyList = mine && mine.active;
     if (!task || isOnMyList || !isTaskOnMap(task, mapKey)) continue;
     const ticks = ticksOfSharedTask(shared[taskId]);
@@ -349,18 +408,22 @@ function wholeTaskPercent(task, ticks) {
 // ---------------------------------------------------------------- my share
 
 /**
- * What you send your friends (PUT /api/squad/share): all your drawings and, when "Share my tasks"
- * is on, `{ticks, pct}` for each active task. Nothing else leaves your saved data. Anything the
- * server would refuse is left out, so one odd stroke never blocks the whole share.
+ * What you send your friends (PUT /api/squad/share): the game mode you're shown, all your
+ * drawings and, when "Share my tasks" is on, `{ticks, pct}` for each active task of that mode's
+ * list (ticket 22: friends see them only when they're on the same mode). Nothing else leaves
+ * your saved data. Anything the server would refuse is left out, so one odd stroke never blocks
+ * the whole share.
  * @param {SavedState} saved
+ * @param {string} myMode the game mode you're shown
  * @param {Record<string, Task>} taskById
  * @param {boolean} shareTasks
  * @returns {MyShare}
  */
-export function buildMyShare(saved, taskById, shareTasks) {
+export function buildMyShare(saved, myMode, taskById, shareTasks) {
   return {
+    mode: myMode,
     draw: shareableDrawings(saved.draw),
-    tasks: shareTasks ? shareableTasks(saved, taskById) : null,
+    tasks: shareTasks ? shareableTasks(taskListOf(saved, myMode), taskById) : null,
   };
 }
 
@@ -404,18 +467,18 @@ function strokeForShare(stroke) {
 }
 
 /**
- * @param {SavedState} saved
+ * @param {TaskList} list
  * @param {Record<string, Task>} taskById
  * @returns {Record<string, { ticks: Record<string, true | number>, pct: number }>}
  */
-function shareableTasks(saved, taskById) {
+function shareableTasks(list, taskById) {
   const shared = {};
-  for (const taskId of Object.keys(saved.tasks)) {
+  for (const taskId of Object.keys(list.tasks)) {
     if (Object.keys(shared).length >= MAX_SHARED_TASKS) break;
     const task = ownValue(taskById, taskId);
-    if (!task || !saved.tasks[taskId].active || !GAME_ID.test(taskId)) continue;
-    const ticks = shareableTicks(task, saved.ticks);
-    shared[taskId] = { ticks, pct: wholeTaskPercent(task, saved.ticks) };
+    if (!task || !list.tasks[taskId].active || !GAME_ID.test(taskId)) continue;
+    const ticks = shareableTicks(task, list.ticks);
+    shared[taskId] = { ticks, pct: wholeTaskPercent(task, list.ticks) };
   }
   return shared;
 }
@@ -526,6 +589,8 @@ function compareFriend(change, before, after, mapKey) {
     return;
   }
   const hasNewLook = before.name !== after.name || before.color !== after.color;
+  const hasNewGameMode = friendGameMode(before) !== friendGameMode(after); // the chip's ☰ Tasks
+  if (hasNewGameMode) change.chipsChanged = true;
   const hasNewPresence = before.online !== after.online || (!after.online && before.lastSeen !== after.lastSeen);
   if (hasNewLook || hasNewPresence) change.chipsChanged = true;
   if (hasNewLook) change.tasksChanged.push(playerId);
@@ -537,8 +602,8 @@ function compareFriend(change, before, after, mapKey) {
     if (drawingsBefore !== drawingsAfter) change.drawingsChanged.push(playerId);
   }
   if (!change.tasksChanged.includes(playerId)) {
-    const tasksBefore = JSON.stringify(before.share?.tasks || null);
-    const tasksAfter = JSON.stringify(after.share?.tasks || null);
+    const tasksBefore = JSON.stringify([friendGameMode(before), before.share?.tasks || null]);
+    const tasksAfter = JSON.stringify([friendGameMode(after), after.share?.tasks || null]);
     if (tasksBefore !== tasksAfter) change.tasksChanged.push(playerId);
   }
 }

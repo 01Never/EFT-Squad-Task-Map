@@ -10,8 +10,11 @@ shows it.
 
 **Where the data comes from:** the tasks themselves from the game data (`/api/data`, made by
 `internal/gamedata` from json.tarkov.dev); your list, ticks, pins and category choices from the
-saved data (`tasks`, `ticks`, `cats`, `collapsed`, `pinnedOnly`). Tasks are added by a scan
-(`features/scan`), by the game log (event `task`), or by name.
+saved data (`tasks` and `ticks` of the shown game mode's list, and the shared `cats`,
+`collapsed`, `pinnedOnly`). Each game mode (PvP, PvE, PvP Season) is its own character with its
+own list (ticket 22); the page shows the list of the mode in Settings, read and changed only
+through `app/current-list.js currentList()`. Tasks are added by a scan (`features/scan`), by the
+game log (event `task`), or by name.
 
 **The rules** (`rules.js`, `categories.js`):
 - Kind of work per objective (`actionOfObjective()`): kills are a boss hunt (a boss name in the
@@ -32,6 +35,11 @@ saved data (`tasks`, `ticks`, `cats`, `collapsed`, `pinnedOnly`). Tasks are adde
 - A task finished or failed in the game leaves the list quietly, unpinned, ticks cleared,
   categories and sub-tasks kept (`finishTaskEntry()`). A task a scan doesn't show is forgotten
   completely (`forgetTask()`).
+- A game-log task event changes the list of the game mode it happened in, even when another mode
+  is shown; an event without a mode (queued by an older version) or with an unknown one goes to
+  the shown list (`applyTaskEventFromGame()`, ticket 22).
+- Categories are shared by every game mode; a part's category choice belongs to its mode's list.
+  Deleting a category clears it from every list; "Re-sort everything" re-sorts the shown list.
 - New categories go just before Unsorted and take the next colour of `NEW_CATEGORY_COLORS` and the
   next marker shape.
 
@@ -40,13 +48,14 @@ saved data (`tasks`, `ticks`, `cats`, `collapsed`, `pinnedOnly`). Tasks are adde
   change the saved data → `save()` → `renderMapPage()` (or `renderPanel()` when only the list changes).
 - Ticking: `objective-line.js onTickBoxChanged()` → `task-list.js setTick()` (also takes a marker
   out of the bag, see `features/readiness`) → save → redraw.
-- Game log: event `task` → `app/live-events.js onTaskChangedInGame()` → `activateTask()` /
-  `finishTask()` → save → redraw.
+- Game log: event `task` (`{taskId, status, mode}`) → `app/live-events.js onTaskChangedInGame()`
+  → `applyTaskEventFromGame()` on `modes[mode]` → save → redraw.
 - Selecting: a row → `selection.js selectPartFromList()` (zooms to its spots); a marker →
   `map/input.js` → `selectPartFromMarker()` (scrolls the list).
 
-**Saved data / settings:** `tasks{id: {active, source, addedAt, gamePct, scannedAt, noSplit,
-pinned, partCats}}`, `ticks`, `cats`, `collapsed`, `pinnedOnly`. No settings.
+**Saved data / settings:** per game mode `modes[mode].tasks{id: {active, source, addedAt,
+gamePct, scannedAt, noSplit, pinned, partCats}}` and `modes[mode].ticks`; shared `cats`,
+`collapsed`, `pinnedOnly`. Reads the setting `gameMode` (which list is shown).
 
 **Files:**
 - `rules.js`: kind of work, splitting, maps, ticks and progress, adding/finishing/forgetting.
@@ -61,7 +70,9 @@ pinned, partCats}}`, `ticks`, `cats`, `collapsed`, `pinnedOnly`. No settings.
 - `tasks.css`: styles.
 
 **Tests:** `rules.test.js` (kinds of kills, splitting on real tasks, glue rules, "(In one raid)",
-Don't split, progress, finishing and forgetting) and `categories.test.js` (default category,
-moved part, deleted built-in, re-sort and undo). The browser suite (`tests/browser/task-list.e2e.mjs`)
+Don't split, progress, finishing and forgetting, game-log events going to their mode's list) and
+`categories.test.js` (default category, moved part, deleted built-in, re-sort and undo, choices
+per game mode, deleting a category in every list). `app/current-list.test.js`: switching mode
+shows the other list and leaves both intact. The browser suite (`tests/browser/task-list.e2e.mjs`)
 covers adding by name, ticking, pins, Move to, Re-sort + Undo, Don't split and selection.
 **Needs an in-game check:** nothing new in 04b.

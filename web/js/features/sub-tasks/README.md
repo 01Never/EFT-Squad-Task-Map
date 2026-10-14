@@ -5,7 +5,8 @@ behind the blue door"), each with a done box. A note can be pinned on a map with
 "Pin" (or "Move pin"), then click the map. Pins are drawn like the task's markers, smaller, with a
 white dot; a done one gets a tick.
 
-**Where the data comes from:** the saved data (`subs`). Nothing from the game.
+**Where the data comes from:** the saved data (`subs` of the shown game mode's list: each game
+mode has its own tasks and notes, ticket 22). Nothing from the game.
 
 **The rules** (`rules.js`):
 - A new sub-task isn't done and isn't pinned (`newSubTask()`); text up to `SUB_TASK_MAX_LENGTH` = 140.
@@ -20,7 +21,8 @@ white dot; a done one gets a tick.
 a click on the map → `map/input.js` → `placeSubTaskPinAt()` (game position, 2 decimals) → save →
 `renderMapPage()`.
 
-**Saved data / settings:** `subs[{id, task, text, done, map, x, z, f}]`. No settings.
+**Saved data / settings:** `modes[mode].subs[{id, task, text, done, map, x, z, f}]`. Reads the
+setting `gameMode` (which list is shown).
 
 **Files:**
 - `rules.js`: new sub-task, unpinning, where a pin is.

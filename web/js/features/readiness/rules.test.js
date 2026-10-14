@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { findTask } from "../../../../tests/support/game-data.js";
-import { freshState } from "../../app/saved-data.js";
+import { emptyTaskList } from "../../app/saved-data.js";
 import {
   requirementsOf,
   isObjectivePossible,
@@ -46,19 +46,19 @@ test("separate single items to wear are all needed, while outfit lists are alter
 });
 
 test("ticking a marker spot takes a marker out of the bag, and unticking gives back only what it took", () => {
-  const saved = freshState();
+  const list = emptyTaskList();
   const markSpot = aFuelMatter.objs[0];
-  saved.have[MS2000_MARKER_ID] = 1;
+  list.have[MS2000_MARKER_ID] = 1;
 
-  updateBagForTick(saved, markSpot, 1);
-  assert.equal(saved.have[MS2000_MARKER_ID], 0);
-  assert.equal(saved.used[markSpot.id], 1);
+  updateBagForTick(list, markSpot, 1);
+  assert.equal(list.have[MS2000_MARKER_ID], 0);
+  assert.equal(list.used[markSpot.id], 1);
 
-  updateBagForTick(saved, markSpot, -1);
-  assert.equal(saved.have[MS2000_MARKER_ID], 1);
-  assert.equal(saved.used[markSpot.id], undefined);
+  updateBagForTick(list, markSpot, -1);
+  assert.equal(list.have[MS2000_MARKER_ID], 1);
+  assert.equal(list.used[markSpot.id], undefined);
 
-  const emptyBag = freshState();
+  const emptyBag = emptyTaskList();
   updateBagForTick(emptyBag, markSpot, 1);
   updateBagForTick(emptyBag, markSpot, -1);
   assert.equal(emptyBag.have[MS2000_MARKER_ID], undefined, "nothing was taken, so nothing comes back");

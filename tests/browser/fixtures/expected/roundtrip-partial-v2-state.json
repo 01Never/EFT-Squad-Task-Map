@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "cats": [
     {
       "id": "c-mine",
@@ -18,30 +18,51 @@
       "visible": true
     }
   ],
-  "tasks": {
-    "65734c186dc1e402c80dc19e": {
-      "active": true,
-      "source": "log",
-      "addedAt": 1790000000000,
-      "gamePct": null,
-      "scannedAt": null,
-      "noSplit": false,
-      "pinned": false,
-      "partCats": {}
+  "modes": {
+    "regular": {
+      "tasks": {
+        "65734c186dc1e402c80dc19e": {
+          "active": true,
+          "source": "log",
+          "addedAt": 1790000000000,
+          "gamePct": null,
+          "scannedAt": null,
+          "noSplit": false,
+          "pinned": false,
+          "partCats": {}
+        },
+        "639135a7e705511c8a4a1b78": {
+          "active": false,
+          "source": "manual",
+          "addedAt": 1790000000000,
+          "gamePct": null,
+          "scannedAt": null,
+          "noSplit": false,
+          "pinned": false,
+          "partCats": {}
+        }
+      },
+      "ticks": {
+        "657356c410becd24bc776f55": true
+      },
+      "used": {},
+      "have": {},
+      "subs": []
     },
-    "639135a7e705511c8a4a1b78": {
-      "active": false,
-      "source": "manual",
-      "addedAt": 1790000000000,
-      "gamePct": null,
-      "scannedAt": null,
-      "noSplit": false,
-      "pinned": false,
-      "partCats": {}
+    "pve": {
+      "tasks": {},
+      "ticks": {},
+      "used": {},
+      "have": {},
+      "subs": []
+    },
+    "pvp-season": {
+      "tasks": {},
+      "ticks": {},
+      "used": {},
+      "have": {},
+      "subs": []
     }
-  },
-  "ticks": {
-    "657356c410becd24bc776f55": true
   },
   "prefs": {
     "streets-of-tarkov": {
@@ -56,8 +77,6 @@
       "extMarked": {}
     }
   },
-  "have": {},
-  "subs": [],
   "draw": {},
   "collapsed": {},
   "pinnedOnly": false,

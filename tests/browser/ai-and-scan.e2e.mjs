@@ -66,7 +66,7 @@ test("AI Categorize: add the key, ask, apply the answer and undo it", async (t) 
     assert.equal(keyRuns.icon, "star");
     const inKeyRuns = await page.$$eval(`#panel .cat[data-cat="${keyRuns.id}"] .task`, (rows) => rows.map((row) => row.dataset.part).sort());
     assert.deepEqual(inKeyRuns, [...keyedParts].sort());
-    const saved = s.savedState();
+    const saved = s.savedList();
     for (const part of keyedParts) assert.deepEqual(saved.tasks[part.split(":")[0]].partCats[part], { cat: keyRuns.id, manual: true });
 
     await s.saving(() => page.click('#panel [data-ai-act="undo"]'));
@@ -74,8 +74,8 @@ test("AI Categorize: add the key, ask, apply the answer and undo it", async (t) 
     assert.match(await page.textContent("#panel .msg .acts2"), /Undone/);
     const undone = s.savedState();
     assert.equal(undone.cats.some((category) => category.name === "Key runs"), false, "the new category is gone");
-    assert.deepEqual(undone.tasks[ballet.id].partCats, {});
-    assert.deepEqual(undone.tasks[audiophile.id].partCats, {});
+    assert.deepEqual(s.savedList().tasks[ballet.id].partCats, {});
+    assert.deepEqual(s.savedList().tasks[audiophile.id].partCats, {});
     assert.equal(await page.locator(`#panel .cat[data-cat="${keyRuns.id}"]`).count(), 0);
   });
 });
@@ -129,7 +129,7 @@ test("Scan: captured screenshots are read, confirming replaces the list and dele
     await s.saving(() => page.click("#rvok"));
     await s.waitForToast("Added 6 tasks · removed 1 · deleted 1 screenshot");
     assert.deepEqual(s.screenshotFiles(), [], "the confirmed screenshot is deleted");
-    const saved = s.savedState();
+    const saved = s.savedList();
     const activeNames = Object.entries(saved.tasks).filter(([, entry]) => entry.active).map(([id]) => taskNameOf(id)).sort();
     assert.deepEqual(activeNames, ["A Fuel Matter", "Anesthesia", "Ballet Lover", "Booze", "Dandies", "Seizing the Initiative", "The Good Times - Part 1"]);
     assert.equal(saved.tasks[glory.id], undefined, "a task not in the scan is forgotten");
@@ -137,6 +137,7 @@ test("Scan: captured screenshots are read, confirming replaces the list and dele
     assert.deepEqual(saved.subs.map((sub) => sub.id), ["sub-dandies"], "and its sub-tasks");
     assert.equal(saved.tasks[shortage.id].active, false, "an inactive task's entry is kept");
     assert.equal(saved.tasks[dandies.id].source, "manual", "a task already on the list keeps its source");
+    assert.deepEqual(s.savedList("pve").tasks, {}, "only the shown game mode's list changes (ticket 22)");
     assert.equal(await page.isHidden("#capbar"), true);
 
     // Cancel at the review: nothing is deleted or changed.

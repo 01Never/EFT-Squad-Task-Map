@@ -2,6 +2,7 @@
 // One objective line, as the open task row and the map popup show it: its tick control (a checkbox,
 // or − n/N + for counts), its text and its tags; and the handlers for those tick controls.
 import { app } from "../../app/state.js";
+import { currentList } from "../../app/current-list.js";
 import { escapeHtml } from "../../app/dom.js";
 import { save } from "../../app/saving.js";
 import { objectiveById } from "../../app/game-data.js";
@@ -20,7 +21,7 @@ import { renderRequirementTags } from "../readiness/panel.js";
  * @param {boolean} [isOnThisMap]
  */
 export function renderObjectiveLine(objective, isOnThisMap = true) {
-  const isDone = isObjectiveDone(objective, app.saved.ticks);
+  const isDone = isObjectiveDone(objective, currentList().ticks);
   const classes = `ob${isDone ? " done" : ""}${isOnThisMap ? "" : " away"}`;
   return `<li class="${classes}">${renderTickControl(objective, isDone)}<span class="od">${escapeHtml(objective.d)}</span>${renderObjectiveTags(objective, isDone)}</li>`;
 }
@@ -29,7 +30,7 @@ export function renderObjectiveLine(objective, isOnThisMap = true) {
 function renderTickControl(objective, isDone) {
   const id = escapeHtml(objective.id);
   if (usesCounter(objective)) {
-    const count = `${tickCount(objective, app.saved.ticks)}/${tickTarget(objective)}`;
+    const count = `${tickCount(objective, currentList().ticks)}/${tickTarget(objective)}`;
     return `<span class="ctr"><button class="ib sm" data-tick="-1" data-obj="${id}" title="Less">−</button><b>${count}</b><button class="ib sm" data-tick="1" data-obj="${id}" title="More">+</button></span>`;
   }
   return `<input type="checkbox" data-tickbox="${id}" ${isDone ? "checked" : ""} title="Done">`;
@@ -48,7 +49,7 @@ function renderObjectiveTags(objective, isDone) {
     objective.time ? ` <span class="tag">🕑 ${objective.time[0]}:00–${objective.time[1]}:00</span>` : "",
     renderPossibleSpotsTag(objective),
     objective.gear && objective.gear.notWearing ? ' <span class="tag">no armor/gear restriction</span>' : "",
-    !isDone && !isObjectivePossible(objective, app.saved.have) ? ' <span class="tag miss">! missing items</span>' : "",
+    !isDone && !isObjectivePossible(objective, currentList().have) ? ' <span class="tag miss">! missing items</span>' : "",
   ];
   return tags.join("");
 }
@@ -86,7 +87,7 @@ export function onTickBoxChanged(objectiveId, isChecked) {
 export function onTickCounterClicked(objectiveId, step) {
   const objective = objectiveById(objectiveId);
   if (!objective) return;
-  setTick(objective, tickCount(objective, app.saved.ticks) + step);
+  setTick(objective, tickCount(objective, currentList().ticks) + step);
   save();
   renderMapPage();
 }

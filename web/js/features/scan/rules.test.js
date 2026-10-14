@@ -2,7 +2,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { gameData } from "../../../../tests/support/game-data.js";
-import { makeTaskNameMatcher, matchScannedRows, shouldScanReplaceList, estimatedThousandTokens } from "./rules.js";
+import { makeTaskNameMatcher, matchScannedRows, shouldScanReplaceList, estimatedThousandTokens, forgetTasksNotSeen } from "./rules.js";
+import { freshState } from "../../app/saved-data.js";
 
 const matcher = makeTaskNameMatcher(gameData.tasks);
 
@@ -37,4 +38,26 @@ test("a scan replaces the list only when every screenshot was read and something
 test("the cost estimate shows one decimal up to six screenshots", () => {
   assert.equal(estimatedThousandTokens(3), "4.5");
   assert.equal(estimatedThousandTokens(7), "11");
+});
+
+test("a scan that replaces the list changes only the shown game mode's list", () => {
+  const saved = freshState();
+  const seen = { id: "t-seen", objs: [{ id: "o-seen" }] };
+  const notSeen = { id: "t-gone", objs: [{ id: "o-gone" }] };
+  const taskById = { [seen.id]: seen, [notSeen.id]: notSeen };
+  for (const mode of ["regular", "pve"]) {
+    saved.modes[mode].tasks = { "t-seen": { active: true }, "t-gone": { active: true } };
+    saved.modes[mode].ticks = { "o-gone": true };
+    saved.modes[mode].subs = [{ id: "s1", task: "t-gone" }];
+  }
+
+  const removed = forgetTasksNotSeen(saved.modes.pve, new Set(["t-seen"]), taskById);
+
+  assert.equal(removed, 1);
+  assert.deepEqual(Object.keys(saved.modes.pve.tasks), ["t-seen"]);
+  assert.deepEqual(saved.modes.pve.ticks, {});
+  assert.deepEqual(saved.modes.pve.subs, []);
+  assert.deepEqual(Object.keys(saved.modes.regular.tasks), ["t-seen", "t-gone"], "PvP is another character");
+  assert.deepEqual(saved.modes.regular.ticks, { "o-gone": true });
+  assert.equal(saved.modes.regular.subs.length, 1);
 });

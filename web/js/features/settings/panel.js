@@ -14,6 +14,7 @@ import { rerenderPage } from "../../app/routing.js";
 import { showExtractsNoticeIfDue } from "../extracts/notice.js";
 import { renderUpdatesSectionBox, bindUpdatesSection } from "../updates/panel.js";
 import { renderSquadSettingsBox, bindSquadSection } from "../squad/settings-section.js";
+import { sendShare } from "../squad/share-sync.js";
 import { DEFAULT_AI_MODEL, REASONING_EFFORTS, gameDataDescription } from "./rules.js";
 
 /** @import { FolderStatus, Status } from "../../app/types.js" */
@@ -181,7 +182,8 @@ async function onSaveClicked(dialog, close) {
     }
     close();
     showToast("Settings saved");
-    rerenderPage();
+    rerenderPage(); // another game mode shows its own task list (ticket 22)
+    sendShare(false); // and the squad gets that list; nothing is sent when nothing changed
   } catch (error) {
     showToast(String(error.message || error));
   }

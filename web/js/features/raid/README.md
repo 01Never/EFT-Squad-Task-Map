@@ -11,7 +11,9 @@ raid's GPS screenshots were deleted.
 and `mode`. The server deletes the raid's GPS screenshots itself.
 
 **The rules** (`rules.js`):
-- After a raid: `have` and `used` empty, no extract marked on any map (`resetAfterRaid()`).
+- After a raid: `have` and `used` of the raid's game mode empty (the event's `mode`; the mode in
+  Settings when an older queued event has none), no extract marked on any map
+  (`resetAfterRaid()`). Other modes' bags stay: each mode is its own character (ticket 22).
 - The mode prompt (`modePromptAfterReport()`): the same mode as Settings clears it; another mode
   is offered unless you said Not now to that mode. The game logs a mode more than once at start-up
   ("Pve" then "PvpSeason"); the last one counts.
@@ -20,11 +22,12 @@ and `mode`. The server deletes the raid's GPS screenshots itself.
 - `log line → gamelog → raid → event "raidEnd" → app/live-events.js onRaidEnded() →
   resetAfterRaid() → save → rerenderPage() → toast raidOverMessage()`.
 - `event "mode" → onGameModeReported() → modePromptAfterReport() → renderNav()`; Switch data →
-  `PUT /api/settings {gameMode}` (the server then sends `data`, which reloads the game data).
+  `PUT /api/settings {gameMode}` → `rerenderPage()` (that mode's own task list shows) and
+  `sendShare()` (the squad gets it); the server then sends `data`, which reloads the game data.
 - `event "raidStart"` → "● In raid", and with Follow my position the raid's map opens
   (`features/find-me switchToMapIfFollowing()`).
 
-**Saved data / settings:** resets `have`, `used`, `prefs[map].extMarked`. Reads and changes
+**Saved data / settings:** resets `modes[mode].have`, `modes[mode].used`, `prefs[map].extMarked`. Reads and changes
 `gameMode`.
 
 **Files:**

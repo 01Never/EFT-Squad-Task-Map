@@ -3,6 +3,7 @@
 // overlapping markers spread around their spot, the selected part's markers bigger and flashing.
 // The "!" and fading come from readiness; the drawing itself is map/markers.js.
 import { app } from "../../app/state.js";
+import { currentList } from "../../app/current-list.js";
 import { createSvgElement } from "../../app/dom.js";
 import { floorBadge } from "../../map/projection.js";
 import { drawMarker } from "../../map/markers.js";
@@ -81,7 +82,7 @@ function spotsOfObjective(task, objective) {
  * @param {Record<string, true | number>} [ticks]
  * @returns {Spot[]}
  */
-export function spotsOfPart(task, part, ticks = app.saved.ticks) {
+export function spotsOfPart(task, part, ticks = currentList().ticks) {
   const spots = [];
   for (const objective of part.objs) {
     if (isObjectiveDone(objective, ticks) || !isObjectiveOnMap(objective, app.mapView.key, task)) continue;
@@ -127,7 +128,7 @@ export function renderTaskMarkers() {
  */
 function partMarkerItems() {
   const mapView = app.mapView;
-  const bag = app.saved.have;
+  const bag = currentList().have;
   const withIcons = showsItemIcons(app.saved);
   const items = [];
   const firstShownRowByTask = new Map();

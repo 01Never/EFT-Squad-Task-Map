@@ -6,6 +6,7 @@ import { app } from "./app/state.js";
 import { findElement, escapeHtml } from "./app/dom.js";
 import { fetchJson } from "./app/api.js";
 import { migrateSavedData, SAVED_DATA_VERSION } from "./app/saved-data.js";
+import { shownGameMode } from "./app/current-list.js";
 import { flush, saveMigratedData, saveUnsavedChangesOnClose } from "./app/saving.js";
 import { indexGameData } from "./app/game-data.js";
 import { showPageForAddress, rerenderPage } from "./app/routing.js";
@@ -46,7 +47,8 @@ async function start() {
     app.trail = status.trail || [];
     app.squad = await loadSquad();
     const isOlderData = savedData && savedData.version !== SAVED_DATA_VERSION;
-    app.saved = migrateSavedData(savedData);
+    // A v2 file's one task list goes to the game mode in Settings (ticket 22).
+    app.saved = migrateSavedData(savedData, shownGameMode());
     indexGameData();
     if (isOlderData) await saveMigratedData();
     findElement("#saved").textContent = savedData ? "Saved ✓" : "";

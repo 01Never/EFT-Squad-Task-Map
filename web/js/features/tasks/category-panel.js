@@ -6,6 +6,7 @@ import { app } from "../../app/state.js";
 import { escapeHtml, findElement, showToast } from "../../app/dom.js";
 import { save } from "../../app/saving.js";
 import { newId } from "../../app/saved-data.js";
+import { currentList } from "../../app/current-list.js";
 import { renderMapPage } from "../../map/map-page.js";
 import { renderPanel } from "../../panel/panel.js";
 import { MARKER_SHAPES, renderShapeSwatch } from "../../map/marker-shapes.js";
@@ -30,7 +31,7 @@ import { isHiddenBySquadFilter } from "../squad/friends.js";
 /** "📌 Pinned only", "Clear pins" (when anything is pinned) and the "⇅ Auto-sort" menu. */
 export function renderListTools() {
   const saved = app.saved;
-  const pinCount = Object.values(saved.tasks).filter((entry) => entry.active && entry.pinned).length;
+  const pinCount = Object.values(currentList().tasks).filter((entry) => entry.active && entry.pinned).length;
   return `<div class="sec tools"><button class="chip" data-act="pinnedonly" aria-pressed="${!!saved.pinnedOnly}">📌 Pinned only${pinCount ? ` <span class="n">${pinCount}</span>` : ""}</button>
       ${pinCount ? '<button class="lnk" data-act="clearpins">Clear pins</button>' : ""}
       ${renderSortMenu()}</div>`;
@@ -124,9 +125,13 @@ function categoryAround(element) {
   return block ? app.saved.cats.find((category) => category.id === block.getAttribute("data-cat")) : undefined;
 }
 
-/** Undo for the sort menu: put the categories and choices back as they were. */
-function undoTo(snapshot) {
-  restoreCategories(app.saved, snapshot);
+/**
+ * Undo for the sort menu: put the categories and choices back as they were.
+ * @param {import("../../app/types.js").TaskList} list the list the snapshot was taken of
+ * @param {string} snapshot
+ */
+function undoTo(list, snapshot) {
+  restoreCategories(app.saved, list, snapshot);
   save();
   renderMapPage();
 }
@@ -134,7 +139,8 @@ function undoTo(snapshot) {
 /** "Auto-sort": re-create deleted built-ins. Parts you haven't moved are already sorted. */
 function onAutoSortClicked(button) {
   button.closest("details").open = false;
-  const snapshot = snapshotCategories(app.saved);
+  const list = currentList();
+  const snapshot = snapshotCategories(app.saved, list);
   const categoryIdsBefore = partsOnMap(app.mapView.key).map((row) => row.cat.id).join();
   const added = recreateMissingDefaults(app.saved);
   const categoryIdsAfter = partsOnMap(app.mapView.key).map((row) => row.cat.id).join();
@@ -145,7 +151,7 @@ function onAutoSortClicked(button) {
     return;
   }
   const message = added ? `Re-created ${added} default categor${added > 1 ? "ies" : "y"}` : "Sorted";
-  showToast(message, { label: "Undo", run: () => undoTo(snapshot) });
+  showToast(message, { label: "Undo", run: () => undoTo(list, snapshot) });
 }
 
 /** "Re-sort everything…": after a confirm, every part goes to its default category (with Undo). */
@@ -154,11 +160,12 @@ function onResortEverythingClicked(button) {
   const question =
     "Put every part back into its default category? This also undoes your manual moves and AI choices (you can undo right after).";
   if (!confirm(question)) return;
-  const snapshot = snapshotCategories(app.saved);
-  resortEverything(app.saved);
+  const list = currentList();
+  const snapshot = snapshotCategories(app.saved, list);
+  resortEverything(app.saved, list);
   save();
   renderMapPage();
-  showToast("Re-sorted everything", { label: "Undo", run: () => undoTo(snapshot) });
+  showToast("Re-sorted everything", { label: "Undo", run: () => undoTo(list, snapshot) });
 }
 
 /** The category's header: show or hide its markers on the map. */

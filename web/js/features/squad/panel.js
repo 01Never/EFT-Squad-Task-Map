@@ -7,6 +7,7 @@
 // URL or an unescaped attribute. The rules are in rules.js; what is drawn on the map is in
 // map-layer.js.
 import { app } from "../../app/state.js";
+import { shownGameMode } from "../../app/current-list.js";
 import { escapeHtml, findElement } from "../../app/dom.js";
 import { save } from "../../app/saving.js";
 import { renderMapPage } from "../../map/map-page.js";
@@ -28,6 +29,7 @@ import {
   friendPrefsOf,
   setFriendPref,
   friendTasksOf,
+  friendTasksButtonTitle,
   friendsOwnTasksOnMap,
   isSharedOnlyFilterOn,
   setSharedOnlyFilter,
@@ -100,8 +102,9 @@ function renderFriendChip(friend) {
   const prefs = friendPrefsOf(app.saved, friend.playerId);
   const id = escapeHtml(friend.playerId);
   const name = escapeHtml(friendDisplayName(friend.name));
-  const isSharingTasks = friendTasksOf(friend) !== null;
-  const tasksTitle = isSharingTasks ? `Show ${name}'s tasks` : `${name} isn't sharing tasks`;
+  const myMode = shownGameMode();
+  const isSharingTasks = friendTasksOf(friend, myMode) !== null;
+  const tasksTitle = escapeHtml(friendTasksButtonTitle(friend, myMode));
   return `<div class="squad-chip${friend.online ? " online" : ""}" data-friend="${id}" style="--friend:${safeFriendColor(friend.color)}">
     <span class="squad-dot"></span>
     <span class="squad-who"><b class="squad-name"><bdi>${name}</bdi></b><span class="squad-state">${escapeHtml(friendStatusText(friend, Date.now()))}</span></span>
@@ -225,7 +228,8 @@ export function renderFriendsTasksSection() {
  * @returns {string} "" when the friend has nothing here
  */
 function renderFriendTasksGroup(friend) {
-  const theirTasks = friendsOwnTasksOnMap(friend, app.saved, app.taskById, app.mapView.key);
+  const myMode = shownGameMode();
+  const theirTasks = friendsOwnTasksOnMap(friend, app.saved, myMode, app.taskById, app.mapView.key);
   if (!theirTasks.length) return "";
   const name = escapeHtml(friendDisplayName(friend.name));
   const rows = theirTasks.map(({ task, percent }) => renderFriendTaskRow(task, percent)).join("");

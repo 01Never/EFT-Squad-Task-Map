@@ -8,7 +8,8 @@ of each you carry. Placing a marker or item (ticking it) takes one off; counts r
 
 **Where the data comes from:** the objectives' `keys`, `marker`, `items` and `gear` in the game
 data (`/api/data`); your bag counts in the saved data (`have`, plus `used`: what each ticked
-objective took).
+objective took), in the shown game mode's list: each mode is its own character with its own bag
+(ticket 22).
 
 **The rules** (`rules.js`):
 - Requirements of an objective (`requirementsOf()`): every key group is needed (any key of a group
@@ -33,9 +34,10 @@ objective took).
 **Flow:** − / + or a typed count → `panel/panel.js` → `onBagStepClicked()` /
 `onBagCountChanged()` → `stepBagCount()` / `setBagCount()` → save → `renderMapPage()` (the "!",
 the fading and the tab number follow). Raid end: event `raidEnd` → `features/raid resetAfterRaid()`
-empties `have` and `used`.
+empties `have` and `used` of the raid's game mode.
 
-**Saved data / settings:** `have`, `used`, `panelTab` ("bring"). No settings.
+**Saved data / settings:** `modes[mode].have`, `modes[mode].used` (the shown mode's list), shared
+`panelTab` ("bring"). Reads the setting `gameMode`.
 
 **Files:**
 - `rules.js`: requirements, possible or not, the bag, the Bring list.

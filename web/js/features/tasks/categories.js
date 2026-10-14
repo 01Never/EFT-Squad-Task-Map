@@ -3,7 +3,7 @@
 // them (new, move, delete, re-sort). Plain functions only: no DOM, no network.
 import { MARKER_SHAPES } from "../../map/marker-shapes.js";
 
-/** @import { SavedState, Category, Task, Part, TaskEntry } from "../../app/types.js" */
+/** @import { SavedState, TaskList, Category, Task, Part, TaskEntry } from "../../app/types.js" */
 
 /**
  * The built-in categories, one per kind of work, plus Unsorted (always last). `builtin` is the
@@ -39,13 +39,14 @@ function chosenCategoryFor(entry, part) {
 /**
  * The category a part is in: the owner's choice, else the built-in for its kind of work, else
  * Unsorted. So "auto-sort" is implicit: only parts you moved are stored.
- * @param {SavedState} saved
+ * @param {SavedState} saved its categories (shared by every game mode)
+ * @param {TaskList} list the game mode's list, with the choices
  * @param {Task} task
  * @param {Part} part
  * @returns {Category}
  */
-export function categoryOfPart(saved, task, part) {
-  const choice = chosenCategoryFor(saved.tasks[task.id], part);
+export function categoryOfPart(saved, list, task, part) {
+  const choice = chosenCategoryFor(list.tasks[task.id], part);
   if (choice && choice.cat) {
     const chosen = saved.cats.find((category) => category.id === choice.cat);
     if (chosen) return chosen;
@@ -56,12 +57,12 @@ export function categoryOfPart(saved, task, part) {
 
 /**
  * Whether you (or AI Categorize) moved this part by hand, so "reset" is offered.
- * @param {SavedState} saved
+ * @param {TaskList} list
  * @param {Task} task
  * @param {Part} part
  */
-export function isMovedByHand(saved, task, part) {
-  return !!chosenCategoryFor(saved.tasks[task.id], part)?.manual;
+export function isMovedByHand(list, task, part) {
+  return !!chosenCategoryFor(list.tasks[task.id], part)?.manual;
 }
 
 /**
@@ -130,14 +131,17 @@ export function resetPartCategory(entry, partKey) {
 }
 
 /**
- * Delete a category: every part you put in it goes back to its default category (or Unsorted).
+ * Delete a category: every part you put in it goes back to its default category (or Unsorted),
+ * in every game mode's list, since the categories are shared by all of them.
  * @param {SavedState} saved
  * @param {Category} category
  */
 export function deleteCategory(saved, category) {
-  for (const entry of Object.values(saved.tasks)) {
-    for (const [partKey, choice] of Object.entries(entry.partCats || {})) {
-      if (choice.cat === category.id) delete entry.partCats[partKey];
+  for (const list of Object.values(saved.modes)) {
+    for (const entry of Object.values(list.tasks)) {
+      for (const [partKey, choice] of Object.entries(entry.partCats || {})) {
+        if (choice.cat === category.id) delete entry.partCats[partKey];
+      }
     }
   }
   saved.cats = saved.cats.filter((candidate) => candidate !== category);
@@ -145,33 +149,36 @@ export function deleteCategory(saved, category) {
 
 /**
  * "Re-sort everything": the built-ins come back and every part goes to its default category,
- * undoing manual moves and AI choices.
+ * undoing manual moves and AI choices. Only in the list shown: other game modes keep theirs.
  * @param {SavedState} saved
+ * @param {TaskList} list
  */
-export function resortEverything(saved) {
+export function resortEverything(saved, list) {
   recreateMissingDefaults(saved);
-  for (const entry of Object.values(saved.tasks)) entry.partCats = {};
+  for (const entry of Object.values(list.tasks)) entry.partCats = {};
 }
 
 /**
- * The categories and every task's choices, as text, so a sort can be undone.
+ * The categories and every task's choices in this list, as text, so a sort can be undone.
  * @param {SavedState} saved
+ * @param {TaskList} list
  * @returns {string}
  */
-export function snapshotCategories(saved) {
-  const choicesByTask = Object.fromEntries(Object.entries(saved.tasks).map(([taskId, entry]) => [taskId, entry.partCats]));
+export function snapshotCategories(saved, list) {
+  const choicesByTask = Object.fromEntries(Object.entries(list.tasks).map(([taskId, entry]) => [taskId, entry.partCats]));
   return JSON.stringify({ cats: saved.cats, pc: choicesByTask });
 }
 
 /**
  * Put back what snapshotCategories() saved (tasks that are gone since are skipped).
  * @param {SavedState} saved
+ * @param {TaskList} list the list the snapshot was taken of
  * @param {string} snapshot
  */
-export function restoreCategories(saved, snapshot) {
+export function restoreCategories(saved, list, snapshot) {
   const restored = JSON.parse(snapshot);
   saved.cats = restored.cats;
   for (const [taskId, partCats] of Object.entries(restored.pc)) {
-    if (saved.tasks[taskId]) saved.tasks[taskId].partCats = /** @type {any} */ (partCats);
+    if (list.tasks[taskId]) list.tasks[taskId].partCats = /** @type {any} */ (partCats);
   }
 }

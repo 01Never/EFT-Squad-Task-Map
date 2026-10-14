@@ -1,9 +1,11 @@
 // @ts-check
 // Your task list as the page reads and changes it: active tasks, their parts on a map, ticks.
-// These use the shared state (app.saved, app.taskById); the rules themselves are in rules.js
-// and categories.js. Nothing here draws or saves: callers call save() and re-render.
+// These use the shared state (the shown game mode's list through currentList(), app.taskById);
+// the rules themselves are in rules.js and categories.js. Nothing here draws or saves: callers
+// call save() and re-render.
 import { app } from "../../app/state.js";
 import { blankTaskEntry } from "../../app/saved-data.js";
+import { currentList } from "../../app/current-list.js";
 import {
   partsOfTask,
   isTaskOnMap,
@@ -11,7 +13,6 @@ import {
   isPartOnMap,
   isPartDone,
   activateTaskEntry,
-  finishTaskEntry,
   savedTickCount,
   clampedTickCount,
   storeTick,
@@ -21,16 +22,18 @@ import { categoryOfPart } from "./categories.js";
 import { updateBagForTick } from "../readiness/rules.js";
 import { isHiddenBySquadFilter } from "../squad/friends.js";
 
-/** @import { Task, Part, Category, Objective, TaskEntry, PartOnMap } from "../../app/types.js" */
+/** @import { Task, Part, Category, Objective, TaskEntry, TaskList, PartOnMap } from "../../app/types.js" */
 
 /**
- * A task's saved entry, created (not on the list) the first time it's needed.
+ * A task's saved entry in the given list (the shown one by default), created (not on the list)
+ * the first time it's needed.
  * @param {string} taskId
+ * @param {TaskList} [list]
  * @returns {TaskEntry}
  */
-export function taskEntry(taskId) {
-  app.saved.tasks[taskId] = app.saved.tasks[taskId] || blankTaskEntry();
-  return app.saved.tasks[taskId];
+export function taskEntry(taskId, list = currentList()) {
+  list.tasks[taskId] = list.tasks[taskId] || blankTaskEntry();
+  return list.tasks[taskId];
 }
 
 /**
@@ -38,8 +41,9 @@ export function taskEntry(taskId) {
  * @returns {Task[]}
  */
 export function activeTasks() {
-  return Object.keys(app.saved.tasks)
-    .filter((taskId) => app.saved.tasks[taskId].active && app.taskById[taskId])
+  const list = currentList();
+  return Object.keys(list.tasks)
+    .filter((taskId) => list.tasks[taskId].active && app.taskById[taskId])
     .map((taskId) => app.taskById[taskId]);
 }
 
@@ -62,7 +66,7 @@ export function activeOffMapTasks() {
  * @returns {Part[]}
  */
 export function partsOf(task) {
-  const entry = app.saved.tasks[task.id];
+  const entry = currentList().tasks[task.id];
   return partsOfTask(task, !!(entry && entry.noSplit));
 }
 
@@ -72,7 +76,7 @@ export function partsOf(task) {
  * @returns {Category}
  */
 export function categoryOf(task, part) {
-  return categoryOfPart(app.saved, task, part);
+  return categoryOfPart(app.saved, currentList(), task, part);
 }
 
 /**
@@ -82,14 +86,14 @@ export function categoryOf(task, part) {
  * @returns {PartOnMap[]}
  */
 export function partsOnMap(mapKey) {
-  const saved = app.saved;
+  const list = currentList();
   const rows = [];
   for (const task of activeTasksOnMap(mapKey)) {
-    const entry = saved.tasks[task.id];
+    const entry = list.tasks[task.id];
     for (const part of partsOf(task)) {
       if (!isPartOnMap(part, mapKey, task)) continue;
       const cat = categoryOf(task, part);
-      rows.push({ task, part, cat, done: isPartDone(part, saved.ticks), pinned: !!(entry && entry.pinned) });
+      rows.push({ task, part, cat, done: isPartDone(part, list.ticks), pinned: !!(entry && entry.pinned) });
     }
   }
   return rows;
@@ -104,22 +108,16 @@ export function isShownOnMap(row) {
 }
 
 /**
- * Put a task on your list (from a scan, the game log, or by hand).
+ * Put a task on a list (from a scan or by hand): the shown game mode's list, unless another is
+ * given (a scan keeps the list it started with). Game-log events: tasks/rules.js.
  * @param {string} taskId
  * @param {string} source "scan", "log" or "manual"
  * @param {Partial<TaskEntry>} [extra] fields to set as well (scan progress…)
+ * @param {TaskList} [list]
  * @returns {boolean} true when it wasn't on the list before
  */
-export function activateTask(taskId, source, extra = {}) {
-  return activateTaskEntry(taskEntry(taskId), source, extra, Date.now());
-}
-
-/**
- * Finished or failed in the game: off the list, ticks cleared, unpinned (see rules.js).
- * @param {string} taskId
- */
-export function finishTask(taskId) {
-  return finishTaskEntry(app.saved, taskId, app.taskById[taskId]);
+export function activateTask(taskId, source, extra = {}, list = currentList()) {
+  return activateTaskEntry(taskEntry(taskId, list), source, extra, Date.now());
 }
 
 /**
@@ -129,9 +127,9 @@ export function finishTask(taskId) {
  * @param {boolean | number} value
  */
 export function setTick(objective, value) {
-  const saved = app.saved;
-  const oldCount = savedTickCount(objective, saved.ticks);
+  const list = currentList();
+  const oldCount = savedTickCount(objective, list.ticks);
   const newCount = clampedTickCount(objective, value);
-  storeTick(saved.ticks, objective, newCount);
-  updateBagForTick(saved, objective, newCount - oldCount);
+  storeTick(list.ticks, objective, newCount);
+  updateBagForTick(list, objective, newCount - oldCount);
 }

@@ -3,6 +3,7 @@
 // are on it, "📷 Scan tasks", the banners, and the tasks that aren't on any map card.
 // The counting rules are in rules.js.
 import { app } from "../../app/state.js";
+import { currentList } from "../../app/current-list.js";
 import { escapeHtml, findElement } from "../../app/dom.js";
 import { save } from "../../app/saving.js";
 import { loadMapArt } from "../../map/map-art.js";
@@ -16,11 +17,10 @@ import { countTasksPerMap, tasksNotOnAMapCard } from "./rules.js";
 /** Show the picker (closing the map if one was open). */
 export function showPicker() {
   closeMap();
-  const saved = app.saved;
   findElement("#crumbs").innerHTML = "Pick a map";
   const tasks = activeTasks();
   const mapKeys = app.mapConfigs.map((config) => config.key);
-  const counts = countTasksPerMap(tasks, mapKeys, partsOf, saved.ticks);
+  const counts = countTasksPerMap(tasks, mapKeys, partsOf, currentList().ticks);
   findElement("#view").innerHTML = `<div class="picker">
     <div class="phd"><div><h1>Maps</h1><p class="lede">${tasks.length} active task${tasks.length === 1 ? "" : "s"}. Pick a map.</p></div><button class="btn" id="pscan">📷 Scan tasks</button></div>
     ${renderScanBanner()}

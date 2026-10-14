@@ -4,9 +4,10 @@ import assert from "node:assert/strict";
 import { freshState, blankTaskEntry } from "../../app/saved-data.js";
 import { chatHistoryForRequest, applyAssignments, undoAssignments } from "./rules.js";
 
-/** A taskEntry() for tests: creates the entry when missing, like the page does. */
+/** A taskEntry() for tests: creates the entry in the PvP list when missing, like the page does. */
 function taskEntryIn(saved) {
-  return (taskId) => (saved.tasks[taskId] = saved.tasks[taskId] || blankTaskEntry(0));
+  const list = saved.modes.regular;
+  return (taskId) => (list.tasks[taskId] = list.tasks[taskId] || blankTaskEntry(0));
 }
 
 const answer = {
@@ -39,7 +40,7 @@ test("applying creates the new category before Unsorted and moves the part into 
   const unsortedIndex = saved.cats.findIndex((category) => category.builtin === "unsorted");
   assert.equal(saved.cats[unsortedIndex - 1].name, "Key runs");
   assert.equal(saved.cats[unsortedIndex - 1].color, "#ff0000");
-  assert.deepEqual(saved.tasks.t1.partCats["t1:go"], { cat: "c-new", manual: true });
+  assert.deepEqual(saved.modes.regular.tasks.t1.partCats["t1:go"], { cat: "c-new", manual: true });
   assert.deepEqual(undo, { parts: { "t1:go": null }, cats: ["c-new"] });
 });
 
@@ -47,7 +48,7 @@ test("a category name that already exists, in any case, is reused", () => {
   const saved = freshState();
   const keyRuns = { ...answer, new_categories: [], assignments: [{ ...answer.assignments[0], category: "mark" }] };
   const undo = applyAssignments(saved, keyRuns, keyRuns.assignments, taskEntryIn(saved), () => "c-new");
-  assert.equal(saved.tasks.t1.partCats["t1:go"].cat, "b-mark");
+  assert.equal(saved.modes.regular.tasks.t1.partCats["t1:go"].cat, "b-mark");
   assert.deepEqual(undo.cats, []);
 });
 
@@ -56,7 +57,7 @@ test("undo puts the parts back and removes the categories it made, unless someth
   const categoryCountBefore = saved.cats.length;
   const undo = applyAssignments(saved, answer, answer.assignments, taskEntryIn(saved), () => "c-new");
   undoAssignments(saved, undo, taskEntryIn(saved));
-  assert.deepEqual(saved.tasks.t1.partCats, {});
+  assert.deepEqual(saved.modes.regular.tasks.t1.partCats, {});
   assert.equal(saved.cats.length, categoryCountBefore);
 
   const savedAgain = freshState();
@@ -64,4 +65,12 @@ test("undo puts the parts back and removes the categories it made, unless someth
   taskEntryIn(savedAgain)("t2").partCats["t2:*"] = { cat: "c-new", manual: true }; // moved there by hand since
   undoAssignments(savedAgain, undoAgain, taskEntryIn(savedAgain));
   assert.ok(savedAgain.cats.some((category) => category.id === "c-new"));
+});
+
+test("undo keeps a category it made when a part of another game mode's list is in it now", () => {
+  const saved = freshState();
+  const undo = applyAssignments(saved, answer, answer.assignments, taskEntryIn(saved), () => "c-new");
+  saved.modes.pve.tasks.t2 = { ...blankTaskEntry(0), partCats: { "t2:*": { cat: "c-new", manual: true } } };
+  undoAssignments(saved, undo, taskEntryIn(saved));
+  assert.ok(saved.cats.some((category) => category.id === "c-new"));
 });
