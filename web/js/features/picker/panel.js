@@ -1,9 +1,11 @@
 // @ts-check
-// The map picker (the start page): a card per map with a small picture and how many of your tasks
+// The map picker (a game mode's second page): a card per map with a small picture and how many of your tasks
 // are on it, "📷 Scan tasks", the banners, and the tasks that aren't on any map card.
 // The counting rules are in rules.js.
 import { app } from "../../app/state.js";
-import { currentList } from "../../app/current-list.js";
+import { showCrumbs } from "../../app/crumbs.js";
+import { currentList, shownGameMode } from "../../app/current-list.js";
+import { mapAddress } from "../../app/addresses.js";
 import { escapeHtml, findElement } from "../../app/dom.js";
 import { save } from "../../app/saving.js";
 import { loadMapArt } from "../../map/map-art.js";
@@ -17,7 +19,7 @@ import { countTasksPerMap, tasksNotOnAMapCard } from "./rules.js";
 /** Show the picker (closing the map if one was open). */
 export function showPicker() {
   closeMap();
-  findElement("#crumbs").innerHTML = "Pick a map";
+  showCrumbs({ page: "picker", mode: shownGameMode() });
   const tasks = activeTasks();
   const mapKeys = app.mapConfigs.map((config) => config.key);
   const counts = countTasksPerMap(tasks, mapKeys, partsOf, currentList().ticks);
@@ -55,7 +57,7 @@ function renderNoTasksBanner(taskCount) {
  */
 function renderMapCard(config, taskCount) {
   const countText = taskCount ? taskCount + " task" + (taskCount > 1 ? "s" : "") : "no tasks";
-  return `<a class="card" href="#/map/${config.key}"><div class="thumb" data-svg="${escapeHtml(config.svg)}"></div><div class="meta"><b>${escapeHtml(config.name)}</b><span class="${taskCount ? "has" : ""}">${countText}</span></div></a>`;
+  return `<a class="card" href="${mapAddress(shownGameMode(), config.key)}"><div class="thumb" data-svg="${escapeHtml(config.svg)}"></div><div class="meta"><b>${escapeHtml(config.name)}</b><span class="${taskCount ? "has" : ""}">${countText}</span></div></a>`;
 }
 
 /**

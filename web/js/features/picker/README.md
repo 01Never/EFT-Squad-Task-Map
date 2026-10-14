@@ -1,6 +1,6 @@
 # Map picker
 
-**What it does (player's view):** the start page: a card per map with a small picture and how many
+**What it does (player's view):** a game mode's second page (after the mode select page): a card per map with a small picture and how many
 of your tasks have work left there, 📷 Scan tasks, a banner after moving from v1 (or when your
 list is empty), and a folded list of your tasks that aren't on any map card.
 
@@ -13,7 +13,9 @@ list is empty), and a folded list of your tasks that aren't on any map card.
   name), and tasks only on maps this app has no art for (Labs). Their found-in-raid
   items still appear in every map's Bring list.
 
-**Flow:** the address `#/` (or an unknown map) → `app/routing.js` → `showPicker()`. Each card's
+**Flow:** the address `#/<mode>/maps` (or `#/<mode>/map/<unknown>`) → `app/routing.js` → `showPicker()`
+(after switching Settings to that mode when needed). The cards link to `#/<mode>/map/<key>`; the
+crumbs read `PvE / Maps`. Counts, banners and 📷 Scan tasks use the shown mode's list. Each card's
 picture loads the map art once (`map/map-art.js`) and keeps only its base layer.
 
 **Saved data / settings:** clears `showScanBanner` (Dismiss). No settings.

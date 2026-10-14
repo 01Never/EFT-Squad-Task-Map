@@ -38,6 +38,7 @@ input[type=checkbox]::before{content:"";width:10px;height:10px;transform:scale(0
 .brand span{color:var(--gold-one)}
 .crumbs{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
 .crumbs a{color:var(--gold-one)} .crumbs b{color:var(--gold-one);font-weight:700}
+.crumbback{display:none;color:var(--gold-one);white-space:nowrap}
 .navr{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--muted);white-space:nowrap}
 .saved{min-width:70px;text-align:right} .saved.err{color:#ff7a85}
 #navinfo{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
@@ -86,5 +87,7 @@ main{height:calc(100% - 56px)}
 @media (max-width:600px){
   .nav{gap:10px;padding:0 12px} .brand{font-size:16px;letter-spacing:1px}
   .crumbs,.navr .saved,.lbl,.hm{display:none}
+  /* the trail hides on a phone; one "‹ previous step" link takes its place */
+  .crumbback:not([hidden]){display:inline;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
   .navr{gap:8px;font-size:13px;margin-left:auto}
 }

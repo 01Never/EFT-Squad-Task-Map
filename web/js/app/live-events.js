@@ -9,6 +9,7 @@ import { callApi } from "./api.js";
 import { save } from "./saving.js";
 import { reloadGameData } from "./game-data.js";
 import { rerenderPage } from "./routing.js";
+import { showModeSelect } from "../features/mode-select/panel.js";
 import { EVENT_NAMES } from "./event-names.js";
 import { shownGameMode } from "./current-list.js";
 import { GAME_MODE_NAMES, knownGameMode } from "./game-modes.js";
@@ -194,6 +195,7 @@ function onGameModeReported(event) {
   });
   app.modePrompt = prompt;
   if (hasChanged) renderNav();
+  if (document.querySelector(".modes")) showModeSelect(); // "Game is in this mode" on its card
 }
 
 /**

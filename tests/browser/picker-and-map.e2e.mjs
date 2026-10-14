@@ -20,7 +20,7 @@ test("the map picker shows how many active tasks each map has", async (t) => {
     await s.openPicker();
     const config = await s.api("/api/config");
     const cards = await pickerCards(s.page);
-    assert.deepEqual(cards.map((card) => card.href), config.map((map) => "#/map/" + map.key), "one card per map, in the config's order");
+    assert.deepEqual(cards.map((card) => card.href), config.map((map) => "#/regular/map/" + map.key), "one card per map, in the config's order");
     assert.deepEqual(cards.map((card) => card.name), config.map((map) => map.name));
     const taskCount = (await s.api("/api/data")).tasks.length;
     const lede = await s.page.textContent(".picker .lede");
@@ -36,7 +36,7 @@ test("a task on one map counts on that map only", async (t) => {
     await s.openPicker();
     const cards = await pickerCards(s.page);
     for (const card of cards) {
-      assert.equal(card.count, card.href === "#/map/streets-of-tarkov" ? "1 task" : "no tasks", card.name);
+      assert.equal(card.count, card.href === "#/regular/map/streets-of-tarkov" ? "1 task" : "no tasks", card.name);
     }
     assert.equal(await s.page.textContent(".picker .lede"), "1 active task. Pick a map.");
     assert.equal(await s.page.locator(".picker .card .meta span.has").count(), 1, "only the Streets count is highlighted");

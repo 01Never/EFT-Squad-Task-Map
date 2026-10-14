@@ -90,6 +90,7 @@ pixel by pixel (prints the % of differing pixels and writes a diff image to `<af
 
 | File | Tests |
 |---|---|
+| `mode-select.e2e.mjs` | ticket 23: the start page is the mode select page (cards PvE, PvP, PvP Season with kind, active-task count, "Last used"); PvE → `#/pve/maps` → Customs with crumbs `PvE / Maps / Customs`, the `Maps` and `PvE` crumb links lead back; picking PvP Season saves the mode and shows its (empty) list, and the browser Back button walks the steps and switches back; the old `#/map/customs` opens the map in the Settings mode; an unknown mode goes to `#/`, an unknown map to the picker; Switch data stays on the same page; at phone width `#crumbback` ("‹ PvP", "‹ Maps") replaces the trail. Uses `.modes .mode[data-mode]` (`.mname`, `.mkind`, `.mcount`, `.note`), `#crumbs`, `#crumbback`. |
 | `picker-and-map.e2e.mjs` | picker counts per map (every task active; recorded); one Streets task counts on Streets only; Streets markers, zones, extracts and category counts (recorded); the Scav extract chip. |
 | `task-list.e2e.mjs` | add a task by name; tick a marker objective → "have" goes down, untick gives it back (and only what that tick took); pins and Pinned only (list, markers, Bring list); mark / unmark / clear extracts; Move to, Re-sort everything + Undo, Don't split; selection highlight, flash, marker click, Esc, empty-map click; Hide / ◂ Tasks keeping the view; Settings save; phone width layout and Find me. |
 | `ai-and-scan.e2e.mjs` | AI key (wrong, then right), categorize, apply, undo (mock); Scan without a key asks for one; Scan capture → review → confirm replaces the list and deletes the screenshot; cancel at review and while capturing keep the screenshots. |
@@ -125,7 +126,9 @@ Files in the data folder: `squad-task-map-data.json`, `squad-task-map-settings.j
 `.modal h4`, `.modal .mnote`, `#capbar` (`hidden`), `#capdone` (`disabled`), `#capcancel`,
 `#capbar .th img`.
 
-**Picker:** `.picker h1` ("Maps"), `.picker .lede`, `.picker .card` (`href="#/map/<key>"`,
+**Mode select:** `.modes .mode` (`data-mode`, `href="#/<mode>/maps"`), `#crumbs`, `#crumbback`.
+
+**Picker:** `.picker h1` ("Maps"), `.picker .lede`, `.picker .card` (`href="#/<mode>/map/<key>"`,
 `.meta b`, `.meta span`, `.meta span.has`, `.thumb svg`), `.picker details.offmap summary`, `#pscan`.
 
 **Map:** `svg.map` (its `viewBox` is the pan/zoom; the map art's own groups have class `.lyr`),

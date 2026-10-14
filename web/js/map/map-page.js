@@ -4,6 +4,9 @@
 // pin). What each layer draws belongs to its feature; the layer order is in layers.js.
 import { app } from "../app/state.js";
 import { escapeHtml, findElement } from "../app/dom.js";
+import { showCrumbs } from "../app/crumbs.js";
+import { mapKeyOfAddress } from "../app/addresses.js";
+import { shownGameMode } from "../app/current-list.js";
 import { loadMapArt } from "./map-art.js";
 import { makeProj } from "./projection.js";
 import { createMapLayers } from "./layers.js";
@@ -35,10 +38,10 @@ const PLACE_PIN_HINT = "Click the map to place the sub-task marker · Esc to can
 export async function openMap(mapKey) {
   closeMap();
   const config = app.mapConfigs.find((candidate) => candidate.key === mapKey);
-  findElement("#crumbs").innerHTML = `<a href="#/">Maps</a> / <b>${escapeHtml(config.name)}</b>`;
+  showCrumbs({ page: "map", mode: shownGameMode(), mapKey }, config.name);
   findElement("#view").innerHTML = renderMapPageFrame();
   const artText = await loadMapArt(config.svg);
-  if (location.hash !== "#/map/" + mapKey) return; // you went elsewhere while it loaded
+  if (mapKeyOfAddress(location.hash) !== mapKey) return; // you went elsewhere while it loaded
   const svg = mapArtElement(artText, config);
   findElement("#stage").prepend(svg);
   const artBox = svg.viewBox.baseVal;
