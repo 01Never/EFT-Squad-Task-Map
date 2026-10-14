@@ -22,8 +22,12 @@ the OpenAI Responses API (vision, with your key), and the task data (for matchin
 *Capture (server):*
 - **Start** fails when the screenshots folder isn't being watched; the error is the folder's
   status message and the page opens Settings.
-- While capture is on, a new screenshot joins the list if it has no position in its name (those
-  go to GPS) and the game wrote it no earlier than `captureClockSlack` = 2 s before Scan tasks was
+- While capture is on, **every** new screenshot joins the list, with or without a position in its
+  name (ticket 21; `routeScreenshot` in `internal/app/screenshot_routing.go`). So Scan tasks also
+  works inside a raid, where the game puts a position in every name. A captured shot that has a
+  position also moves your marker, but it is not a raid GPS shot: raid end never deletes it, it
+  never counts for "back in the menus", and only Confirm deletes it. It must have been written no
+  earlier than `captureClockSlack` = 2 s before Scan tasks was
   clicked (slack between the file's time and the PC clock).
 - The list is oldest first, by the file's time; files written in the same millisecond (the game
   writes one at a time, so only in tests) are ordered by name, which follows Tarkov's " (0)", " (1)"
@@ -73,7 +77,8 @@ the OpenAI Responses API (vision, with your key), and the task data (for matchin
 **Flow:**
 ```
 Scan tasks → POST /api/scan/start → Scan.Start → Broadcast "capture" {files: []}
-screenshot → screenshots watcher → app.onScreenshot → (no position) Scan.OnScreenshot
+screenshot → screenshots watcher → app.onScreenshot → routeScreenshot → Scan.OnScreenshot
+  (position in the name and capture on: also gps.Tracker.Update + "gps", no raid.NoteGPSShot)
   → Broadcast "capture" {files} → live.js → scan.js onCapture → thumbnails (GET /api/scan/image)
 Done → POST /api/scan/stop → page reads 3 at a time: POST /api/scan/read
   → app.ReadScanImage → Scan.Read → OpenAI → {rows}

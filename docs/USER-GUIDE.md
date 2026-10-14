@@ -26,7 +26,7 @@ A banner suggests running **Scan tasks** once, so the list matches exactly what 
 ## Where your tasks come from
 1. **Scan tasks** (button on the map picker and in the panel). Needs an OpenAI key (see below).
    1. Click **📷 Scan tasks**. The app starts watching your screenshots folder.
-   2. In Tarkov, open **Tasks** and press your screenshot key on each page, scrolling between shots. STORY, SIDE and OPERATIONAL all work.
+   2. In Tarkov, open **Tasks** and press your screenshot key on each page, scrolling between shots. STORY, SIDE and OPERATIONAL all work. This also works while you're in a raid: shots taken while Scan tasks is capturing go to the scan, are never treated as raid screenshots, and aren't deleted when the raid ends (only **Update list & delete screenshots** deletes them).
    3. Back in the app, the captured shots show as thumbnails (× drops one). Click **Done**.
    4. The model reads the task names; the app matches them to the game data and shows a review: new tasks (with how many land on each map), hand-in-only tasks, tasks already on your list, and names it couldn't match (type the right name, or leave blank to skip).
    5. **Update list & delete screenshots** makes your list match the scan: new tasks are added, and any task on your list that isn't in the screenshots is removed completely (its categories, pin, ticks and sub-tasks go too). Then it deletes those screenshot files. **Capture every page**, or tasks on a missed page are dropped. If a screenshot couldn't be read, or no task names were recognised, nothing is removed and the button says **Add tasks** instead. **Cancel** changes nothing and deletes nothing.

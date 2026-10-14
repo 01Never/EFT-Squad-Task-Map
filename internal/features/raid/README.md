@@ -58,7 +58,8 @@ screenshot that appears while the app runs (`NoteGPSShot`).
 "Network game matching cancelled" → (matchingAborted) → raid.MatchingAborted (no event)
 "GameStarted" → (raidStart) → raid.Start → gps trail cleared → Broadcast "raidStart" {map}
   → live.js: trail cleared, "● In raid: <map>", switches to that map if Follow my position is on
-GPS screenshot → screenshots watcher → app.onScreenshot → raid.NoteGPSShot + raid.CurrentMap
+GPS screenshot (position in the name, and no Scan tasks capture running; a captured shot is the
+  scan's and is never noted) → screenshots watcher → app.onScreenshot → raid.NoteGPSShot + raid.CurrentMap
   → gps.Tracker.Update → Broadcast "gps"
 profile line / "UserMatchOver" → (profileSelected / raidLeft) → raid.ShouldEndOnMenuReturn
   → app.endRaid → raid.End(gps.IsGPSFileName, screenshots.DeleteFile)
