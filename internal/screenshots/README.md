@@ -33,8 +33,10 @@ scan) and deletes one when a feature asks.
   once a minute instead. Each settling file has a timer; `Stop` cancels them.
 
 **Flow:** `the game writes a .png → fsnotify event → scheduleSettle (400 ms) → settle (size
-unchanged after another 400 ms) → onSettled(File) → app.onScreenshot → gps.ParseFileName → GPS
-(raid + gps) or taskscan.OnScreenshot`.
+unchanged after another 400 ms) → onSettled(File) → app.onScreenshot → gps.ParseFileName → routeScreenshot` (`internal/app/screenshot_routing.go`): GPS
+(raid + gps) for a position-named shot, `taskscan.OnScreenshot` for everything else, and for every
+shot while Scan tasks is capturing (a position-named one then also moves the marker, but is not a
+raid GPS shot).
 
 **Settings:** `screenshotsPath` (empty = found by `gamefolders`); changing it restarts the watch.
 `STM_SCREENSHOTS_DIR` overrides the detected folder (tests).
