@@ -16,12 +16,30 @@ Get the latest `SquadTaskMap.exe` from **[Releases](https://github.com/01Never/E
 
 Windows SmartScreen may say "Windows protected your PC" the first time, because the program isn't code-signed. Click **More info → Run anyway**.
 
+## The pages
+
+Three steps, like the game's own menus: pick a game mode, then a map, then work on the map. The links in the top bar (`PvP Season / Maps / Customs`) take you back a step at any time.
+
+**1. Game mode** (the home page). In Tarkov, PvE, PvP and PvP Season are separate characters, so each has its own task list. Each card shows how many tasks that mode has, which one you used last, and which mode the game is in right now.
+
+![The game mode page: PvE, PvP and PvP Season cards with their task counts](docs/images/game-mode.png)
+
+**2. Maps.** Every map, with how many of that mode's tasks are on it. **Scan tasks** is here too.
+
+![The map picker for PvP Season: every map with how many of your tasks are on it](docs/images/map-picker.png)
+
+**3. A map.** Your task markers, extracts and place names on the left; your tasks, the Bring list and the map's settings in the panel on the right.
+
+![Customs in PvP Season: task markers on the map and the task panel](docs/images/map-customs.png)
+
+On a phone the map sits above the list, and a single "‹ Maps" link replaces the trail at the top.
+
+<img src="docs/images/phone-map.png" alt="Customs on a phone: the map above the task list, with a ‹ Maps link" width="300">
+
 ## What it does
 
 ### Your tasks, per map
-The app opens on a game mode page (PvE, PvP, PvP Season); each mode keeps its own task list. Pick a mode, then a map, and see a marker for every objective of the tasks you have, grouped into categories (boss hunts, kills, placing, retrieving…) that you can rename, recolour and reorder. Tasks you accept or finish in-game are added or removed within seconds, from the game's log files. Where you have to place something, the marker shows the item's icon.
-
-![The map picker: every map with how many of your tasks are on it](docs/images/map-picker.png)
+Each game mode keeps its own task list. On a map, see a marker for every objective of the tasks you have, grouped into categories (boss hunts, kills, placing, retrieving…) that you can rename, recolour and reorder. Tasks you accept or finish in-game are added or removed within seconds, from the game's log files, in the list of the mode you're playing. Where you have to place something, the marker shows the item's icon.
 
 Click a marker or a row to select a task: its spots flash on the map, and the popup and the list show every objective with ticks and counters, the wiki link, sub-tasks and pins.
 
@@ -48,7 +66,7 @@ Join friends with an invite code: a private Tailscale network is built into the 
 ![A friend's drawing in their colour, and "Also: Alice" on a shared task](docs/images/squad.png)
 
 ### And more
-- **Scan your task list:** screenshot the in-game Tasks screen and an OpenAI vision model reads it, so your list matches the game exactly (optional, your own API key).
+- **Scan your task list:** screenshot the in-game Tasks screen, in the menus or in a raid, and an OpenAI vision model reads it, so your list matches the game exactly (optional, your own API key).
 - **AI Categorize:** sort tasks by plain-English instructions, checked against each task's wiki page (optional).
 - **Draw** on the map, **pin** tasks, add **sub-tasks**, and switch between game modes (PvP, PvE, PvP Season), each with its own task list.
 - **Check for updates** in Settings: signed releases from this repo, installed with one click.
