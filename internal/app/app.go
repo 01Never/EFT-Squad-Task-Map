@@ -76,6 +76,7 @@ func newApp(version, updatedFrom string, files storage.Files, builtInGameData fu
 	app := &App{version: version, files: files, raid: &raid.Tracker{}, position: &gps.Tracker{}, exitRequested: make(chan struct{})}
 
 	storage.BackupV1IfNeeded(files)
+	storage.BackupV2IfNeeded(files)
 	app.settings = storage.ReadSettings(files.Settings)
 	app.hub = events.NewHub(files.Pending)
 	app.ai = openai.NewClient(userAgent)
@@ -143,26 +144,36 @@ func (app *App) onLogEvent(event gamelog.Event) {
 }
 
 // onTaskChanged: a task started, finished or failed in the game. It reaches the page (and stays
-// queued until the page has it) when it's in the chosen game mode and in the task data; daily and
-// weekly tasks aren't.
+// queued until the page has it) when it's in the task data; daily and weekly tasks aren't. It
+// carries the game mode it happened in, so the page updates that mode's task list.
 func (app *App) onTaskChanged(event gamelog.Event) {
-	if !raid.ModeMatches(app.raid.SessionMode(), app.currentSettings().GameModeOrDefault()) {
-		return
-	}
 	if !app.gameData.TaskExists(event.TaskID) {
 		return
 	}
-	app.hub.Deliver(events.New(events.Task, map[string]any{"taskId": event.TaskID, "status": event.Status}))
+	payload := map[string]any{
+		"taskId": event.TaskID,
+		"status": event.Status,
+		"mode":   app.currentEventMode(),
+	}
+	app.hub.Deliver(events.New(events.Task, payload))
+}
+
+// currentEventMode is the game mode a task event or raid end belongs to: the game's session mode,
+// else the mode chosen in Settings (raid.TaskEventMode).
+func (app *App) currentEventMode() string {
+	return raid.TaskEventMode(app.raid.SessionMode(), app.currentSettings().GameModeOrDefault())
 }
 
 // endRaid: back in the menus after a raid. Delete that raid's GPS screenshots, forget the position,
-// and tell the page (queued, so it resets bag counts and extract marks even if it was closed).
+// and tell the page (queued, so it resets bag counts and extract marks even if it was closed). The
+// event carries the game mode, so only that mode's bag counts are reset.
 func (app *App) endRaid() {
 	app.raidAndPosition.Lock()
 	defer app.raidAndPosition.Unlock()
 	app.extracts.RaidEnded() // before the raidEnd below, so a late answer can't mark the next raid's map
 	mapKey, deleted := app.raid.End(gps.IsGPSFileName, app.screenshots.DeleteFile)
-	app.hub.Deliver(events.New(events.RaidEnd, map[string]any{"map": mapKey, "deleted": deleted}))
+	payload := map[string]any{"map": mapKey, "deleted": deleted, "mode": app.currentEventMode()}
+	app.hub.Deliver(events.New(events.RaidEnd, payload))
 	app.position.Clear()
 }
 

@@ -197,13 +197,13 @@ Friends' copies ◄─(tailnet :7777, peer API; only when joined)─► features
 | `internal/app` | Creates every part and wires them (`app.go`: log event → raid/gps/events; screenshot → gps or scan, decided by `routeScreenshot`), the backend behind every route (`backend.go`), start-up (`run.go`: data folder, single copy, port 7777→7800, the allowed hosts for that port, banner, browser), the squad's wiring (`squad.go`: tsnet or dev transport, its settings block, the `squad` event, resume at launch only when joined). |
 | `internal/httpapi` | `Guard` (Host/Origin checks) and `jsonBody` (415) in `guard.go`, route table and thin handlers (`routes.go`), static files with explicit content types and an ETag = version (`static.go`), the `Backend` interface listing everything the page can ask for. |
 | `internal/events` | Event names (`names.go`, spelled identically in `web/js/app/event-names.js`; `names_test.go` fails if the lists differ) and the SSE hub: `Deliver` (queued in `squad-task-map-pending.json` until acked) and `Broadcast` (live only). |
-| `internal/storage` | Files next to the exe: settings (unknown fields kept, `tt*` dropped), the page's saved data as opaque text (atomic write + `.bak`), v1 backup. |
+| `internal/storage` | Files next to the exe: settings (unknown fields kept, `tt*` dropped), the page's saved data as opaque text (atomic write + `.bak`), one-time v1 and v2 backups. |
 | `internal/gamedata` | Saved copy or built-in snapshot; refresh when over 24 h old (checked hourly); validation (≥ max(200, 50% of previous) tasks, ≥ 5 maps); `convert.go`/`snapshot.go` = 1:1 port of v2's converter, JSON-equal to the v2 goldens. |
 | `internal/gamefolders` | Logs folder via the launcher's registry entry or Steam libraries; Documents via `FOLDERID_Documents` (OneDrive-safe). |
 | `internal/screenshots` | Watches the screenshots folder (fsnotify); a file is handed on once quiet for 400 ms with a stable size; the only file deletion, limited to plain names in the folder. |
 | `internal/openai` | Responses API client, error hints, key/model shape checks. |
 | `internal/features/gamelog` | `rules.go` parser (entries → events, screenshot-key check) and `watcher.go` (5 s size check, new bytes only, newest session folder, no catch-up). |
-| `internal/features/raid` | Raid state (loading map, start, end, session mode) and that raid's GPS shots; `rules.go`: `ModeMatches`, `EndsOnMenuReturn`. |
+| `internal/features/raid` | Raid state (loading map, start, end, session mode) and that raid's GPS shots; `rules.go`: `TaskEventMode`, `EndsOnMenuReturn`. |
 | `internal/features/gps` | Position from screenshot names (`rules.go`), last position + trail (`tracker.go`). |
 | `internal/features/taskscan` | Capture mode, serving captured images, the vision read, confirm/cancel. |
 | `internal/features/aicategorize` | AI Categorize (prompt, tool loop, review of the answer), wiki fetch/clean/cache (7 days), jobs. |
@@ -258,7 +258,7 @@ and `npm run typecheck`. Each feature folder has a README.
 - **Log:** `type` 10 = started → add; 11/12 = failed/finished → `finish()` quietly (inactive, ticks cleared, unpinned; categories and sub-tasks kept).
 - **Add by name**, and **Remove task** by hand.
 
-Log task events count only when the log's `Session mode` matches the game-mode setting (`modeMatches()`).
+Log task events carry the game mode they belong to (issue #22: one task list per mode): the log's latest `Session mode`, or the game-mode setting while that is unknown (`raid.TaskEventMode()`). None is dropped for its mode any more.
 
 **Parts** (`partsOf`):
 - Each objective gets an action: `boss`, `pmc`, `scav`, `mark`, `plant`, `retrieve`, `go`, or `offmap`.
@@ -298,7 +298,7 @@ Log task events count only when the log's `Session mode` matches the game-mode s
 - Map: `scene preset path:maps/<x>.bundle` or `TRACE-NetworkGameCreate … Location: <nameId>`.
 - Start: `application|GameStarted`.
 - End: a `SelectProfile`/`SelectedProfile`/`PrepareSelectedProfileLocally ProfileId:` line, or `Got notification | UserMatchOver`. This only ends a raid if one was active or GPS shots exist.
-- At raid end the server deletes that raid's GPS shots and `deliver`s `raidEnd`. The page then resets `have`, `used`, extract marks and the trail.
+- At raid end the server deletes that raid's GPS shots and `deliver`s `raidEnd` `{map, deleted, mode}`. The page then resets `have`, `used` (that mode's), extract marks and the trail.
 
 **Scan:**
 1. `Scan tasks` → capture mode.
@@ -324,7 +324,7 @@ See SPEC §12. Fields: `cats`, `tasks{id: {active, source, addedAt, gamePct, sca
 - **Adding a field:** add its default to `freshState()`. `fill()` adds missing defaults when loading. Only bump `version` and add a `migrate` step for structural changes; keep the v1 → v2 path working (fixture: `tests/fixtures/v1-data.json`, the owner's real v1 file).
 
 ### 6.3 Files next to the exe
-`squad-task-map-data.json` (+ `.bak`), `squad-task-map-settings.json` (OpenAI key/model/effort, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`, ticket 06: `readExtracts`, `extractsNoticeSeen`), `squad-task-map-gamedata-<mode>.json`, `squad-task-map-pending.json`, `squad-task-map-wikicache.json`, `squad-task-map-data.v1-backup.json`, `squad-task-map-instance.json` (port of the running copy), `squad-task-map-data.before-<version>.json` (newest 3, made before an update), `squad-task-map-update-notice.json` (release notes for the copy an update starts), `squad-task-map-squad.json` (ticket 05: my last squad share, friends' last shares with `lastSeen`), `squad-task-map-tailscale/` (ticket 05: tsnet's state folder with the node key, secret; deleted by Leave squad); the settings file's `squad` block holds `playerId`, `name`, `color`, `shareTasks`, `joined` (never the invite code); next to the exe, `SquadTaskMap.download.exe` and `SquadTaskMap.previous.exe` during/after an update.
+`squad-task-map-data.json` (+ `.bak`), `squad-task-map-settings.json` (OpenAI key/model/effort, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`, ticket 06: `readExtracts`, `extractsNoticeSeen`), `squad-task-map-gamedata-<mode>.json`, `squad-task-map-pending.json`, `squad-task-map-wikicache.json`, `squad-task-map-data.v1-backup.json`, `squad-task-map-data.v2-backup.json` (issue #22: untouched v2 file before the page's v3 migration), `squad-task-map-instance.json` (port of the running copy), `squad-task-map-data.before-<version>.json` (newest 3, made before an update), `squad-task-map-update-notice.json` (release notes for the copy an update starts), `squad-task-map-squad.json` (ticket 05: my last squad share, friends' last shares with `lastSeen`), `squad-task-map-tailscale/` (ticket 05: tsnet's state folder with the node key, secret; deleted by Leave squad); the settings file's `squad` block holds `playerId`, `name`, `color`, `shareTasks`, `joined` (never the invite code); next to the exe, `SquadTaskMap.download.exe` and `SquadTaskMap.previous.exe` during/after an update.
 
 ---
 
@@ -437,7 +437,7 @@ Verified on the owner's PC since 2.3.0: folder detection (registry → `E:\Games
 ## 11. Known gaps and quirks (not bugs the owner has reported; ask before changing behavior)
 
 - **"Switch data" reloads the game data twice, by design (ticket 04e, decided 2026-10-07):** when there is no fresh saved copy for the new mode, the server sends two `data` events: `SetMode` (built-in snapshot, `fetchedAt` null, so the new mode shows at once) and then the finished download (`internal/gamedata/store.go`). The page reloads for each. Both carry a real change; waiting for the download instead would show the old mode's tasks under the new mode's name for the length of the download. With a fresh saved copy it's one reload.
-- **Phantom tasks (reported by squadmates, not diagnosed):** tasks show that the player doesn't have. Suspects, from reading the code: (1) the v1 → v2 migration activates the whole v1 manual list, including tasks finished since; (2) `raid.ModeMatches()` accepts every log task event while the session mode is unknown, which is the case whenever the app starts after the game; (3) several open tabs each save the whole state, so a stale tab can restore a removed task; (4) a scan of a trader's available-tasks page, or a fuzzy match to the wrong name. The owner chose not to diagnose for now; a full scan now clears them. Each task entry's `source` and `addedAt` show which path added it.
+- **Phantom tasks (reported by squadmates, not diagnosed):** tasks show that the player doesn't have. Suspects, from reading the code: (1) the v1 → v2 migration activates the whole v1 manual list, including tasks finished since; (2) while the session mode is unknown, which is the case whenever the app starts after the game, `raid.TaskEventMode()` sends every log task event to the Settings mode's task list (issue #22: before that, every such event was accepted into the one list), so a task from another mode can land in the wrong list; (3) several open tabs each save the whole state, so a stale tab can restore a removed task; (4) a scan of a trader's available-tasks page, or a fuzzy match to the wrong name. The owner chose not to diagnose for now; a full scan now clears them. Each task entry's `source` and `addedAt` show which path added it.
 - **Scan ignores the Reasoning setting:** `taskscan.Scan.Read` always sends `effort: "low"` for gpt-5/gpt-6/o-series models. SPEC §8 says to reuse the setting, defaulting to low.
 - **Don't split vs moved parts:** a manual move stored on `<id>:<action>` doesn't apply once the task is unsplit (`<id>:*`); it falls back to the precedence default.
 - GPS trail labels ("x min ago") overlap when zoomed far out.

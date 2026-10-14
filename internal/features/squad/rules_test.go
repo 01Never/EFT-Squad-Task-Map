@@ -29,6 +29,11 @@ func TestRevStamping(t *testing.T) {
 	movedLine.Draw["customs"][0].Points = [][]float64{{11, 20}, {30, 40}}
 	renamed := mike
 	renamed.Name = "Mikey"
+	inPvE := someParts()
+	inPvE.Mode = "pve"
+	firstInPvE, _ := StampShare(nil, mike, inPvE, true, noon)
+	inPvPSeason := someParts()
+	inPvPSeason.Mode = "pvp-season"
 
 	cases := []struct {
 		name        string
@@ -43,6 +48,9 @@ func TestRevStamping(t *testing.T) {
 		{"a moved line raises the rev by one", &first, mike, movedLine, 2, true},
 		{"a new name raises the rev by one", &first, renamed, someParts(), 2, true},
 		{"undoing every drawing raises the rev", &first, mike, ShareParts{Tasks: someParts().Tasks}, 2, true},
+		{"naming a game mode raises the rev", &first, mike, inPvE, 2, true},
+		{"the same game mode keeps the rev", &firstInPvE, mike, inPvE, 1, false},
+		{"switching to another game mode raises the rev", &firstInPvE, mike, inPvPSeason, 2, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -94,6 +102,44 @@ func TestTasksAreStrippedWhenSharingIsOff(t *testing.T) {
 		hidden, changed := StampShare(&shared, mike, someParts(), false, noon.Add(time.Second))
 		if !changed || hidden.Rev != 2 || hidden.Tasks != nil {
 			t.Errorf("changed %v rev %d tasks %v", changed, hidden.Rev, hidden.Tasks)
+		}
+	})
+}
+
+func TestTheShareCarriesItsGameModeThereAndBack(t *testing.T) {
+	t.Run("the page's mode is stamped into my share and survives the trip to a friend", func(t *testing.T) {
+		parts := someParts()
+		parts.Mode = "pvp-season"
+		share, _ := StampShare(nil, mike, parts, true, noon)
+		encoded, _ := json.Marshal(share)
+		received, err := DecodeShare(encoded)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if received.Mode != "pvp-season" {
+			t.Errorf("mode = %q, want pvp-season (JSON %s)", received.Mode, encoded)
+		}
+	})
+	t.Run("the mode is kept when \"Share my tasks\" is off", func(t *testing.T) {
+		parts := someParts()
+		parts.Mode = "pve"
+		share, _ := StampShare(nil, mike, parts, false, noon)
+		if share.Mode != "pve" || share.Tasks != nil {
+			t.Errorf("mode %q tasks %v, want pve and no tasks", share.Mode, share.Tasks)
+		}
+	})
+	t.Run("a share without a mode is written without the field, as older copies wrote it", func(t *testing.T) {
+		share, _ := StampShare(nil, mike, someParts(), true, noon)
+		encoded, _ := json.Marshal(share)
+		if strings.Contains(string(encoded), `"mode"`) {
+			t.Errorf("JSON %s has a mode field", encoded)
+		}
+	})
+	t.Run("an unknown mode from the page is refused", func(t *testing.T) {
+		parts := someParts()
+		parts.Mode = "arena"
+		if err := ValidateParts(parts); err == nil {
+			t.Error("mode arena was accepted")
 		}
 	})
 }
@@ -170,6 +216,15 @@ func TestValidationRejectsBadPeerData(t *testing.T) {
 		{"a name of only spaces is dropped", validShareJSON(withPlayer(sam.ID, "   ", sam.Color)), false},
 		{"a 32-character name of 3-byte characters is accepted (characters, not bytes)", validShareJSON(withPlayer(sam.ID, strings.Repeat("\u4e2d", 32), sam.Color)), true},
 		{"a share over 2 MB is dropped", append(validShareJSON(nil), make([]byte, MaxShareBytes)...), false},
+		{"a share without a game mode (an older copy) is accepted", validShareJSON(nil), true},
+		{"game mode regular is accepted", validShareJSON(map[string]any{"mode": "regular"}), true},
+		{"game mode pve is accepted", validShareJSON(map[string]any{"mode": "pve"}), true},
+		{"game mode pvp-season is accepted", validShareJSON(map[string]any{"mode": "pvp-season"}), true},
+		{"an empty game mode is accepted", validShareJSON(map[string]any{"mode": ""}), true},
+		{"an unknown game mode is dropped", validShareJSON(map[string]any{"mode": "arena"}), false},
+		{"a game mode in another spelling is dropped", validShareJSON(map[string]any{"mode": "PvE"}), false},
+		{"a game mode that isn't text is dropped", validShareJSON(map[string]any{"mode": 2}), false},
+		{"a field this copy doesn't know is ignored (how older copies read the mode)", validShareJSON(map[string]any{"futureField": true}), true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

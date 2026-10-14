@@ -16,8 +16,8 @@
 
 | Event | Kind | Fields | Sent when |
 |---|---|---|---|
-| `task` | deliver | `taskId`, `status` (started, failed, finished) | the log says so, the game mode matches and the task is in the data |
-| `raidEnd` | deliver | `map`, `deleted` (GPS shots deleted) | back in the menus after a raid |
+| `task` | deliver | `taskId`, `status` (started, failed, finished), `mode` (regular, pve, pvp-season: the session mode, else the Settings mode) | the log says so and the task is in the data |
+| `raidEnd` | deliver | `map`, `deleted` (GPS shots deleted), `mode` (as for `task`) | back in the menus after a raid |
 | `gps` | broadcast | `gps` {map, x, y, z, yaw, t}, `trail` [{x, z, t}] | a GPS screenshot appears |
 | `capture` | broadcast | `files` [{name, t, size}]; at the end `done: true` or `cancelled: true` | the scan's capture list changes |
 | `raidStart` | broadcast | `map` | `GameStarted` |

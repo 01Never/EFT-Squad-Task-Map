@@ -23,10 +23,11 @@ categories, AI chats, your position. The server only ever sends what's in the sh
 
 | Rule | Function | Numbers and why |
 |---|---|---|
-| A share is `{v, player, rev, updatedAt, draw, tasks}` | `Share` | `v` = 1 (`ShareFormatVersion`); `updatedAt` in ms since 1970 |
-| `rev` goes up only when the content changes | `StampShare` | content = player (id, name, colour) + drawings + tasks; the same content again keeps rev and updatedAt |
+| A share is `{v, player, rev, updatedAt, draw, tasks, mode}` | `Share` | `v` = 1 (`ShareFormatVersion`); `updatedAt` in ms since 1970; `mode` is optional (below) |
+| A share says which game mode its tasks belong to | `Share.Mode`, `IsValidShareMode` | issue #22: each game mode has its own task list. `mode` is `"regular"`, `"pve"` or `"pvp-season"`, or absent/`""` (a copy from before #22, or the page didn't say); anything else refuses the share. Passed through from the page as is, also when "Share my tasks" is off. `v` stays 1: copies before #22 read shares with plain `json.Unmarshal` (no `DisallowUnknownFields`), so they skip `mode` and keep working (tested: an unknown field is ignored) |
+| `rev` goes up only when the content changes | `StampShare` | content = player (id, name, colour) + drawings + tasks + game mode; the same content again keeps rev and updatedAt |
 | Tasks are dropped when "Share my tasks" is off | `StampShare` | enforced by the server, whatever the page sends; turning it off re-stamps at once (rev + 1, `tasks: null`) |
-| Everything received is checked; a bad share is dropped whole and logged once | `DecodeShare`, `ValidateShare`, `ValidateParts` | ≤ 2 MB (`MaxShareBytes`, ticket's cap); player id 16 lower-case hex; name 1–32 characters (not bytes), no control characters, no bidi controls or zero-width spaces, at least one visible character, no spaces at the ends; colour `#rrggbb`; task and objective ids exactly 24 lower-case hex characters (what the real game data has: all 515 task ids and 1441 objective ids in the bundled snapshot; so `toString`, `__proto__` and the like can't get in); map keys `[A-Za-z0-9_-]{1,64}` and never a name of a JavaScript object property (`__proto__`, `constructor`, `prototype`, `toString`, `valueOf`, `hasOwnProperty`, …); ≤ 64 maps, ≤ 5000 strokes a map, 1–10000 `[x, z]` points a stroke, width 0–1000, coordinates within ±1e6, stroke colour `#rgb`/`#rrggbb`; ≤ 2000 tasks, ≤ 200 ticks each, a tick is `true` or a whole number 0–100000, `pct` 0–100 |
+| Everything received is checked; a bad share is dropped whole and logged once | `DecodeShare`, `ValidateShare`, `ValidateParts` | ≤ 2 MB (`MaxShareBytes`, ticket's cap); player id 16 lower-case hex; name 1–32 characters (not bytes), no control characters, no bidi controls or zero-width spaces, at least one visible character, no spaces at the ends; colour `#rrggbb`; task and objective ids exactly 24 lower-case hex characters (what the real game data has: all 515 task ids and 1441 objective ids in the bundled snapshot; so `toString`, `__proto__` and the like can't get in); `mode` one of `regular`, `pve`, `pvp-season` or empty; map keys `[A-Za-z0-9_-]{1,64}` and never a name of a JavaScript object property (`__proto__`, `constructor`, `prototype`, `toString`, `valueOf`, `hasOwnProperty`, …); ≤ 64 maps, ≤ 5000 strokes a map, 1–10000 `[x, z]` points a stroke, width 0–1000, coordinates within ±1e6, stroke colour `#rgb`/`#rrggbb`; ≤ 2000 tasks, ≤ 200 ticks each, a tick is `true` or a whole number 0–100000, `pct` 0–100 |
 | A friend's share is new when rev or updatedAt differ | `HasChanged` | not "higher": a friend who reset their data starts again at rev 1 |
 | On the tailnet a share must carry the id its node is named after | `ShareFitsPeer` | so one friend can't pose as another (the dev transport has no names) |
 | Friends are the online `tag:stm` nodes whose MagicDNS name is exactly `stm-<player id>` | `SquadPeers` | the id comes **only from the DNS name's first part**, which the tailnet keeps unique (a clash becomes `stm-<id>-1`, which doesn't count), never from the host name, which each node picks itself; connections are keyed by the node's stable id; when two machines claim one id (`stm-<id>` and `stm-<id>-1`, online or not), **neither** is trusted and one console line says to delete the old machine; IPv4 address preferred; yourself left out |
@@ -109,7 +110,8 @@ All bodies are JSON sent as `application/json` (415 otherwise). Times are ms sin
       "online": true, "lastSeen": 1791336708099,
       "share": { "v": 1, "player": {…}, "rev": 7, "updatedAt": …,
                  "draw":  { "<mapKey>": [ { "c": "#ff4d4d", "w": 2.5, "pts": [[x, z], …] } ] },
-                 "tasks": null | { "<taskId>": { "ticks": { "<objId>": true | 3 }, "pct": 40 } } } }
+                 "tasks": null | { "<taskId>": { "ticks": { "<objId>": true | 3 }, "pct": 40 } },
+                 "mode": "pve" } }   // absent for a friend on a copy before issue #22
   ]
 }
 ```
@@ -118,11 +120,13 @@ All bodies are JSON sent as `application/json` (415 otherwise). Times are ms sin
 - Friends' data is read-only. Draw friends' strokes in the friend's `color` (owner's default),
   not the strokes' own `c`.
 
-### `PUT /api/squad/share {draw, tasks}` → `{ok, rev, updatedAt, changed, tasksShared, inSquad}`
+### `PUT /api/squad/share {draw, tasks, mode}` → `{ok, rev, updatedAt, changed, tasksShared, inSquad}`
 - `draw`: the page's `draw` (by map key, strokes `{c, w, pts}`); `tasks`: by task id
-  `{ticks, pct}`, or `null`. Any other field is ignored (the server stamps `v`, `player`, `rev`,
-  `updatedAt`).
-- `changed: false` when the content is the same as the last share (rev unchanged).
+  `{ticks, pct}`, or `null`; `mode` (optional): the game mode those tasks are from, `"regular"`,
+  `"pve"` or `"pvp-season"` (anything else → 400). Any other field is ignored (the server stamps
+  `v`, `player`, `rev`, `updatedAt`).
+- `changed: false` when the content is the same as the last share (rev unchanged). Another `mode`
+  counts as a change (rev + 1).
   `tasksShared: false` when "Share my tasks" is off: the tasks were dropped. `inSquad: false`: kept
   for when you join; nobody gets it now.
 - Over 2 MB → **413**; not the shape or limits above → **400** `{ok: false, error: "The share isn't valid: …"}`.
@@ -187,8 +191,11 @@ kept" for the page event and the cache file. Wiring: `internal/app/squad.go`; ro
 `internal/httpapi/squad.go`.
 
 ## Tests
-- `rules_test.go`: rev stamping, tasks stripped when sharing is off, validation rejects bad peer
-  data (about 35 cases), ticks, backoff schedule, caller checks (loopback, tag, browser), peer list
+- `rules_test.go`: rev stamping (a new or different game mode raises the rev, the same one keeps
+  it), tasks stripped when sharing is off, the game mode there and back
+  (`TestTheShareCarriesItsGameModeThereAndBack`: stamped, decoded by a friend, kept with sharing
+  off, no `mode` field when none was given, an unknown one refused), validation rejects bad peer
+  data (about 45 cases, including unknown game modes, and an unknown field is ignored), ticks, backoff schedule, caller checks (loopback, tag, browser), peer list
   rules, identity check, "new share" rule, profile rules, status line.
 - `rules_peers_test.go`: who a friend is (DNS name only, keyed by node id; `-1` names and host
   names don't count; two machines with the same host name or id → neither trusted), the `Host`
@@ -196,7 +203,8 @@ kept" for the page event and the cache file. Wiring: `internal/app/squad.go`; ro
   escapes them) but RTL override, zero-width characters and bidi isolates refused; ids that aren't 24 hex characters refused.
 - `squad_test.go`: **three copies on the dev transport** (A's share reaches B and C; an update
   propagates; B's tasks aren't sent; C goes offline and A keeps C's share with `lastSeen`, also in
-  the cache file; C comes back and refreshes), cache read/write, rev kept across a restart,
+  the cache file; C comes back and refreshes), cache read/write, a friend's game mode survives the
+  cache and reaches the page's friend view (absent for an older copy's share), rev kept across a restart,
   player id made once, sharing off re-stamps, Leave deletes the state folder and forgets friends
   (and only deletes a folder with that name), the peer API's caller and `Host` checks (a
   rebinding domain gets 421), the per-caller stream cap, the server's idle and write limits,
@@ -211,7 +219,8 @@ kept" for the page event and the cache file. Wiring: `internal/app/squad.go`; ro
   `STM_SQUAD_TSNET_TEST=1` (tsnet binds UDP on every interface, so Windows Firewall would ask
   about every new test binary).
 - `internal/app/squad_test.go`: never joined starts nothing; the server drops tasks the page sent
-  with sharing off (checked through the real peer API); 413/400/415 on the share route;
+  with sharing off (checked through the real peer API); 413/400/415 on the share route (400 for an
+  unknown game mode); the page's game mode reaches a friend and a change of mode raises the rev;
   join/leave/profile through the routes; the code isn't in the settings file; the peer API isn't
   on the page's server; a joined copy reconnects at launch.
 - **A simulated tailnet for whole copies:** `cmd/faketailnet` (Tailscale's test control server,
