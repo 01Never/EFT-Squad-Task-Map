@@ -380,3 +380,46 @@ test("at phone width the list sits under the map, Hide isn't offered, and Find m
     await assertSettingsCheckboxesLookNormal(page);
   });
 });
+
+// Issue #22, browser acceptance check: Settings → Game mode on a map shows the other mode's list
+// (markers and panel), and switching back shows the first list exactly as it was.
+test("switching game mode in Settings shows that mode's list on the map; switching back finds the first list unchanged", async (t) => {
+  await withScenario(t, { state: stateWithTasks(FOUR_STREETS_TASKS) }, async (s) => {
+    const page = s.page;
+    const panelRows = () => page.locator("#panel .tasks .task").count();
+    const switchModeInSettings = async (mode) => {
+      await page.click("#settings");
+      await page.waitForSelector(".modal #sSave");
+      await page.selectOption("#sMode", mode);
+      await s.answered("PUT", "/api/settings", () => page.click("#sSave"));
+      await page.waitForFunction((hash) => location.hash === hash, `#/${mode}/map/streets-of-tarkov`);
+      await s.waitForMap("streets-of-tarkov");
+    };
+
+    await s.openMap("streets-of-tarkov");
+    const regularMarkers = await markerCount(page);
+    const regularRows = await panelRows();
+    assert.ok(regularMarkers > 0 && regularRows >= FOUR_STREETS_TASKS.length, "the PvP list shows on Streets");
+    await waitUntil(() => s.savedState().version === 3, { what: "the v2 fixture to be saved as v3" });
+    const regularListBefore = s.savedList("regular");
+
+    s.step("Settings → PvE");
+    await switchModeInSettings("pve");
+    await waitUntil(async () => (await markerCount(page)) === 0 && (await panelRows()) === 0, { what: "PvE's empty list on the map" });
+    assert.equal(s.savedSettings().gameMode, "pve");
+
+    s.step("a task added in PvE goes on the PvE list only");
+    await s.saving(async () => {
+      await page.fill("#addtask", revision.name);
+      await page.press("#addtask", "Enter");
+    });
+    assert.equal(s.savedList("pve").tasks[revision.id].active, true);
+    await waitUntil(async () => (await markerCount(page)) === revision.objs.length, { what: "only PvE's one task to have markers" });
+
+    s.step("Settings → PvP again");
+    await switchModeInSettings("regular");
+    await waitUntil(async () => (await markerCount(page)) === regularMarkers && (await panelRows()) === regularRows, { what: "PvP's list back on the map" });
+    assert.deepStrictEqual(s.savedList("regular"), regularListBefore, "the PvP list is exactly as it was");
+    assert.equal(s.savedList("pve").tasks[revision.id].active, true, "and the PvE list keeps its task");
+  });
+});
