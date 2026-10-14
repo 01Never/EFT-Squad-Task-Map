@@ -23,6 +23,11 @@ Put the new exe in the same folder as the old one, next to your `squad-task-map-
 
 A banner suggests running **Scan tasks** once, so the list matches exactly what you have in-game.
 
+## Pick a game mode, then a map
+The app opens on **Game mode**: three cards in the game's order, **PvE**, **PvP** and **PvP Season**. Each shows how many active tasks that mode's list has, **Last used** on the mode you used last, and **Game is in this mode** when Tarkov's log says that is the mode you are playing. Click one to see its maps, then click a map.
+
+The top bar shows where you are, like `PvE / Maps / Customs`. Click **Maps** to go back to the maps, or **PvE** to go back to the game modes. On a phone the trail becomes one link, `‹ Maps` (or `‹ PvE` on the maps page). Your browser's Back button walks the same steps. Opening a mode's page also switches the mode in Settings, so you always see that mode's tasks. Links from older versions (`#/map/customs`) still work and open the map in the mode set in Settings.
+
 ## Where your tasks come from
 1. **Scan tasks** (button on the map picker and in the panel). Needs an OpenAI key (see below).
    1. Click **📷 Scan tasks**. The app starts watching your screenshots folder.

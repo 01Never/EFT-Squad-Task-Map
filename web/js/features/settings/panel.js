@@ -10,7 +10,7 @@ import { save } from "../../app/saving.js";
 import { showsItemIcons } from "../icons/rules.js";
 import { GAME_MODE_NAMES } from "../../app/game-modes.js";
 import { reloadGameData } from "../../app/game-data.js";
-import { rerenderPage } from "../../app/routing.js";
+import { rerenderPage, followGameMode } from "../../app/routing.js";
 import { showExtractsNoticeIfDue } from "../extracts/notice.js";
 import { renderUpdatesSectionBox, bindUpdatesSection } from "../updates/panel.js";
 import { renderSquadSettingsBox, bindSquadSection } from "../squad/settings-section.js";
@@ -182,7 +182,7 @@ async function onSaveClicked(dialog, close) {
     }
     close();
     showToast("Settings saved");
-    rerenderPage(); // another game mode shows its own task list (ticket 22)
+    followGameMode(); // another game mode shows its own task list, on the same page (ticket 23)
     sendShare(false); // and the squad gets that list; nothing is sent when nothing changed
   } catch (error) {
     showToast(String(error.message || error));

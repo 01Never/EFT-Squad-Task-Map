@@ -694,25 +694,33 @@ export class Scenario {
     return this.app.base;
   }
 
-  /** Loads the page on the map picker. */
-  async openPicker() {
-    await this.page.goto(this.base + "/#/");
+  /** Loads the page on a mode's map picker (the mode in Settings unless one is given). */
+  async openPicker(mode) {
+    const shownMode = mode || (await this.status()).settings.gameMode;
+    await this.page.goto(`${this.base}/#/${shownMode}/maps`);
     await this.waitForPicker();
+  }
+
+  /** Loads the page on the mode select page (the start page). */
+  async openModeSelect() {
+    await this.page.goto(this.base + "/#/");
+    await this.page.waitForSelector(".modes .mode");
   }
 
   async waitForPicker() {
     await this.page.waitForFunction(() => document.querySelector(".picker h1")?.textContent === "Maps" && document.querySelectorAll(".picker .card").length > 0);
   }
 
-  /** Loads the page on a map. */
-  async openMap(key) {
-    await this.page.goto(`${this.base}/#/map/${key}`);
+  /** Loads the page on a map (in the mode in Settings unless one is given). */
+  async openMap(key, mode) {
+    const shownMode = mode || (await this.status()).settings.gameMode;
+    await this.page.goto(`${this.base}/#/${shownMode}/map/${key}`);
     await this.waitForMap(key);
   }
 
   /** Waits until a map page is drawn: map art, toolbar and task list. */
   async waitForMap(key) {
-    await this.page.waitForFunction((mapKey) => location.hash === "#/map/" + mapKey && !!document.querySelector("svg.map") && !!document.querySelector("#bfindme") && !!document.querySelector("#panel .phead"), key);
+    await this.page.waitForFunction((mapKey) => location.hash.endsWith("/map/" + mapKey) && !!document.querySelector("svg.map") && !!document.querySelector("#bfindme") && !!document.querySelector("#panel .phead"), key);
     await this.page.evaluate(() => document.fonts.ready.then(() => true));
   }
 

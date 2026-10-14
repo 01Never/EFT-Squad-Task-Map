@@ -24,7 +24,7 @@ test("the picker, the map, the task list, the Bring list and Settings come up (s
     await waitForMapThumbnails(page);
     await s.screenshot("picker");
 
-    await page.click('.picker .card[href="#/map/streets-of-tarkov"]');
+    await page.click('.picker .card[href="#/regular/map/streets-of-tarkov"]');
     await s.waitForMap("streets-of-tarkov");
     assert.ok((await page.locator("svg.map g.mk").count()) > 0);
     await s.screenshot("map-streets");
@@ -54,7 +54,7 @@ test("at phone width the picker and the map come up (screenshots in record mode)
     await waitForMapThumbnails(page);
     await s.screenshot("phone-picker");
 
-    await page.tap('.picker .card[href="#/map/streets-of-tarkov"]');
+    await page.tap('.picker .card[href="#/regular/map/streets-of-tarkov"]');
     await s.waitForMap("streets-of-tarkov");
     await s.screenshot("phone-map");
     await s.screenshot("phone-map-full-page", { fullPage: true });

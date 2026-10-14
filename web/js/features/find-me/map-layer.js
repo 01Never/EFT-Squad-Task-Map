@@ -7,6 +7,8 @@
 import { app } from "../../app/state.js";
 import { escapeHtml, createSvgElement, showToast } from "../../app/dom.js";
 import { callApi } from "../../app/api.js";
+import { mapAddress } from "../../app/addresses.js";
+import { shownGameMode } from "../../app/current-list.js";
 import { mapDisplayName } from "../../app/game-data.js";
 import { floorBadge, arrowRotation } from "../../map/projection.js";
 import { applyView, panTo, afterUserLetsGo } from "../../map/view.js";
@@ -79,7 +81,7 @@ export function switchToMapIfFollowing(mapKey) {
   const hasMapArt = app.mapConfigs.some((config) => config.key === mapKey);
   if (!app.status.settings.followPosition || !mapKey || !hasMapArt) return false;
   if (!app.mapView || app.mapView.key !== mapKey) {
-    location.hash = "#/map/" + mapKey;
+    location.hash = mapAddress(shownGameMode(), mapKey);
     return true;
   }
   return false;

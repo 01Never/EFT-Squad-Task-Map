@@ -4,10 +4,9 @@
 // The rules are in rules.js; the raid itself is followed by the server (internal/features/raid).
 import { app } from "../../app/state.js";
 import { escapeHtml, findElement, showToast } from "../../app/dom.js";
-import { callApi } from "../../app/api.js";
+import { switchGameMode } from "../../app/switch-mode.js";
 import { GAME_MODE_NAMES } from "../../app/game-modes.js";
-import { rerenderPage } from "../../app/routing.js";
-import { sendShare } from "../squad/share-sync.js";
+import { followGameMode } from "../../app/routing.js";
 
 /** Draw the raid part of the top bar (#navinfo) and wire up the prompt's buttons. */
 export function renderNav() {
@@ -54,17 +53,16 @@ function mapNameForNav(mapKey) {
 
 /**
  * "Switch data": change Settings' game mode to the one the game reported. That mode's own task
- * list shows straight away (ticket 22), and the squad gets it.
+ * list shows straight away (ticket 22), on the same page (the picker or map) in that mode, and
+ * the squad gets it.
  */
 async function onSwitchDataClicked() {
   const mode = app.modePrompt;
   app.modePrompt = null;
   try {
-    const response = await callApi("/api/settings", { method: "PUT", body: { gameMode: mode } });
-    app.status = response.status;
+    await switchGameMode(mode);
     showToast(`Switched to ${GAME_MODE_NAMES[mode]} data`);
-    rerenderPage();
-    sendShare(false);
+    followGameMode();
   } catch (error) {
     showToast(String(error.message || error));
   }

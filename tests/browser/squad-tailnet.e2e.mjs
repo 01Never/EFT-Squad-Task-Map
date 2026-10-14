@@ -192,7 +192,7 @@ class Player {
   async restart() {
     this.scenario.step("restart");
     this.scenario.app = await startApp({ slug: this.scenario.slug, dataDir: this.dataDir, keepData: true, env: this.env });
-    await this.page.goto(this.scenario.base + `/#/map/${MAP}`);
+    await this.page.goto(this.scenario.base + `/#/regular/map/${MAP}`);
     await this.scenario.waitForMap(MAP);
   }
 
