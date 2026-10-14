@@ -233,7 +233,7 @@ test("three copies: drawings, task sharing, offline and back, and leaving", { ti
     assert.equal(await alice.page.locator(".squad-chip").count(), 2, "she stays in the list");
     await alice.shot("chips-friend-offline");
     cara.scenario.app = await startApp({ slug: caraSlug, dataDir: cara.scenario.app.dataDir, keepData: true, env: cara.env });
-    await cara.page.goto(cara.scenario.base + `/#/map/${MAP}`);
+    await cara.page.goto(cara.scenario.base + `/#/regular/map/${MAP}`);
     await cara.scenario.waitForMap(MAP);
     await cara.page.click("#bdraw");
     await cara.scenario.dragMap(-100, 80);

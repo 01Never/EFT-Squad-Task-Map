@@ -1,0 +1,11 @@
+/* The mode select page: a card per game mode. Page frame and heading come from picker.css. */
+.modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;max-width:900px}
+.mode{display:flex;flex-direction:column;gap:6px;min-height:150px;padding:16px 18px;background:var(--panel);border:1px solid #444;color:var(--gold-one);transition:border-color .15s}
+.mode:hover,.mode:focus-visible{border-color:var(--accent);color:var(--gold-one);outline:none}
+.mode .mname{font-size:26px}
+.mode .mkind{font-size:14px;color:var(--muted)}
+.mode .mcount{font-size:15px;color:var(--muted);margin-top:6px} .mode .mcount.has{color:var(--accent)}
+.mode .mnotes{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto}
+.mode .note{font-size:12px;padding:2px 8px;border:1px solid #555;color:var(--muted)}
+.mode .note.ingame{border-color:var(--accent);color:var(--accent)}
+@media (max-width:600px){.mode{min-height:0}}

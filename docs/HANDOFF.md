@@ -230,7 +230,8 @@ and `npm run typecheck`. Each feature folder has a README.
 - `saving.js`: `save()` (500 ms debounce), `flush()`, save on close. Plain `fetch` except the last-chance save on close, which uses `keepalive` only when the body is ≤ 64 KiB (`saving-rules.js`; browsers refuse bigger keepalive bodies). A refused save is retried after 15 s, a network error after 1.5 s.
   - `game-data.js`: lookups (tasks by id, objectives by id, name matcher, map names), reload.
   - `live-events.js`: the live-event router; `event-names.js`: the names.
-  - `routing.js`: `#/` picker or `#/map/<key>`, and `rerenderPage()`.
+  - `addresses.js`: the addresses (`#/` mode select, `#/<mode>/maps`, `#/<mode>/map/<key>`, old `#/map/<key>` redirects) and the breadcrumbs' content; `crumbs.js` draws them.
+  - `routing.js`: shows the page for the address (switching the Settings game mode first when the address names another one), `followGameMode()`, `rerenderPage()`. `switch-mode.js`: save the game mode.
   - `api.js`, `dom.js` (find, escape, SVG elements, toast, modal), `map-prefs.js`, `game-modes.js`.
 - `web/js/map/`: the map view, no feature rules.
   - `map-page.js`: open/close a map, `renderMapPage()` (panel, then each layer, then the popup),

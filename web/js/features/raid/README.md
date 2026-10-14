@@ -22,7 +22,8 @@ and `mode`. The server deletes the raid's GPS screenshots itself.
 - `log line → gamelog → raid → event "raidEnd" → app/live-events.js onRaidEnded() →
   resetAfterRaid() → save → rerenderPage() → toast raidOverMessage()`.
 - `event "mode" → onGameModeReported() → modePromptAfterReport() → renderNav()`; Switch data →
-  `PUT /api/settings {gameMode}` → `rerenderPage()` (that mode's own task list shows) and
+  `switchGameMode()` (`PUT /api/settings {gameMode}`) → `followGameMode()` (the same page in that
+  mode, `#/pve/maps` or `#/pve/map/<key>`; that mode's own task list shows) and
   `sendShare()` (the squad gets it); the server then sends `data`, which reloads the game data.
 - `event "raidStart"` → "● In raid", and with Follow my position the raid's map opens
   (`features/find-me switchToMapIfFollowing()`).
