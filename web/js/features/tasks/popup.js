@@ -3,6 +3,7 @@
 // name, trader, category and progress, Wiki and Pin buttons, the sub-task you clicked, and its
 // objectives on this map with their tick controls.
 import { app } from "../../app/state.js";
+import { currentList } from "../../app/current-list.js";
 import { escapeHtml, findElement } from "../../app/dom.js";
 import { save } from "../../app/saving.js";
 import { renderMapPage } from "../../map/map-page.js";
@@ -33,13 +34,13 @@ export function renderPopup() {
 function renderPopupContent(row) {
   const { task, part, cat } = row;
   const mapView = app.mapView;
-  const entry = app.saved.tasks[task.id] || /** @type {any} */ ({});
+  const entry = currentList().tasks[task.id] || /** @type {any} */ ({});
   const partText = part.split ? " · " + escapeHtml(partLabel(part)) : "";
   const wiki = task.wiki ? `<a class="wiki" href="${escapeHtml(task.wiki)}" target="_blank" rel="noopener">📖 Wiki ↗</a>` : "";
   const clickedSubTask = "sub" in mapView.popup && mapView.popup.sub;
   const subTaskLine = clickedSubTask ? `<div style="margin-bottom:6px;color:#fff">Sub-task: ${escapeHtml(clickedSubTask.text)}</div>` : "";
   const objectivesHere = part.objs.filter((objective) => isObjectiveOnMap(objective, mapView.key, task));
-  return `<button class="x" title="Close">×</button><h3>${escapeHtml(task.name)}</h3><div class="m">${escapeHtml(task.trader)} · ${escapeHtml(cat.name)}${partText} · ${partProgressPercent(part, app.saved.ticks)}%</div>
+  return `<button class="x" title="Close">×</button><h3>${escapeHtml(task.name)}</h3><div class="m">${escapeHtml(task.trader)} · ${escapeHtml(cat.name)}${partText} · ${partProgressPercent(part, currentList().ticks)}%</div>
     ${renderSquadLinesForPopup(task, part)}
     <div class="popacts">${wiki}<button class="btn sm line" data-pin="${escapeHtml(task.id)}">${entry.pinned ? "📌 Unpin" : "📌 Pin"}</button></div>
     ${subTaskLine}
@@ -58,7 +59,7 @@ function onPopupClicked(event) {
   }
   const pinButton = target.closest("[data-pin]");
   if (pinButton) {
-    const entry = app.saved.tasks[pinButton.getAttribute("data-pin")];
+    const entry = currentList().tasks[pinButton.getAttribute("data-pin")];
     if (entry) {
       entry.pinned = !entry.pinned;
       save();

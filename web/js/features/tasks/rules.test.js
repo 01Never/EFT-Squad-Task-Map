@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { findTask } from "../../../../tests/support/game-data.js";
-import { freshState } from "../../app/saved-data.js";
+import { freshState, emptyTaskList } from "../../app/saved-data.js";
 import {
   actionOfObjective,
   partsOfTask,
@@ -11,6 +11,7 @@ import {
   isOneRaidTask,
   forgetTask,
   finishTaskEntry,
+  applyTaskEventFromGame,
 } from "./rules.js";
 
 test("kills are sorted into boss, PMC and scav by their targets and wording", () => {
@@ -77,38 +78,93 @@ test("a part is half done with one of two objectives ticked and done with both",
 });
 
 test("a task finished in the game leaves the list unpinned with its ticks cleared, keeping its sub-tasks", () => {
-  const saved = freshState();
+  const list = emptyTaskList();
   const dandies = findTask("Dandies");
-  saved.tasks[dandies.id] = { active: true, pinned: true, partCats: {} };
-  saved.ticks[dandies.objs[0].id] = true;
-  saved.subs = [{ id: "s1", task: dandies.id }];
+  list.tasks[dandies.id] = { active: true, pinned: true, partCats: {} };
+  list.ticks[dandies.objs[0].id] = true;
+  list.subs = [{ id: "s1", task: dandies.id }];
 
-  assert.equal(finishTaskEntry(saved, dandies.id, dandies), true);
-  assert.equal(saved.tasks[dandies.id].active, false);
-  assert.equal(saved.tasks[dandies.id].pinned, false);
-  assert.equal(saved.ticks[dandies.objs[0].id], undefined);
-  assert.equal(saved.subs.length, 1);
-  assert.equal(finishTaskEntry(saved, dandies.id, dandies), false, "a task not on the list isn't finished again");
+  assert.equal(finishTaskEntry(list, dandies.id, dandies), true);
+  assert.equal(list.tasks[dandies.id].active, false);
+  assert.equal(list.tasks[dandies.id].pinned, false);
+  assert.equal(list.ticks[dandies.objs[0].id], undefined);
+  assert.equal(list.subs.length, 1);
+  assert.equal(finishTaskEntry(list, dandies.id, dandies), false, "a task not on the list isn't finished again");
 });
 
 test("a forgotten task leaves nothing behind; other tasks are untouched", () => {
-  const saved = freshState();
+  const list = emptyTaskList();
   const dandies = findTask("Dandies");
   const booze = findTask("Booze");
   const wholeTaskInUnsorted = { "*": { cat: "unsorted", manual: true } };
-  saved.tasks[dandies.id] = { active: true, pinned: true, partCats: wholeTaskInUnsorted };
-  saved.tasks[booze.id] = { active: true };
-  saved.ticks[dandies.objs[0].id] = true;
-  saved.ticks[booze.objs[0].id] = true;
-  saved.used = { [dandies.objs[0].id]: 1 };
-  saved.subs = [{ id: "s1", task: dandies.id }, { id: "s2", task: booze.id }];
+  list.tasks[dandies.id] = { active: true, pinned: true, partCats: wholeTaskInUnsorted };
+  list.tasks[booze.id] = { active: true };
+  list.ticks[dandies.objs[0].id] = true;
+  list.ticks[booze.objs[0].id] = true;
+  list.used = { [dandies.objs[0].id]: 1 };
+  list.subs = [{ id: "s1", task: dandies.id }, { id: "s2", task: booze.id }];
 
-  forgetTask(saved, dandies.id, dandies);
+  forgetTask(list, dandies.id, dandies);
 
-  assert.equal(saved.tasks[dandies.id], undefined);
-  assert.equal(saved.ticks[dandies.objs[0].id], undefined);
-  assert.equal(saved.used[dandies.objs[0].id], undefined);
-  assert.deepEqual(saved.subs.map((subTask) => subTask.id), ["s2"]);
-  assert.equal(saved.tasks[booze.id].active, true);
-  assert.equal(saved.ticks[booze.objs[0].id], true);
+  assert.equal(list.tasks[dandies.id], undefined);
+  assert.equal(list.ticks[dandies.objs[0].id], undefined);
+  assert.equal(list.used[dandies.objs[0].id], undefined);
+  assert.deepEqual(list.subs.map((subTask) => subTask.id), ["s2"]);
+  assert.equal(list.tasks[booze.id].active, true);
+  assert.equal(list.ticks[booze.objs[0].id], true);
+});
+
+test("a task accepted in PvE goes on the PvE list, even while PvP Season is shown", () => {
+  const saved = freshState();
+  const dandies = findTask("Dandies");
+  const event = { type: "task", taskId: dandies.id, status: "started", mode: "pve" };
+
+  const result = applyTaskEventFromGame(saved, event, dandies, "pvp-season", 1000);
+
+  assert.deepEqual(result, { mode: "pve", isNew: true });
+  assert.equal(saved.modes.pve.tasks[dandies.id].active, true);
+  assert.equal(saved.modes.pve.tasks[dandies.id].source, "log");
+  assert.equal(saved.modes["pvp-season"].tasks[dandies.id], undefined, "the shown list is untouched");
+  assert.equal(saved.modes.regular.tasks[dandies.id], undefined);
+});
+
+test("a task finished in PvE leaves the PvE list only; the same task stays on the other lists", () => {
+  const saved = freshState();
+  const dandies = findTask("Dandies");
+  for (const mode of ["regular", "pve", "pvp-season"]) {
+    saved.modes[mode].tasks[dandies.id] = { active: true, pinned: true, partCats: {} };
+    saved.modes[mode].ticks[dandies.objs[0].id] = true;
+  }
+  const event = { type: "task", taskId: dandies.id, status: "finished", mode: "pve" };
+
+  applyTaskEventFromGame(saved, event, dandies, "pvp-season", 1000);
+
+  assert.equal(saved.modes.pve.tasks[dandies.id].active, false);
+  assert.equal(saved.modes.pve.ticks[dandies.objs[0].id], undefined);
+  assert.equal(saved.modes["pvp-season"].tasks[dandies.id].active, true);
+  assert.equal(saved.modes["pvp-season"].ticks[dandies.objs[0].id], true);
+  assert.equal(saved.modes.regular.tasks[dandies.id].active, true);
+});
+
+test("a task event without a mode (queued by an older version), or with an unknown one, goes to the shown list", () => {
+  const dandies = findTask("Dandies");
+  const withoutMode = freshState();
+  applyTaskEventFromGame(withoutMode, { type: "task", taskId: dandies.id, status: "started" }, dandies, "pvp-season", 1);
+  assert.equal(withoutMode.modes["pvp-season"].tasks[dandies.id].active, true);
+  assert.equal(withoutMode.modes.regular.tasks[dandies.id], undefined);
+
+  const unknownMode = freshState();
+  const event = { type: "task", taskId: dandies.id, status: "started", mode: "arena" };
+  const result = applyTaskEventFromGame(unknownMode, event, dandies, "pve", 1);
+  assert.equal(result.mode, "pve");
+  assert.equal(unknownMode.modes.pve.tasks[dandies.id].active, true);
+  assert.equal("arena" in unknownMode.modes, false);
+});
+
+test("a task accepted again in the game is not new: the toast isn't shown twice", () => {
+  const saved = freshState();
+  const dandies = findTask("Dandies");
+  const event = { type: "task", taskId: dandies.id, status: "started", mode: "regular" };
+  applyTaskEventFromGame(saved, event, dandies, "regular", 1);
+  assert.equal(applyTaskEventFromGame(saved, event, dandies, "regular", 2).isNew, false);
 });

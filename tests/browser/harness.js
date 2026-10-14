@@ -755,6 +755,14 @@ export class Scenario {
     return JSON.parse(fs.readFileSync(this.app.stateFile, "utf8"));
   }
 
+  /**
+   * One game mode's task list in the saved file (saved data v3, ticket 22: `tasks`, `ticks`,
+   * `used`, `have`, `subs` per mode): the mode in the settings file unless one is given.
+   */
+  savedList(mode = this.savedSettings().gameMode || "regular") {
+    return this.savedState().modes[mode];
+  }
+
   savedSettings() {
     return JSON.parse(fs.readFileSync(this.app.settingsFile, "utf8"));
   }

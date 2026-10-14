@@ -224,14 +224,20 @@ export {};
  */
 
 /**
- * @typedef {object} SavedState Everything the page saves (squad-task-map-data.json, version 2).
- * @property {number} version
- * @property {Category[]} cats
+ * @typedef {object} TaskList One game mode's own list (ticket 22): each mode is its own in-game
+ * character. Read and changed through app/current-list.js currentList().
  * @property {Record<string, TaskEntry>} tasks by task id
  * @property {Record<string, true | number>} ticks by objective id: done, or a count
+ * @property {Record<string, number>} used what each ticked objective took from the bag
  * @property {Record<string, number>} have bag counts by requirement key
- * @property {Record<string, number>} [used] what each ticked objective took from the bag
  * @property {SubTask[]} subs
+ */
+
+/**
+ * @typedef {object} SavedState Everything the page saves (squad-task-map-data.json, version 3).
+ * @property {number} version
+ * @property {Category[]} cats shared by every game mode
+ * @property {Record<string, TaskList>} modes by game mode ("regular", "pve", "pvp-season")
  * @property {Record<string, Stroke[]>} draw by map key
  * @property {Record<string, MapPrefs>} prefs by map key
  * @property {Record<string, boolean>} collapsed by category id
@@ -364,8 +370,14 @@ export {};
  * @property {number} size
  */
 
-/** @typedef {{ type: "task", id?: number, taskId: string, status: "started" | "failed" | "finished" }} TaskEvent */
-/** @typedef {{ type: "raidEnd", id?: number, map: string | null, deleted: number }} RaidEndEvent */
+/**
+ * @typedef {{ type: "task", id?: number, taskId: string, status: "started" | "failed" | "finished", mode?: string }} TaskEvent
+ * `mode`: the game mode the task changed in (ticket 22); absent in events queued by older versions.
+ */
+/**
+ * @typedef {{ type: "raidEnd", id?: number, map: string | null, deleted: number, mode?: string }} RaidEndEvent
+ * `mode`: the game mode of the raid (ticket 22); absent in events queued by older versions.
+ */
 /** @typedef {{ type: "gps", gps: Position, trail: TrailPoint[] }} GpsEvent */
 /** @typedef {{ type: "capture", files: CapturedFile[], done?: boolean, cancelled?: boolean }} CaptureEvent */
 /** @typedef {{ type: "raidStart", map: string | null }} RaidStartEvent */
@@ -401,6 +413,8 @@ export {};
  * @property {number} updatedAt
  * @property {Record<string, Stroke[]>} [draw] by map key
  * @property {Record<string, { ticks?: Record<string, true | number>, pct?: number }> | null} [tasks]
+ * @property {string} [mode] the game mode their tasks belong to (ticket 22); absent or "" from
+ *   older copies
  */
 
 /**
@@ -424,6 +438,7 @@ export {};
 
 /**
  * @typedef {object} MyShare What the page sends with PUT /api/squad/share.
+ * @property {string} mode the game mode shown, whose tasks these are (ticket 22)
  * @property {Record<string, Stroke[]>} draw
  * @property {Record<string, { ticks: Record<string, true | number>, pct: number }> | null} tasks
  */

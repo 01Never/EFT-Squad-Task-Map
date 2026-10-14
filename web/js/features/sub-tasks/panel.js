@@ -2,6 +2,7 @@
 // Sub-tasks in the panel: the "Sub-tasks" box in an open task row (each note with done, floor,
 // Pin / Move pin, remove pin, delete; and "Add a sub-task…"), and the handlers for them.
 import { app } from "../../app/state.js";
+import { currentList } from "../../app/current-list.js";
 import { escapeHtml, findElement } from "../../app/dom.js";
 import { save } from "../../app/saving.js";
 import { newId } from "../../app/saved-data.js";
@@ -21,7 +22,7 @@ const NARROW_LAYOUT = "(max-width:860px)";
  * @param {Task} task
  */
 export function renderSubTasksBox(task) {
-  const subTasks = app.saved.subs.filter((subTask) => subTask.task === task.id);
+  const subTasks = currentList().subs.filter((subTask) => subTask.task === task.id);
   return `<div class="subs"><h5>Sub-tasks</h5>${subTasks.map(renderSubTaskRow).join("")}
       <div class="addsub"><input type="text" placeholder="Add a sub-task…" data-addsub="${escapeHtml(task.id)}" maxlength="${SUB_TASK_MAX_LENGTH}"><button class="btn sm" data-act="addsub">Add</button></div></div>`;
 }
@@ -56,7 +57,7 @@ function renderFloorSelect(subTask) {
  */
 function subTaskAround(element) {
   const id = element.closest("[data-sub]").getAttribute("data-sub");
-  return app.saved.subs.find((subTask) => subTask.id === id);
+  return currentList().subs.find((subTask) => subTask.id === id);
 }
 
 /** "Add" (or Enter in the box): a new sub-task under this task; the box keeps focus. */
@@ -66,7 +67,7 @@ function onAddClicked(button) {
   const input = taskRow.querySelector("[data-addsub]");
   const text = input.value.trim();
   if (!text) return;
-  app.saved.subs.push(newSubTask(newId(), taskId, text));
+  currentList().subs.push(newSubTask(newId(), taskId, text));
   save();
   renderPanel();
   findElement("#panel").querySelector(`[data-addsub="${CSS.escape(taskId)}"]`)?.focus();
@@ -81,7 +82,8 @@ function onDoneClicked(checkbox) {
 
 function onDeleteClicked(button) {
   const id = button.closest("[data-sub]").getAttribute("data-sub");
-  app.saved.subs = app.saved.subs.filter((subTask) => subTask.id !== id);
+  const list = currentList();
+  list.subs = list.subs.filter((subTask) => subTask.id !== id);
   save();
   renderMapPage();
 }

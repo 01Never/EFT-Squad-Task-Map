@@ -346,6 +346,8 @@ TarkovMonitor (github.com/tarkovtracker-org/TarkovMonitor) is the reference.
 }
 ```
 
+**Version 3 (ticket 22): one task list per game mode.** Each game mode is its own in-game character, so `tasks`, `ticks`, `used`, `have` and `subs` move under `"modes": { "regular": {...}, "pve": {...}, "pvp-season": {...} }`, one complete list each (empty in a new file). Everything else (`cats`, `draw`, `prefs`, `collapsed`, `pinnedOnly`, `panelTab`, `panelHidden`, `dcolor`, `dwidth`, `aiOpen`, `taskIcons`, `showScanBanner`, `squad`, `migratedFrom`) stays top-level and shared. Migration v2 → v3 (page, `web/js/app/saved-data.js`): the v2 list goes to the mode in Settings when the page loads (default `regular`); the other two start empty. v1 migrates to v2 first, then to v3. A v3 file loads unchanged; the page always saves v3. The server keeps a one-time copy of the v2 file. The page shows the list of the Settings mode; game-log `task` and `raidEnd` events carry `mode` and change that mode's list (Settings' mode when missing).
+
 **Settings file:** OpenAI key, model and effort (unchanged); `gameMode`; `logsPath`; `screenshotsPath`; `followPosition`. Remove the `tt*` fields.
 
 ---

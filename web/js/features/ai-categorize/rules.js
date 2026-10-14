@@ -163,12 +163,17 @@ export function undoAssignments(saved, undo, taskEntry) {
 }
 
 /**
- * Whether any task has a part you put in this category.
+ * Whether any task, in any game mode's list, has a part you put in this category (categories
+ * are shared by every game mode).
  * @param {SavedState} saved
  * @param {string} categoryId
  */
 function isCategoryUsed(saved, categoryId) {
-  return Object.values(saved.tasks).some((entry) =>
-    Object.values(entry.partCats || {}).some((choice) => choice.cat === categoryId),
-  );
+  for (const list of Object.values(saved.modes)) {
+    const isUsedHere = Object.values(list.tasks).some((entry) =>
+      Object.values(entry.partCats || {}).some((choice) => choice.cat === categoryId),
+    );
+    if (isUsedHere) return true;
+  }
+  return false;
 }

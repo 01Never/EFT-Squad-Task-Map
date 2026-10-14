@@ -34,7 +34,7 @@ test("adding a task by name lists it, and ticking a marker objective uses a mark
     const row = `#panel .task[data-task="${revision.id}"]`;
     assert.equal(await page.locator(row).count(), 1, "the task has a row");
     assert.equal(await markerCount(page), revision.objs.length, "one marker per objective");
-    const entry = s.savedState().tasks[revision.id];
+    const entry = s.savedList().tasks[revision.id];
     assert.equal(entry.active, true);
     assert.equal(entry.source, "manual");
     assert.equal(await page.locator(row + " .bang").count(), 1, "not ready: no marker in the bag");
@@ -51,22 +51,22 @@ test("adding a task by name lists it, and ticking a marker objective uses a mark
     // Tick the first marker objective: one marker comes out of the bag.
     await page.click(row + " .trow");
     await s.saving(() => page.check(`#panel [data-tickbox="${firstMark.id}"]`));
-    let saved = s.savedState();
+    let saved = s.savedList();
     assert.equal(saved.ticks[firstMark.id], true);
     assert.equal(saved.have[MS2000_MARKER_ID], 0, "ticking a marker objective takes one from the bag");
     assert.deepEqual(saved.used, { [firstMark.id]: 1 });
 
     // A second tick with an empty bag takes nothing; unticking it gives nothing back.
     await s.saving(() => page.check(`#panel [data-tickbox="${secondMark.id}"]`));
-    saved = s.savedState();
+    saved = s.savedList();
     assert.equal(saved.have[MS2000_MARKER_ID], 0);
     assert.deepEqual(saved.used, { [firstMark.id]: 1 });
     await s.saving(() => page.uncheck(`#panel [data-tickbox="${secondMark.id}"]`));
-    assert.equal(s.savedState().have[MS2000_MARKER_ID], 0, "unticking only gives back what that tick took");
+    assert.equal(s.savedList().have[MS2000_MARKER_ID], 0, "unticking only gives back what that tick took");
 
     // Unticking the first gives its marker back.
     await s.saving(() => page.uncheck(`#panel [data-tickbox="${firstMark.id}"]`));
-    saved = s.savedState();
+    saved = s.savedList();
     assert.equal(saved.have[MS2000_MARKER_ID], 1, "unticking gives the marker back");
     assert.deepEqual(saved.used, {});
     assert.equal(saved.ticks[firstMark.id], undefined);
@@ -86,7 +86,7 @@ test("a pinned task stays alone on the list, the map and the Bring list with Pin
     await s.saving(() => page.click(`#panel .task[data-task="${ballet.id}"] [data-act="pin"]`));
     assert.equal(await page.locator(`#panel .task[data-task="${ballet.id}"] .pinb.on`).count(), 1);
     assert.equal(await page.textContent('#panel [data-act="pinnedonly"] .n'), "1");
-    assert.equal(s.savedState().tasks[ballet.id].pinned, true);
+    assert.equal(s.savedList().tasks[ballet.id].pinned, true);
     assert.equal(await page.locator('#panel [data-act="clearpins"]').count(), 1, "Clear pins is offered");
 
     await s.saving(() => page.click("#bpin"));
@@ -148,19 +148,19 @@ test("Move to puts a part in another category, Re-sort everything puts it back w
     await page.click(rowOf(scoutingPart) + " .trow");
     await s.saving(() => page.selectOption(`#panel select[data-move="${scoutingPart}"]`, "c-night-raids"));
     assert.equal(await categoryOf(page, scoutingPart), "c-night-raids");
-    assert.deepEqual(s.savedState().tasks[glory.id].partCats, { [scoutingPart]: { cat: "c-night-raids", manual: true } });
+    assert.deepEqual(s.savedList().tasks[glory.id].partCats, { [scoutingPart]: { cat: "c-night-raids", manual: true } });
     assert.equal(await page.locator(rowOf(scoutingPart) + ' [data-act="unmove"]').count(), 1, "reset is offered");
 
     await page.click("#panel details.menu summary");
     await s.saving(() => page.click('#panel [data-act="resortall"]'));
     assert.match(s.dialogs.at(-1), /^Put every part back into its default category\?/);
     assert.equal(await categoryOf(page, scoutingPart), "b-go", "Re-sort everything undoes the move");
-    assert.deepEqual(s.savedState().tasks[glory.id].partCats, {});
+    assert.deepEqual(s.savedList().tasks[glory.id].partCats, {});
     await s.waitForToast("Re-sorted everything");
     assert.equal(await page.textContent("#toastAct"), "Undo");
     await s.saving(() => page.click("#toastAct"));
     assert.equal(await categoryOf(page, scoutingPart), "c-night-raids", "Undo brings the move back");
-    assert.deepEqual(s.savedState().tasks[glory.id].partCats, { [scoutingPart]: { cat: "c-night-raids", manual: true } });
+    assert.deepEqual(s.savedList().tasks[glory.id].partCats, { [scoutingPart]: { cat: "c-night-raids", manual: true } });
 
     // Don't split: one row for the whole task. (A move stored on one part doesn't apply to the
     // whole task: HANDOFF §11, kept as is.)
@@ -170,12 +170,12 @@ test("Move to puts a part in another category, Re-sort everything puts it back w
     assert.deepEqual(await gloryRows(), [glory.id + ":*"]);
     assert.equal(await page.locator(`#panel .task[data-task="${glory.id}"] .partof`).count(), 0);
     assert.equal(await categoryOf(page, glory.id + ":*"), "b-retrieve", "the whole task takes the first kind of work by precedence");
-    assert.equal(s.savedState().tasks[glory.id].noSplit, true);
+    assert.equal(s.savedList().tasks[glory.id].noSplit, true);
 
     await page.click(rowOf(glory.id + ":*") + " .trow");
     await s.saving(() => page.click(`#panel [data-nosplit="${glory.id}"]`));
     assert.deepEqual((await gloryRows()).sort(), [glory.id + ":go", glory.id + ":retrieve"]);
-    assert.equal(s.savedState().tasks[glory.id].noSplit, false);
+    assert.equal(s.savedList().tasks[glory.id].noSplit, false);
   });
 });
 

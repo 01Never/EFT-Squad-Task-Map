@@ -10,7 +10,9 @@ import { save } from "./saving.js";
 import { reloadGameData } from "./game-data.js";
 import { rerenderPage } from "./routing.js";
 import { EVENT_NAMES } from "./event-names.js";
-import { activateTask, finishTask } from "../features/tasks/task-list.js";
+import { shownGameMode } from "./current-list.js";
+import { GAME_MODE_NAMES, knownGameMode } from "./game-modes.js";
+import { applyTaskEventFromGame } from "../features/tasks/rules.js";
 import { resetAfterRaid, raidOverMessage, modePromptAfterReport } from "../features/raid/rules.js";
 import { renderNav } from "../features/raid/nav.js";
 import {
@@ -101,28 +103,30 @@ function acknowledge(eventId) {
 
 /**
  * A task was accepted (added, with a toast), or finished or failed (removed quietly), in the game.
- * Tasks the game data doesn't know are ignored.
+ * It changes the list of the game mode it happened in, even when another mode is shown
+ * (tasks/rules.js applyTaskEventFromGame). Tasks the game data doesn't know are ignored.
  * @param {TaskEvent} event
  */
 function onTaskChangedInGame(event) {
   const task = app.taskById[event.taskId];
   if (!task) return;
-  if (event.status === "started") {
-    const isNew = activateTask(event.taskId, "log");
-    if (isNew) showToast(`Added from the game: ${task.name}`);
-  } else {
-    finishTask(event.taskId);
+  const shownMode = shownGameMode();
+  const { mode, isNew } = applyTaskEventFromGame(app.saved, event, task, shownMode, Date.now());
+  if (isNew) {
+    const otherList = mode === shownMode ? "" : ` (${GAME_MODE_NAMES[mode]} list)`;
+    showToast(`Added from the game${otherList}: ${task.name}`);
   }
   save();
   rerenderPage();
 }
 
 /**
- * The raid ended: bag counts and extract marks reset, your position and trail are cleared.
+ * The raid ended: bag counts (of the raid's game mode; Settings' mode when the event has none)
+ * and extract marks reset, your position and trail are cleared.
  * @param {RaidEndEvent} event
  */
 function onRaidEnded(event) {
-  resetAfterRaid(app.saved);
+  resetAfterRaid(app.saved, knownGameMode(event.mode, shownGameMode()));
   app.gps = null;
   app.trail = [];
   app.status.raid = { ...app.status.raid, active: false, map: null };

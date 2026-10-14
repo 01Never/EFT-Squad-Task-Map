@@ -19,20 +19,23 @@ game data.
 - A task on several screenshots keeps its highest progress (`matchScannedRows()`).
 - The scan **replaces** your list (owner's decision after 2.0.1) only when every screenshot was read
   and something was recognised (`shouldScanReplaceList()`); otherwise it only adds. Replacing
-  forgets every active task the screenshots didn't show (`features/tasks forgetTask()`).
+  forgets every active task the screenshots didn't show (`forgetTasksNotSeen()`, with
+  `features/tasks forgetTask()`).
+- A scan adds to, or replaces, only the shown game mode's list (the mode in Settings when you
+  confirm); the other modes' lists are other characters' tasks and stay as they are (ticket 22).
 - Screenshots are shrunk to `SCAN_IMAGE_MAX_EDGE_PIXELS` = 2048 px on the long edge (JPEG 0.9)
   before they're sent, `SCAN_PARALLEL_READS` = 3 at a time.
 - The capture bar estimates about 1.5k input tokens per screenshot.
 
 **Flow:** Scan → `startScan()` → `POST /api/scan/start` → screenshots → event `capture` →
 `onCaptureChanged()` → thumbnails → Done → `POST /api/scan/stop`, `readCapturedScreenshots()` →
-`POST /api/scan/read` per image → review → confirm: `activateTask()` per task, `forgetTask()` for
-the rest when replacing, save, `POST /api/scan/confirm` (the server deletes only names in its
+`POST /api/scan/read` per image → review → confirm: `activateTask()` per task,
+`forgetTasksNotSeen()` for the rest when replacing (both on the shown mode's list), save, `POST /api/scan/confirm` (the server deletes only names in its
 capture list) → toast "Added 6 tasks · removed 1 · deleted 1 screenshot". Cancel →
 `POST /api/scan/cancel`.
 
-**Saved data / settings:** changes `tasks` (and `ticks`, `used`, `subs` of forgotten tasks),
-clears `showScanBanner`. Needs the OpenAI key and the screenshots folder (Settings).
+**Saved data / settings:** changes `modes[mode].tasks` of the shown mode (and its `ticks`, `used`,
+`subs` of forgotten tasks), clears `showScanBanner`. Reads the setting `gameMode`. Needs the OpenAI key and the screenshots folder (Settings).
 
 **Privacy and cost:** each screenshot (shrunk) goes to OpenAI through the server, billed to your key.
 

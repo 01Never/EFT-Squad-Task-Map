@@ -2,8 +2,13 @@
 // Tasks: what kind of work each objective is, how a task splits into parts, which maps it's on,
 // tick progress, and adding / finishing / forgetting tasks in the saved data.
 // Plain functions only: no DOM, no network. Categories are in categories.js.
+import { blankTaskEntry, taskListOf } from "../../app/saved-data.js";
+import { knownGameMode } from "../../app/game-modes.js";
 
-/** @import { Task, Objective, Part, Action, SavedState, TaskEntry, PartOnMap, MapInfo } from "../../app/types.js" */
+/**
+ * @import { Task, Objective, Part, Action, SavedState, TaskList, TaskEntry, PartOnMap, MapInfo,
+ *   TaskEvent } from "../../app/types.js"
+ */
 
 // A task kept whole takes the first of these actions it contains: the "hardest" kind of work.
 /** @type {Action[]} */
@@ -445,38 +450,64 @@ export function activateTaskEntry(entry, source, extra, now) {
 /**
  * A task finished or failed in the game (from the log): off the list, ticks cleared, unpinned.
  * Its categories and sub-tasks are kept, in case it comes back.
- * @param {SavedState} saved
+ * @param {TaskList} list the game mode's list it finished in
  * @param {string} taskId
  * @param {Task | undefined} task
  * @returns {boolean} false when it wasn't on the list
  */
-export function finishTaskEntry(saved, taskId, task) {
-  const entry = saved.tasks[taskId];
+export function finishTaskEntry(list, taskId, task) {
+  const entry = list.tasks[taskId];
   if (!entry || !entry.active) return false;
   entry.active = false;
   entry.pinned = false;
   if (task) {
-    for (const objective of task.objs) delete saved.ticks[objective.id];
+    for (const objective of task.objs) delete list.ticks[objective.id];
   }
   return true;
 }
 
 /**
+ * A task accepted, finished or failed in the game (a `task` event from the game log) changes the
+ * list of the game mode it happened in, even while another mode is shown: each mode is its own
+ * character (ticket 22). An event without a mode (queued by an older version) or with one this
+ * page doesn't know goes to the shown mode's list. Accepted: on the list, from the log.
+ * Finished or failed: off the list, see finishTaskEntry.
+ * @param {SavedState} saved changed in place
+ * @param {TaskEvent} event
+ * @param {Task | undefined} task the event's task in the game data
+ * @param {string} shownMode the game mode in Settings
+ * @param {number} now ms since 1970
+ * @returns {{ mode: string, isNew: boolean }} the list's mode; isNew: it was just put on the list
+ */
+export function applyTaskEventFromGame(saved, event, task, shownMode, now) {
+  const mode = knownGameMode(event.mode, shownMode);
+  const list = taskListOf(saved, mode);
+  if (event.status === "started") {
+    list.tasks[event.taskId] = list.tasks[event.taskId] || blankTaskEntry(now);
+    const isNew = activateTaskEntry(list.tasks[event.taskId], "log", {}, now);
+    return { mode, isNew };
+  }
+  finishTaskEntry(list, event.taskId, task);
+  return { mode, isNew: false };
+}
+
+/**
  * Drop a task as if it was never added: its entry (categories, pin, Don't split), ticks, used
- * counts and sub-tasks. Used when a scan replaces the list (owner's decision).
- * @param {SavedState} saved
+ * counts and sub-tasks. Used when a scan replaces the list (owner's decision). Only this game
+ * mode's list changes.
+ * @param {TaskList} list
  * @param {string} taskId
  * @param {Task | undefined} task
  */
-export function forgetTask(saved, taskId, task) {
-  delete saved.tasks[taskId];
+export function forgetTask(list, taskId, task) {
+  delete list.tasks[taskId];
   if (task) {
     for (const objective of task.objs) {
-      delete saved.ticks[objective.id];
-      if (saved.used) delete saved.used[objective.id];
+      delete list.ticks[objective.id];
+      if (list.used) delete list.used[objective.id];
     }
   }
-  saved.subs = saved.subs.filter((subTask) => subTask.task !== taskId);
+  list.subs = list.subs.filter((subTask) => subTask.task !== taskId);
 }
 
 /**
