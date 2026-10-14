@@ -5,7 +5,7 @@ backups, the names of every other data file, and writing a file safely.
 
 **What it deliberately doesn't do:**
 - Look inside the page's saved data. The page owns its format and migrates it (SPEC §5.3, §12);
-  the server only checks it's JSON, and whether it's still v1.
+  the server only checks it's JSON, and its `version` (for the one-time v1 and v2 backups).
 - Touch the game's files.
 
 **Data folder** (`DataDir`): `STM_DATA_DIR` when set (development and tests use a scratch folder);
@@ -18,6 +18,7 @@ temporary build is recognised by `go-build` or `\temp\` in the exe's path.
 |---|---|---|
 | `squad-task-map-data.json` (+ `.bak`) | the page's saved data | the page, through `WriteStateText` |
 | `squad-task-map-data.v1-backup.json` | an untouched copy of v1 data, made once | `BackupV1IfNeeded` |
+| `squad-task-map-data.v2-backup.json` | an untouched copy of v2 data, made once before the page moves to v3 (one task list per game mode, issue #22) | `BackupV2IfNeeded` |
 | `squad-task-map-settings.json` | settings | the app, through `WriteSettings` |
 | `squad-task-map-pending.json` | events waiting for the page | `events` |
 | `squad-task-map-wikicache.json` | wiki pages for AI Categorize | `aicategorize` |
@@ -35,7 +36,12 @@ temporary build is recognised by `go-build` or `\temp\` in the exe's path.
   JSON"), so a broken request can't wipe your data. The previous file is copied to `.bak` first.
   `ReadStateText` returns `null` when there's no file yet; the page then starts fresh.
 - **v1 backup** (`BackupV1IfNeeded`, at start-up): when the saved data exists, there's no backup
-  yet, and it isn't `{"version": 2, …}`, copy it once before the page migrates it.
+  yet, and it has no `version` or a version below 2, copy it once before the page migrates it.
+  Version 2 and later (also v3) are never copied here.
+- **v2 backup** (`BackupV2IfNeeded`, at start-up, right after the v1 backup): when the saved data
+  is `{"version": 2, …}` and there's no v2 backup yet, copy it once before the page migrates it to
+  v3. Never for v1, v3, `null` or broken JSON, and an existing backup is never overwritten, so it
+  stays the untouched v2 file after the page has saved v3.
 - **Settings** (`ReadSettings`, `WriteSettings`): the known fields are `openaiKey`, `openaiModel`,
   `openaiEffort`, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`, and
   the `squad` block (ticket 05: `playerId`, `name`, `color`, `shareTasks`, `joined`; never the
@@ -52,7 +58,7 @@ temporary build is recognised by `go-build` or `\temp\` in the exe's path.
   `MaskKey`: the first 4 and last 4 characters around "…" (null when there's no key).
 
 **Files:** `files.go` (data folder, file names, atomic write), `settings.go` (settings, masking the
-key), `state.go` (saved data, `.bak`, v1 backup).
+key), `state.go` (saved data, `.bak`, v1 and v2 backups).
 
 - **Pre-update backup** (`BackupStateBeforeUpdate(files, version)`): copies the saved data to
   `squad-task-map-data.before-<version>.json`, then deletes all but the newest 3 such files (by
@@ -60,5 +66,9 @@ key), `state.go` (saved data, `.bak`, v1 backup).
   is refused. The saved data itself is never touched.
 
 **Tests:** `update_backup_test.go` (the copy, no data, only the newest 3 kept while other backups are
-left alone, unsafe versions refused); `storage_test.go`: atomic writes leave no `.tmp`; non-JSON state is refused and the previous file kept as `.bak`; "null" when there's no data; the v1 backup is made once and never for version 2; unknown settings survive a save while `tt…` fields are dropped; unknown fields inside `squad` survive too, and no block reads as not in a squad; defaults for Follow and auto-center; key masking; only a go-build path counts as `go run`. **Needs a Windows check:** the data files land next to the exe; the
-owner's real v1 file gets its backup once.
+left alone, unsafe versions refused); `storage_test.go`: atomic writes leave no `.tmp`; non-JSON state is refused and the previous file kept as `.bak`; "null" when there's no data; the v1 backup is made once and never for version 2 or 3; the v2 backup
+(`TestTheV2DataIsCopiedOnceBeforeTheMigrationToOneListPerMode`,
+`TestTheV2BackupIsMadeOnlyOnceAndSurvivesTheMigration`) is made once, only for version 2, never
+overwritten, and a v3 file doesn't become the v1 backup; unknown settings survive a save while `tt…` fields are dropped; unknown fields inside `squad` survive too, and no block reads as not in a squad; defaults for Follow and auto-center; key masking; only a go-build path counts as `go run`. **Needs a Windows check:** the data files land next to the exe; the
+owner's real v1 file gets its backup once; the owner's real v2 file gets its v2 backup once, at the
+first start of the version with one task list per game mode.

@@ -131,6 +131,7 @@ func TestTheV1DataIsCopiedOnceBeforeTheMigration(t *testing.T) {
 		{"v1 data (no version) is copied", ptr(`{"tasks":[]}`), nil, ptr(`{"tasks":[]}`)},
 		{"version 1 is copied", ptr(`{"version":1}`), nil, ptr(`{"version":1}`)},
 		{"version 2 is never copied", ptr(`{"version":2}`), nil, nil},
+		{"version 3 (one list per game mode) is never copied", ptr(`{"version":3}`), nil, nil},
 		{"null (nothing saved yet) is never copied", ptr(`null`), nil, nil},
 		{"broken JSON is never copied", ptr(`{"tasks":`), nil, nil},
 		{"no data file, no backup", nil, nil, nil},
@@ -167,6 +168,62 @@ func TestTheV1BackupIsMadeOnlyOnce(t *testing.T) {
 	BackupV1IfNeeded(files)
 	if got := readText(t, files.V1Backup); got != `{"tasks":["first"]}` {
 		t.Errorf("backup = %q, want the first copy", got)
+	}
+}
+
+func TestTheV2DataIsCopiedOnceBeforeTheMigrationToOneListPerMode(t *testing.T) {
+	cases := []struct {
+		name       string
+		saved      *string // nil: no data file
+		backup     *string // an existing backup
+		wantBackup *string // nil: no backup afterwards
+	}{
+		{"version 2 is copied", ptr(`{"version":2,"tasks":{}}`), nil, ptr(`{"version":2,"tasks":{}}`)},
+		{"v1 data (no version) is never copied", ptr(`{"tasks":[]}`), nil, nil},
+		{"version 1 is never copied", ptr(`{"version":1}`), nil, nil},
+		{"version 3 is never copied", ptr(`{"version":3,"modes":{}}`), nil, nil},
+		{"null (nothing saved yet) is never copied", ptr(`null`), nil, nil},
+		{"broken JSON is never copied", ptr(`{"version":2,`), nil, nil},
+		{"no data file, no backup", nil, nil, nil},
+		{"an existing backup is never overwritten", ptr(`{"version":2,"newer":true}`), ptr(`{"version":2}`), ptr(`{"version":2}`)},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			files := FilesIn(t.TempDir())
+			if testCase.saved != nil {
+				writeText(t, files.State, *testCase.saved)
+			}
+			if testCase.backup != nil {
+				writeText(t, files.V2Backup, *testCase.backup)
+			}
+			BackupV2IfNeeded(files)
+			if testCase.wantBackup == nil {
+				if FileExists(files.V2Backup) {
+					t.Errorf("unexpected backup: %q", readText(t, files.V2Backup))
+				}
+				return
+			}
+			if got := readText(t, files.V2Backup); got != *testCase.wantBackup {
+				t.Errorf("backup = %q, want %q", got, *testCase.wantBackup)
+			}
+		})
+	}
+}
+
+func TestTheV2BackupIsMadeOnlyOnceAndSurvivesTheMigration(t *testing.T) {
+	files := FilesIn(t.TempDir())
+	writeText(t, files.State, `{"version":2,"tasks":["first"]}`)
+	BackupV2IfNeeded(files)
+	writeText(t, files.State, `{"version":2,"tasks":["second"]}`)
+	BackupV2IfNeeded(files)
+	writeText(t, files.State, `{"version":3,"modes":{}}`) // the page migrated it
+	BackupV2IfNeeded(files)
+	BackupV1IfNeeded(files)
+	if got := readText(t, files.V2Backup); got != `{"version":2,"tasks":["first"]}` {
+		t.Errorf("backup = %q, want the first copy", got)
+	}
+	if FileExists(files.V1Backup) {
+		t.Errorf("a v3 file must not become the v1 backup: %q", readText(t, files.V1Backup))
 	}
 }
 

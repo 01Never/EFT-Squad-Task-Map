@@ -158,7 +158,7 @@ type ShareResult struct {
 	InSquad     bool  `json:"inSquad"`     // false: kept for when you join, nobody gets it now
 }
 
-// SetMyShare takes the page's drawings and tasks, stamps them (StampShare) and, when they changed,
+// SetMyShare takes the page's drawings, tasks and game mode, stamps them (StampShare) and, when they changed,
 // saves them and sends them to friends' open streams.
 func (squad *Squad) SetMyShare(parts ShareParts) (ShareResult, error) {
 	if err := ValidateParts(parts); err != nil {
@@ -210,7 +210,7 @@ func (squad *Squad) restampMineLocked() {
 	if squad.mine == nil {
 		return
 	}
-	parts := ShareParts{Draw: squad.mine.Draw, Tasks: squad.mine.Tasks}
+	parts := ShareParts{Draw: squad.mine.Draw, Tasks: squad.mine.Tasks, Mode: squad.mine.Mode}
 	next, changed := squad.stampLocked(parts)
 	squad.mine = &next
 	if changed {

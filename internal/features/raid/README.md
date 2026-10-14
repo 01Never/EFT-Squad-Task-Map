@@ -4,7 +4,8 @@
 your GPS positions land on that raid's map. Back in the menus after a raid, a toast says "Raid
 over: bag counts and extract marks reset, N GPS screenshots deleted": what you're carrying (`have`,
 `used`), your extract marks and your trail are reset, and the GPS screenshots you took in that raid
-are deleted. It also decides whether a task event from the log counts, by game mode.
+are deleted. It also decides which game mode's task list a task event from the log (and a raid
+end) belongs to: each mode (PvP, PvE, PvP Season) is a separate character with its own tasks.
 
 **Where the data comes from:** the `gamelog` events (application log: `scene preset path`,
 `NetworkGameCreate … Location`, `GameStarted`, the profile lines, matchmaking cancelled,
@@ -38,15 +39,21 @@ screenshot that appears while the app runs (`NoteGPSShot`).
     screenshots folder.
   Screenshots from the menus, from before the app started, or from an earlier raid are never
   touched. This is one of the two deletions CLAUDE.md allows. Then the raid's map, the loading map
-  and the shot list are cleared, and the app *delivers* `raidEnd` with the map and the number of
-  files deleted. Delivered means queued until the page confirms it, so the reset happens even if
-  the page was closed at that moment.
-- **Game mode** (`ModeMatches`): a task event from the log counts only when the game's latest
-  `Session mode` equals the game mode chosen in Settings (`gameMode`, default `regular`). The latest
-  line wins (the game writes two at start-up: `Pve`, then `PvpSeason`). While the session mode is
-  unknown, because the app started after the game wrote it, every task event counts, as in v2.
-  That gap is one suspect for the "phantom tasks" squadmates reported (HANDOFF §11); it's kept
-  until the owner decides. The session mode isn't reset at raid end.
+  and the shot list are cleared, and the app *delivers* `raidEnd` with the map, the number of
+  files deleted and the game mode (below), so the page resets only that mode's bag counts.
+  Delivered means queued until the page confirms it, so the reset happens even if the page was
+  closed at that moment.
+- **Game mode** (`TaskEventMode`, issue #22): no task event is dropped for its game mode any more.
+  Each one carries the mode it belongs to: the game's latest `Session mode`, or, while that is
+  unknown, the game mode chosen in Settings (`gameMode`, default `regular`). The latest line wins
+  (the game writes two at start-up: `Pve`, then `PvpSeason`). The page puts the event in that
+  mode's task list. The same mode goes on `raidEnd`. The session mode is unknown when the app
+  started after the game wrote it; the event then lands in the Settings mode's list, which may be
+  the wrong one. That gap is one suspect for the "phantom tasks" squadmates reported (HANDOFF §11).
+  The session mode isn't reset at raid end.
+  - Events for tasks that aren't in the game data are still dropped (`gameData.TaskExists`, daily
+    and weekly tasks). That check uses the game data of the Settings mode; tarkov.dev uses the same
+    task ids in every mode, so a task from another mode is found too.
 - **Status** (part of `/api/status`): `active`, `map` (the raid's map, else the loading one),
   `sessionMode` (null until the log says).
 
@@ -62,28 +69,33 @@ GPS screenshot → screenshots watcher → app.onScreenshot → raid.NoteGPSShot
   → gps.Tracker.Update → Broadcast "gps"
 profile line / "UserMatchOver" → (profileSelected / raidLeft) → raid.ShouldEndOnMenuReturn
   → app.endRaid → raid.End(gps.IsGPSFileName, screenshots.DeleteFile)
-  → hub.Deliver "raidEnd" {map, deleted} → gps position cleared
-  → live.js: have, used, extract marks and trail reset, saved, toast
+  → hub.Deliver "raidEnd" {map, deleted, mode} (mode: raid.TaskEventMode) → gps position cleared
+  → page: that mode's have and used, extract marks and trail reset, saved, toast
 "Session mode: X" → (mode) → raid.SetSessionMode → Broadcast "mode"
-"ChatMessageReceived" type 10/11/12 → (task) → raid.ModeMatches(session mode, setting)
-  and gameData.TaskExists → Deliver "task"
+"ChatMessageReceived" type 10/11/12 → (task) → gameData.TaskExists
+  → Deliver "task" {taskId, status, mode} (mode: raid.TaskEventMode(session mode, setting))
+  → page: that mode's task list
 ```
 
 **Saved data / settings:** nothing saved; the raid state lives in memory. Restarting the app
 forgets the current raid and its shot list, so shots taken before the restart are never deleted
-automatically. Reads the `gameMode` setting (through the app) for `ModeMatches`. What gets reset
+automatically. Reads the `gameMode` setting (through the app) for `TaskEventMode`. What gets reset
 at raid end (`have`, `used`, `prefs[map].extMarked`) is the page's saved data, reset by the page.
 
 **Files:**
-- `rules.go`: the rules as plain functions: `ModeMatches`, `EndsOnMenuReturn`.
+- `rules.go`: the rules as plain functions: `TaskEventMode`, `EndsOnMenuReturn`.
 - `raid.go`: `Tracker`, one method per log event (`SetSessionMode`, `MapLoading`, `MapLoaded`,
   `MatchingAborted`, `Start`, `NoteGPSShot`, `CurrentMap`, `ShouldEndOnMenuReturn`, `End`,
   `Status`). A mutex guards it: log events and screenshots arrive on different goroutines.
 - `raid_test.go`: the tests.
 
 **Tests** (`raid_test.go`):
-- `TestTaskEventsCountOnlyInTheChosenGameMode`: same mode counts; PvE events don't touch the PvP
-  Season list; unknown session mode counts (as v2).
+- `TestTaskEventsGoToTheListOfTheGameModeTheyHappenedIn`: the session mode wins over Settings
+  (a PvE event goes to the PvE list even when Settings say PvP Season); unknown session mode →
+  the Settings mode.
+- In `internal/app/game_mode_test.go`: `TestATaskEventInAnotherGameModeIsDeliveredWithThatMode`
+  (delivered, not dropped, with its mode), `TestATaskThatIsNotInTheGameDataIsStillDropped`,
+  `TestTheRaidEndCarriesTheGameModeOfThatRaid`.
 - `TestARaidTakesTheLoadingMapAndEndsBackInTheMenus`: the profile line before any raid doesn't end
   anything; the scene path's map wins over the nameId; back in the menus ends the raid.
 - `TestCancelledMatchmakingForgetsTheLoadingMap`.

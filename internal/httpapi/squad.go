@@ -33,7 +33,7 @@ func (server *Server) squadView(writer http.ResponseWriter, _ *http.Request) {
 	writeJSON(writer, http.StatusOK, server.backend.SquadView())
 }
 
-// setSquadShare: PUT /api/squad/share {draw, tasks} → {ok, rev, updatedAt, changed, tasksShared, inSquad}.
+// setSquadShare: PUT /api/squad/share {draw, tasks, mode} → {ok, rev, updatedAt, changed, tasksShared, inSquad}.
 // Over 2 MB → 413; not the right shape → 400 with the reason.
 func (server *Server) setSquadShare(writer http.ResponseWriter, request *http.Request) {
 	data, err := io.ReadAll(io.LimitReader(request.Body, squad.MaxShareBytes+1))

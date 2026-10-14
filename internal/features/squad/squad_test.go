@@ -241,6 +241,38 @@ func TestTheCacheKeepsMyShareAndFriendsAcrossARestart(t *testing.T) {
 	}
 }
 
+func TestAFriendsGameModeSurvivesTheCacheAndReachesThePage(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "squad-task-map-squad.json")
+	parts := someParts()
+	parts.Mode = "pve"
+	friendShare, _ := StampShare(nil, sam, parts, true, noon)
+	oldCopyShare, _ := StampShare(nil, sam, someParts(), true, noon)
+
+	cases := []struct {
+		name     string
+		share    Share
+		wantJSON string // what the page's friend view must contain, or "" for no mode field
+	}{
+		{"a friend's mode is kept", friendShare, `"mode":"pve"`},
+		{"an older copy's share has no mode field", oldCopyShare, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			writeCache(path, nil, map[string]CachedFriend{sam.ID: {LastSeen: 42, Share: tc.share}})
+			_, friends := readCache(path)
+			view := FriendView{PlayerID: sam.ID, Share: friends[sam.ID].Share}
+			encoded, _ := json.Marshal(view)
+			hasMode := strings.Contains(string(encoded), `"mode"`)
+			if tc.wantJSON == "" && hasMode {
+				t.Errorf("friend view %s has a mode", encoded)
+			}
+			if tc.wantJSON != "" && !strings.Contains(string(encoded), tc.wantJSON) {
+				t.Errorf("friend view %s, want %s", encoded, tc.wantJSON)
+			}
+		})
+	}
+}
+
 func TestMyShareKeepsItsRevAfterARestart(t *testing.T) {
 	dir := t.TempDir()
 	settings := Settings{PlayerID: mike.ID, Name: "Mike", Color: "#4dabf7", ShareTasks: true}

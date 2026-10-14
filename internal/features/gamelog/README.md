@@ -112,14 +112,14 @@ in a way that doesn't work (SysReq)…"; if nothing is bound, "No screenshot key
 Tarkov writes a line
   → (within 5 s) Watcher.Poll → readNewBytesLocked → Feed → SplitEntries → EventsFrom
   → app.onLogEvent (internal/app/app.go), one event at a time, in log order:
-      task             → onTaskChanged: raid.ModeMatches + gameData.TaskExists
-                         → hub.Deliver "task" → live.js: activate() + toast, or finish() quietly
+      task             → onTaskChanged: gameData.TaskExists, mode = raid.TaskEventMode
+                         → hub.Deliver "task" {taskId, status, mode} → page: that mode's list
       mode             → raid.SetSessionMode → hub.Broadcast "mode" → live.js: "Switch data" prompt
       mapLoading       → gameData.MapFromScene → raid.MapLoading → Broadcast "raidMap" → nav bar
       mapLoaded        → gameData.MapFromNameID → raid.MapLoaded (no event)
       raidStart        → raid.Start, gps trail cleared → Broadcast "raidStart" → live.js: "● In raid"
       raidLeft,
-      profileSelected  → raid.ShouldEndOnMenuReturn → app.endRaid → Deliver "raidEnd"
+      profileSelected  → raid.ShouldEndOnMenuReturn → app.endRaid → Deliver "raidEnd" {…, mode}
       matchingAborted  → raid.MatchingAborted (no event)
       keybind          → onScreenshotKeyChecked → Broadcast "keybind" → live.js: toast if not ok
 ```
