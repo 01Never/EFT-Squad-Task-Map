@@ -27,7 +27,7 @@ func newGameModeRig(t *testing.T, settingMode string) (*App, storage.Files) {
 		t.Fatal(err)
 	}
 	notNeeded := func() (gamedata.GameData, error) { return gamedata.GameData{}, errors.New("not needed in this test") }
-	app := newApp("2.8.1", "", files, notNeeded)
+	app := newApp("2.9.0", "", files, notNeeded)
 	t.Cleanup(app.squad.Stop)
 	app.gameData.SetMode(settingMode, false)
 	return app, files

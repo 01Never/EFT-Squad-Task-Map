@@ -19,7 +19,7 @@ Windows SmartScreen may say "Windows protected your PC" the first time, because 
 ## What it does
 
 ### Your tasks, per map
-Pick a map and see a marker for every objective of the tasks you have, grouped into categories (boss hunts, kills, placing, retrieving…) that you can rename, recolour and reorder. Tasks you accept or finish in-game are added or removed within seconds, from the game's log files. Where you have to place something, the marker shows the item's icon.
+The app opens on a game mode page (PvE, PvP, PvP Season); each mode keeps its own task list. Pick a mode, then a map, and see a marker for every objective of the tasks you have, grouped into categories (boss hunts, kills, placing, retrieving…) that you can rename, recolour and reorder. Tasks you accept or finish in-game are added or removed within seconds, from the game's log files. Where you have to place something, the marker shows the item's icon.
 
 ![The map picker: every map with how many of your tasks are on it](docs/images/map-picker.png)
 
@@ -50,7 +50,7 @@ Join friends with an invite code: a private Tailscale network is built into the 
 ### And more
 - **Scan your task list:** screenshot the in-game Tasks screen and an OpenAI vision model reads it, so your list matches the game exactly (optional, your own API key).
 - **AI Categorize:** sort tasks by plain-English instructions, checked against each task's wiki page (optional).
-- **Draw** on the map, **pin** tasks, add **sub-tasks**, and switch between PvP and PvE data.
+- **Draw** on the map, **pin** tasks, add **sub-tasks**, and switch between game modes (PvP, PvE, PvP Season), each with its own task list.
 - **Check for updates** in Settings: signed releases from this repo, installed with one click.
 
 The full manual is the **[user guide](docs/USER-GUIDE.md)**: setup, every feature, settings, privacy, and the files the app keeps next to the exe.
