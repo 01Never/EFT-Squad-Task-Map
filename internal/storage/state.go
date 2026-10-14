@@ -21,10 +21,15 @@ func ReadStateText(path string) string {
 }
 
 // WriteStateText saves the page's data. The previous file is kept as .bak first, and anything
-// that isn't JSON is refused, so a broken request can't wipe the data.
+// that isn't JSON is refused, so a broken request can't wipe the data. Data older than the file
+// is refused too: a page left open from an older version (one task list for every mode) must not
+// turn the migrated file back into its own version after an update.
 func WriteStateText(path string, text []byte) error {
 	if !json.Valid(text) {
 		return errors.New("the saved data isn't valid JSON")
+	}
+	if isOlderThanTheFile(path, text) {
+		return errors.New("this page is from an older version of the program: reload it to keep saving")
 	}
 	if FileExists(path) {
 		if err := copyFile(path, path+".bak"); err != nil {
@@ -65,6 +70,13 @@ func BackupV2IfNeeded(files Files) {
 	_ = copyFile(files.State, files.V2Backup)
 }
 
+// isOlderThanTheFile: the page sent data of a lower version than the file on disk.
+func isOlderThanTheFile(path string, text []byte) bool {
+	fileVersion, fileHasData := savedDataVersion(path)
+	newVersion, newHasData := savedDataVersionOf(text)
+	return fileHasData && newHasData && newVersion < fileVersion
+}
+
 // savedDataVersion reads the "version" of the page's saved data. hasData is false when there's
 // no file, it isn't JSON, or it's null (nothing saved yet). Data without a version number (v1)
 // reads as version 0.
@@ -73,6 +85,11 @@ func savedDataVersion(path string) (version float64, hasData bool) {
 	if err != nil {
 		return 0, false
 	}
+	return savedDataVersionOf(data)
+}
+
+// savedDataVersionOf is savedDataVersion for data already read.
+func savedDataVersionOf(data []byte) (version float64, hasData bool) {
 	var saved any
 	if json.Unmarshal(data, &saved) != nil || saved == nil {
 		return 0, false
