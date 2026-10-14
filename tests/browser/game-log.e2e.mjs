@@ -30,14 +30,14 @@ test("game log: a task accepted in-game is added, a finished one is removed, and
       s.taskMessage(dandies.id, 10);
       await s.waitForToast("Added from the game: Dandies");
     }, LOG_WAIT);
-    let entry = s.savedState().tasks[dandies.id];
+    let entry = s.savedList().tasks[dandies.id];
     assert.equal(entry.active, true);
     assert.equal(entry.source, "log");
     assert.equal(await page.locator(`#panel .task[data-task="${dandies.id}"]`).count(), 2, "both parts are listed");
 
     s.step("task finished in-game");
     await s.saving(() => s.taskMessage(dandies.id, 12), LOG_WAIT);
-    assert.equal(s.savedState().tasks[dandies.id].active, false, "a finished task is removed quietly");
+    assert.equal(s.savedList().tasks[dandies.id].active, false, "a finished task is removed quietly");
     assert.equal(await page.locator(`#panel .task[data-task="${dandies.id}"]`).count(), 0);
 
     // A PvE session: its task events don't touch the PvP Season list, and the page offers to switch.
@@ -47,7 +47,7 @@ test("game log: a task accepted in-game is added, a finished one is removed, and
     await page.waitForSelector("#modeSwitch", LOG_WAIT);
     assert.match(await page.textContent("#navinfo .modewarn"), /PvE · Switch data Not now/);
     await sleep(1000); // the task line was read in the same check; give a wrong reaction time to show
-    assert.equal(s.savedState().tasks[dandies.id].active, false, "a PvE task event doesn't change the PvP Season list");
+    assert.equal(s.savedList("pvp-season").tasks[dandies.id].active, false, "a PvE task event doesn't change the PvP Season list");
 
     s.step("switch data");
     await s.answered("PUT", "/api/settings", () => page.click("#modeSwitch"));
@@ -110,11 +110,11 @@ test("a GPS screenshot draws your arrow; raid end resets bag counts and extract 
       s.appLog("PrepareSelectedProfileLocally ProfileId:0 AccountId:1");
       await s.waitForToast("Raid over: bag counts and extract marks reset, 2 GPS screenshots deleted");
     }, LOG_WAIT);
-    const saved = s.savedState();
+    const saved = s.savedList();
     assert.deepEqual(saved.have, {}, "bag counts reset");
     assert.deepEqual(saved.used, {});
-    assert.deepEqual(saved.prefs["streets-of-tarkov"].extMarked, {}, "extract marks reset");
-    assert.deepEqual(saved.prefs.customs.extMarked, {}, "on every map");
+    assert.deepEqual(s.savedState().prefs["streets-of-tarkov"].extMarked, {}, "extract marks reset");
+    assert.deepEqual(s.savedState().prefs.customs.extMarked, {}, "on every map");
     assert.deepEqual(s.screenshotFiles(), [], "that raid's GPS screenshots are deleted");
     assert.equal(await page.isHidden("#gpsbar"), true);
     assert.equal(await page.locator("svg.map g[data-r]").count(), 0, "your marker is gone");

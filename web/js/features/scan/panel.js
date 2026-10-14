@@ -3,12 +3,13 @@
 // with the AI (through the server), and the review dialog that adds tasks, replaces the list and
 // deletes the screenshots. The rules (name matching, what a scan replaces) are in rules.js.
 import { app } from "../../app/state.js";
+import { currentList } from "../../app/current-list.js";
 import { escapeHtml, findElement, showToast, openModal } from "../../app/dom.js";
 import { callApi } from "../../app/api.js";
 import { save } from "../../app/saving.js";
 import { mapDisplayName } from "../../app/game-data.js";
 import { rerenderPage } from "../../app/routing.js";
-import { mapsOfTask, isOffMapTask, forgetTask } from "../tasks/rules.js";
+import { mapsOfTask, isOffMapTask } from "../tasks/rules.js";
 import { activateTask } from "../tasks/task-list.js";
 import { openAiKeyDialog, openSettings } from "../settings/panel.js";
 import {
@@ -19,6 +20,7 @@ import {
   shouldScanReplaceList,
   scanResultNote,
   estimatedThousandTokens,
+  forgetTasksNotSeen,
 } from "./rules.js";
 
 /** @import { CaptureEvent, CapturedFile } from "../../app/types.js" */
@@ -219,7 +221,8 @@ function sortScanResults(fileNames, rows, errors) {
   const { found, unknown } = matchScannedRows(rows, app.taskNameMatcher);
   const byName = (first, second) => first.task.name.localeCompare(second.task.name);
   const all = [...found.values()].sort(byName);
-  const isOnList = (foundTask) => !!(app.saved.tasks[foundTask.task.id] && app.saved.tasks[foundTask.task.id].active);
+  const list = currentList();
+  const isOnList = (foundTask) => !!(list.tasks[foundTask.task.id] && list.tasks[foundTask.task.id].active);
   const fresh = all.filter((foundTask) => !isOnList(foundTask));
   return {
     fileNames,
@@ -323,13 +326,14 @@ function renderUnknownNames(unknown) {
 
 /**
  * The main button: add, update, remove (when the scan replaces the list), then delete the
- * screenshots and say what happened.
+ * screenshots and say what happened. Only the shown game mode's list changes (ticket 22).
  * @param {ScanReview} review
  * @param {HTMLElement} dialog
  * @param {() => void} close
  */
 async function onConfirmClicked(review, dialog, close) {
   const saved = app.saved;
+  const list = currentList();
   const now = () => Date.now();
   let added = 0;
   let removed = 0;
@@ -338,20 +342,22 @@ async function onConfirmClicked(review, dialog, close) {
     if (!checkbox.checked) continue;
     const foundTask = review.found.get(checkbox.dataset.add);
     seen.add(foundTask.task.id);
-    if (activateTask(foundTask.task.id, "scan", { gamePct: foundTask.progress, scannedAt: now() })) added++;
+    const extra = { gamePct: foundTask.progress, scannedAt: now() };
+    if (activateTask(foundTask.task.id, "scan", extra, list)) added++;
   }
   for (const input of /** @type {NodeListOf<HTMLInputElement>} */ (dialog.querySelectorAll("[data-fix]"))) {
     const typedName = input.value.trim();
     const matched = typedName && app.taskNameMatcher.match(typedName);
     if (!matched) continue;
     seen.add(matched.task.id);
-    if (activateTask(matched.task.id, "scan", { scannedAt: now() })) added++;
+    if (activateTask(matched.task.id, "scan", { scannedAt: now() }, list)) added++;
   }
   for (const foundTask of review.alreadyOnList) {
-    const entry = saved.tasks[foundTask.task.id];
+    const entry = list.tasks[foundTask.task.id];
+    if (!entry) continue; // the game mode was switched while the scan was open
     Object.assign(entry, { gamePct: foundTask.progress ?? entry.gamePct, scannedAt: now() });
   }
-  if (review.replacesList) removed = forgetTasksNotSeen(seen);
+  if (review.replacesList) removed = forgetTasksNotSeen(list, seen, app.taskById);
   saved.showScanBanner = false;
   save();
   const deleted = await deleteScreenshots(review.fileNames);
@@ -360,23 +366,6 @@ async function onConfirmClicked(review, dialog, close) {
   close();
   showToast(scanDoneMessage(added, removed, deleted));
   rerenderPage();
-}
-
-/**
- * The scan replaces the list: tasks on it that no screenshot showed are forgotten.
- * @param {Set<string>} seenTaskIds
- * @returns {number} how many were removed
- */
-function forgetTasksNotSeen(seenTaskIds) {
-  const saved = app.saved;
-  let removed = 0;
-  for (const taskId of Object.keys(saved.tasks)) {
-    if (saved.tasks[taskId].active && !seenTaskIds.has(taskId)) {
-      forgetTask(saved, taskId, app.taskById[taskId]);
-      removed++;
-    }
-  }
-  return removed;
 }
 
 /**

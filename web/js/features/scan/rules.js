@@ -2,8 +2,9 @@
 // Scan tasks: matching task names read from screenshots (or typed into "Add a task by name") to
 // the game data, and what a scan's results do to your list. Plain functions only: no DOM, no
 // network. scan.js runs the capture, the reading and the review dialog.
+import { forgetTask } from "../tasks/rules.js";
 
-/** @import { Task } from "../../app/types.js" */
+/** @import { Task, TaskList } from "../../app/types.js" */
 
 // A name that isn't an exact match still counts when it's at least this similar to a task's name
 // (1 = identical; Levenshtein distance / longer length). v2's value: a misread letter or two
@@ -193,6 +194,26 @@ export function scanResultNote(replacesList, errors) {
     return "Some screenshots couldn't be read, so nothing is removed from your list; new tasks are still added.";
   }
   return "No tasks were recognised, so nothing is removed from your list.";
+}
+
+/**
+ * The scan replaces the list: tasks on it that no screenshot showed are forgotten (see
+ * tasks/rules.js forgetTask). Only this game mode's list changes; the other modes' lists are
+ * other characters' tasks and stay as they are (ticket 22).
+ * @param {TaskList} list the shown game mode's list
+ * @param {Set<string>} seenTaskIds
+ * @param {Record<string, Task>} taskById
+ * @returns {number} how many were removed
+ */
+export function forgetTasksNotSeen(list, seenTaskIds, taskById) {
+  let removed = 0;
+  for (const taskId of Object.keys(list.tasks)) {
+    if (list.tasks[taskId].active && !seenTaskIds.has(taskId)) {
+      forgetTask(list, taskId, taskById[taskId]);
+      removed++;
+    }
+  }
+  return removed;
 }
 
 /**

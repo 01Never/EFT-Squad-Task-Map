@@ -2,6 +2,7 @@
 // Sub-tasks on the map: a small pin for each sub-task placed on this map (drawn with the task
 // markers, in its task's look), and placing a pin with a click ("Pin" / "Move pin" in the list).
 import { app } from "../../app/state.js";
+import { currentList } from "../../app/current-list.js";
 import { showToast } from "../../app/dom.js";
 import { save } from "../../app/saving.js";
 import { clientToSvgPoint } from "../../map/view.js";
@@ -28,7 +29,7 @@ export function isPinnedOnMap(subTask, mapKey) {
 export function subTaskMarkerItems(firstShownRowByTask) {
   const mapView = app.mapView;
   const items = [];
-  for (const subTask of app.saved.subs) {
+  for (const subTask of currentList().subs) {
     if (subTask.map !== mapView.key || subTask.x == null) continue;
     const row = firstShownRowByTask.get(subTask.task);
     if (!row) continue;
@@ -56,7 +57,7 @@ export function subTaskMarkerItems(firstShownRowByTask) {
  */
 export function subTaskPinPoints(taskId) {
   const mapView = app.mapView;
-  return app.saved.subs
+  return currentList().subs
     .filter((subTask) => subTask.task === taskId && isPinnedOnMap(subTask, mapView.key))
     .map((subTask) => {
       const [x, y] = mapView.projection.toSvg(subTask.x, subTask.z);
@@ -74,7 +75,7 @@ export function placeSubTaskPinAt(clientX, clientY) {
   const mapView = app.mapView;
   const [svgX, svgY] = clientToSvgPoint(clientX, clientY);
   const [gameX, gameZ] = mapView.projection.toGame(svgX, svgY);
-  const subTask = app.saved.subs.find((candidate) => candidate.id === mapView.placingSubTaskId);
+  const subTask = currentList().subs.find((candidate) => candidate.id === mapView.placingSubTaskId);
   if (subTask) {
     subTask.map = mapView.key;
     subTask.x = +gameX.toFixed(2);

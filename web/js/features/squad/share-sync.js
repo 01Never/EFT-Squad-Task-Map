@@ -4,6 +4,7 @@
 // a save, only while in a squad, and only when its content changed since the last one sent. This
 // is the squad's only timer. A failed send is dropped quietly: the next save sends it again.
 import { app } from "../../app/state.js";
+import { shownGameMode } from "../../app/current-list.js";
 import { callApi } from "../../app/api.js";
 import { buildMyShare, shareFingerprint } from "./rules.js";
 
@@ -33,7 +34,7 @@ export function scheduleShareUpdate() {
 export async function sendShare(isForced) {
   clearTimeout(sendTimer);
   if (!app.saved || !app.squad || !app.squad.settings.joined) return;
-  const share = buildMyShare(app.saved, app.taskById, app.squad.settings.shareTasks);
+  const share = buildMyShare(app.saved, shownGameMode(), app.taskById, app.squad.settings.shareTasks);
   const fingerprint = shareFingerprint(share);
   if (!isForced && fingerprint === lastSentFingerprint) return;
   try {

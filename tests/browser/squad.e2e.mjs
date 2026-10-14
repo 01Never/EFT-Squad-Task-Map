@@ -201,7 +201,7 @@ test("three copies: drawings, task sharing, offline and back, and leaving", { ti
     assert.ok(await bob.page.locator("svg.map .friend-marker").count() > 0, "smaller markers for Alice's other tasks");
     // ... and none of it is on Bob's own list or in his saved data
     assert.equal(await bob.page.locator(`#panel .tasks .task[data-task="${ballet.id}"]`).count(), 0);
-    assert.equal(bob.scenario.savedState().tasks[ballet.id], undefined);
+    assert.equal(bob.scenario.savedList().tasks[ballet.id], undefined);
 
     // Alice ticks one objective; Bob's popup says "Alice 1/3"
     await alice.page.click(`#panel .task[data-task="${revision.id}"] .trow`);

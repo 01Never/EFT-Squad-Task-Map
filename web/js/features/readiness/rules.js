@@ -4,7 +4,7 @@
 // Plain functions only: no DOM, no network. panel.js draws the Bring list and the tags.
 import { isObjectiveDone, isObjectiveOnMap, tickCount, tickTarget } from "../tasks/rules.js";
 
-/** @import { Objective, Part, Item, Task, SavedState } from "../../app/types.js" */
+/** @import { Objective, Part, Item, Task, TaskList } from "../../app/types.js" */
 
 /**
  * @typedef {object} Requirement One thing an objective needs.
@@ -194,36 +194,36 @@ export function usedUpByTicking(objective) {
 /**
  * Ticking a marker or plant objective takes one out of the bag per tick (when the bag has one)
  * and remembers it in `used`, so unticking only gives back what that tick took.
- * @param {SavedState} saved changed in place: `have` and `used`
+ * @param {TaskList} list the game mode's list, changed in place: `have` and `used`
  * @param {Objective} objective
  * @param {number} tickChange new count minus old count
  */
-export function updateBagForTick(saved, objective, tickChange) {
+export function updateBagForTick(list, objective, tickChange) {
   const usedUp = usedUpByTicking(objective);
   if (!usedUp || !tickChange) return;
-  saved.used = saved.used || {};
+  list.used = list.used || {};
   if (tickChange > 0) {
-    takeFromBag(saved, usedUp.key, objective.id, tickChange);
+    takeFromBag(list, usedUp.key, objective.id, tickChange);
   } else {
-    giveBackToBag(saved, usedUp.key, objective.id, -tickChange);
+    giveBackToBag(list, usedUp.key, objective.id, -tickChange);
   }
 }
 
 /** Placed: take from the bag, if anything was counted. */
-function takeFromBag(saved, bagKey, objectiveId, count) {
-  const taken = Math.min(count, saved.have[bagKey] || 0);
+function takeFromBag(list, bagKey, objectiveId, count) {
+  const taken = Math.min(count, list.have[bagKey] || 0);
   if (!taken) return;
-  saved.have[bagKey] -= taken;
-  saved.used[objectiveId] = (saved.used[objectiveId] || 0) + taken;
+  list.have[bagKey] -= taken;
+  list.used[objectiveId] = (list.used[objectiveId] || 0) + taken;
 }
 
 /** Unticked: give back only what this objective took. */
-function giveBackToBag(saved, bagKey, objectiveId, count) {
-  const givenBack = Math.min(count, saved.used[objectiveId] || 0);
+function giveBackToBag(list, bagKey, objectiveId, count) {
+  const givenBack = Math.min(count, list.used[objectiveId] || 0);
   if (!givenBack) return;
-  saved.have[bagKey] = (saved.have[bagKey] || 0) + givenBack;
-  saved.used[objectiveId] -= givenBack;
-  if (!saved.used[objectiveId]) delete saved.used[objectiveId];
+  list.have[bagKey] = (list.have[bagKey] || 0) + givenBack;
+  list.used[objectiveId] -= givenBack;
+  if (!list.used[objectiveId]) delete list.used[objectiveId];
 }
 
 /**

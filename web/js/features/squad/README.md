@@ -26,14 +26,18 @@ Your choices per friend are in the saved data (below). The page never polls.
   skipped with one `console.warn` (`safe.js`). My share carries only 24-hex game ids. Stroke numbers are checked before they reach SVG attributes. Friends' strokes are
   drawn in the **friend's profile colour**, whatever colour the stroke has (owner's default).
 - **Per friend:** drawings **on**, tasks **off** by default (`friendPrefsOf`).
-- **Shown friends for tasks** = tasks switch on **and** they share tasks (`tasks` not null).
-  Everything about tasks (Also, dots, filter, progress, Friends' tasks) uses only those.
+- **Shown friends for tasks** = tasks switch on **and** they share tasks (`tasks` not null)
+  **and** their tasks are for the game mode you're shown (`friendTasksOf`, ticket 22: each mode
+  is its own character). A share whose `mode` is absent or "" (a copy from before ticket 22)
+  counts as yours, as before. Everything about tasks (Also, dots, filter, progress, Friends'
+  tasks) uses only those. A friend on another mode keeps their drawings on your map; their
+  ☰ Tasks is greyed out with the title "Mike's tasks are for PvE" (`friendTasksButtonTitle`).
 - **Also:** a task you have active that a shown friend has active too (`friendsAlsoDoing`,
   `alsoText`). Dots: up to 3 friend colours (`friends.js: squadColorsForTask`).
 - **Progress on a part** (`friendPartProgress`): "✓" when done, "2/5" when the part's one required
   objective counts (kills, items), else "objectives done/required".
 - **Friends' other tasks** (`friendsOwnTasksOnMap`, `openPartsOnMap`): the friend's tasks that
-  are not active on your list, exist in your game data and have something on this map; markers
+  are not active on your list (of the mode you're shown), exist in your game data and have something on this map; markers
   only for the parts still open for them. Read-only: never in your list, readiness, Bring list,
   selection, ticks or saved data.
 - **"Shared with squad"** hides, in the list and on the map, every task no shown friend has
@@ -43,9 +47,12 @@ Your choices per friend are in the saved data (below). The page never polls.
   shown as on, the title says why). Your saved choice is kept and applies again once a shown
   friend shares. Off by default. (2.8.1: in 2.8.0 a saved "on" with only a friend who shared no
   tasks emptied every list and map.)
-- **My share** (`buildMyShare`): all drawings (strokes cut to `{c, w, pts}`, anything the server
-  would refuse left out) and, only while "Share my tasks" is on, `{ticks, pct}` for every active
-  task (`pct` = the whole task's progress). Nothing else leaves the saved data.
+- **My share** (`buildMyShare`): `mode` (the game mode you're shown), all drawings (strokes cut
+  to `{c, w, pts}`, anything the server would refuse left out) and, only while "Share my tasks"
+  is on, `{ticks, pct}` for every active task of that mode's list (`pct` = the whole task's
+  progress). Nothing else leaves the saved data. Switching game mode (Settings or Switch data)
+  sends the share again.
+- A friend switching game mode is a task change (and redraws their chip).
 - **What changed** (`describeSquadChange`): compares two views so only that is redrawn.
 
 **Flow:**

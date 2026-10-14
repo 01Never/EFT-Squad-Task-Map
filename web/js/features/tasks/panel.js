@@ -3,6 +3,7 @@
 // "Move to", Don't split, Remove), "Add a task by name", pins and "Pinned only", and the handlers
 // for those. Categories and their menus are in category-panel.js.
 import { app } from "../../app/state.js";
+import { currentList } from "../../app/current-list.js";
 import { escapeHtml, findElement, showToast } from "../../app/dom.js";
 import { save } from "../../app/saving.js";
 import { mapDisplayName } from "../../app/game-data.js";
@@ -38,12 +39,12 @@ export function renderTaskRow(row) {
 /** The clickable row: shape, name (and part), trader line, "!" when not ready, keys, progress. */
 function renderRowButton(row) {
   const { task, part, cat } = row;
-  const saved = app.saved;
-  const isReady = row.done || isPartPossible(part, saved.ticks, saved.have);
+  const list = currentList();
+  const isReady = row.done || isPartPossible(part, list.ticks, list.have);
   const keysNeeded = countKeysNeeded(task, part, app.mapView.key);
   const notReadyBadge = !isReady ? '<span class="bang" title="You don\'t have everything this needs">!</span>' : "";
   const keysBadge = keysNeeded ? `<span class="kb" title="Keys needed">🔑 ${keysNeeded}</span>` : "";
-  const progress = row.done ? "✓" : partProgressPercent(part, saved.ticks) + "%";
+  const progress = row.done ? "✓" : partProgressPercent(part, list.ticks) + "%";
   return `<button class="trow" data-act="open">${renderShapeSwatch(cat.icon, cat.color, 15)}<span class="nm">${renderRowName(row)}<span class="tr">${renderRowSubtitle(row)}</span>${renderAlsoOnRow(task.id)}</span>${notReadyBadge}${keysBadge}<span class="pct">${progress}</span></button>`;
 }
 
@@ -74,7 +75,7 @@ function otherMapNames(task) {
 
 /** @param {Task} task */
 function renderPinButton(task) {
-  const entry = app.saved.tasks[task.id] || /** @type {any} */ ({});
+  const entry = currentList().tasks[task.id] || /** @type {any} */ ({});
   return `<button class="ib pinb${entry.pinned ? " on" : ""}" data-act="pin" title="${entry.pinned ? "Unpin" : "Pin"}">📌</button>`;
 }
 
@@ -94,7 +95,7 @@ function renderTaskDetails(row) {
 
 /** @param {Task} task */
 function renderDetailsTopLine(task) {
-  const entry = app.saved.tasks[task.id] || /** @type {any} */ ({});
+  const entry = currentList().tasks[task.id] || /** @type {any} */ ({});
   const wiki = task.wiki
     ? `<a class="wiki" href="${escapeHtml(task.wiki)}" target="_blank" rel="noopener">📖 Wiki: ${escapeHtml(task.name)} ↗</a>`
     : "";
@@ -135,11 +136,12 @@ function renderObjectiveList(row) {
 function renderDetailsActions(row) {
   const { task, part, cat } = row;
   const saved = app.saved;
-  const entry = saved.tasks[task.id] || /** @type {any} */ ({});
+  const list = currentList();
+  const entry = list.tasks[task.id] || /** @type {any} */ ({});
   const options = saved.cats
     .map((category) => `<option value="${escapeHtml(category.id)}" ${category.id === cat.id ? "selected" : ""}>${escapeHtml(category.name)}</option>`)
     .join("");
-  const reset = isMovedByHand(saved, task, part)
+  const reset = isMovedByHand(list, task, part)
     ? `<button class="lnk" data-act="unmove" title="Put it back in its default category">reset</button>`
     : "";
   const dontSplit = canTaskSplit(task)
@@ -155,8 +157,8 @@ function renderDetailsActions(row) {
 
 /** The "Add a task by name…" box, with every task not on your list as a suggestion. */
 export function renderAddTaskBox() {
-  const saved = app.saved;
-  const notOnList = app.gameData.tasks.filter((task) => !(saved.tasks[task.id] && saved.tasks[task.id].active));
+  const list = currentList();
+  const notOnList = app.gameData.tasks.filter((task) => !(list.tasks[task.id] && list.tasks[task.id].active));
   const suggestions = notOnList.map((task) => `<option value="${escapeHtml(task.name)}">`).join("");
   return `<input type="search" id="addtask" list="alltasks" placeholder="Add a task by name…" autocomplete="off"><datalist id="alltasks">${suggestions}</datalist>`;
 }
@@ -174,7 +176,8 @@ export function addTaskByName(typedName) {
     return;
   }
   const task = matched.task;
-  if (app.saved.tasks[task.id] && app.saved.tasks[task.id].active) {
+  const entry = currentList().tasks[task.id];
+  if (entry && entry.active) {
     showToast(`“${task.name}” is already on your list`);
     return;
   }
@@ -206,7 +209,7 @@ function onPinClicked(button) {
 }
 
 function onClearPinsClicked() {
-  for (const entry of Object.values(app.saved.tasks)) entry.pinned = false;
+  for (const entry of Object.values(currentList().tasks)) entry.pinned = false;
   save();
   renderMapPage();
 }
@@ -251,8 +254,9 @@ function onRemoveTaskClicked(button) {
   const taskId = button.closest(".task").getAttribute("data-task");
   const task = app.taskById[taskId];
   if (!confirm(`Take “${task.name}” off your list? (A scan or accepting it in-game brings it back.)`)) return;
-  app.saved.tasks[taskId].active = false;
-  app.saved.tasks[taskId].pinned = false;
+  const entry = currentList().tasks[taskId];
+  entry.active = false;
+  entry.pinned = false;
   clearSelectionAndOpenRow();
   save();
   renderMapPage();

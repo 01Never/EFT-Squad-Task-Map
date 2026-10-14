@@ -5,6 +5,7 @@
 // selection or saved data. Everything here came from friends, so numbers are checked before they
 // reach an SVG attribute and colours go through safeFriendColor().
 import { app } from "../../app/state.js";
+import { shownGameMode } from "../../app/current-list.js";
 import { createSvgElement } from "../../app/dom.js";
 import { applyView } from "../../map/view.js";
 import { spotsOfPart } from "../tasks/map-layer.js";
@@ -151,7 +152,8 @@ function drawFriendTaskMarkers(layer, friend, friendIndex, friendCount) {
   const mapView = app.mapView;
   const color = safeFriendColor(friend.color);
   const spreadPixels = (friendIndex - (friendCount - 1) / 2) * FRIEND_MARKER_SPREAD_PIXELS;
-  const theirTasks = friendsOwnTasksOnMap(friend, app.saved, app.taskById, mapView.key);
+  const myMode = shownGameMode();
+  const theirTasks = friendsOwnTasksOnMap(friend, app.saved, myMode, app.taskById, mapView.key);
   for (const { task, ticks } of theirTasks) {
     for (const part of openPartsOnMap(task, ticks, mapView.key)) {
       for (const spot of spotsOfPart(task, part, ticks)) {
