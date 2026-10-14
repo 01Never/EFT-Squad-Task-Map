@@ -180,22 +180,41 @@ func (app *App) onScreenshotKeyChecked(event gamelog.Event) {
 
 // ---------------------------------------------------------------- screenshots
 
-// onScreenshot: a picture appeared (or disappeared) in the screenshots folder. In-raid shots carry
-// a position in their name; everything else may belong to a task scan.
+// onScreenshot: a picture appeared (or disappeared) in the screenshots folder. routeScreenshot
+// decides who gets it: in-raid shots carry a position in their name, but while "Scan tasks" is
+// capturing every new picture belongs to the scan.
 func (app *App) onScreenshot(file screenshots.File) {
-	if !file.Exists {
-		app.scan.OnScreenshot(file)
-		return
-	}
 	fix, hasPosition := gps.ParseFileName(file.Name)
-	if !hasPosition {
+	switch routeScreenshot(file.Exists, hasPosition, app.scan.IsActive()) {
+	case routeToScan:
 		app.scan.OnScreenshot(file)
-		return
+	case routeToGPS:
+		app.onGPSScreenshot(file, fix)
+	case routeToScanAndPosition:
+		app.scan.OnScreenshot(file)
+		app.moveMarkerTo(fix)
 	}
+}
+
+// onGPSScreenshot: a position-named shot with no scan running. Raid end deletes it.
+func (app *App) onGPSScreenshot(file screenshots.File, fix gps.Fix) {
 	app.raidAndPosition.Lock()
 	defer app.raidAndPosition.Unlock()
 	app.raid.NoteGPSShot(file.Name)
 	app.extracts.OnGPSShot(file.Name)
+	app.updatePositionLocked(fix)
+}
+
+// moveMarkerTo: a captured scan shot still says where you are. It is not noted as a raid GPS shot
+// (so raid end never deletes it and it never makes a fake raid end) and doesn't feed extracts.
+func (app *App) moveMarkerTo(fix gps.Fix) {
+	app.raidAndPosition.Lock()
+	defer app.raidAndPosition.Unlock()
+	app.updatePositionLocked(fix)
+}
+
+// updatePositionLocked needs app.raidAndPosition held.
+func (app *App) updatePositionLocked(fix gps.Fix) {
 	position, trail := app.position.Update(fix, app.raid.CurrentMap())
 	app.hub.Broadcast(events.New(events.GPS, map[string]any{"gps": position, "trail": trail}))
 }

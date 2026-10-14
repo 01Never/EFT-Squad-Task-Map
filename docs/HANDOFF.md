@@ -194,7 +194,7 @@ Friends' copies ◄─(tailnet :7777, peer API; only when joined)─► features
 | Package | Role |
 |---|---|
 | `main.go`, `embed.go` | Entry point; `//go:embed` of `web/` and `assets/` (the page is served as-is, no bundler). |
-| `internal/app` | Creates every part and wires them (`app.go`: log event → raid/gps/events; screenshot → gps or scan), the backend behind every route (`backend.go`), start-up (`run.go`: data folder, single copy, port 7777→7800, the allowed hosts for that port, banner, browser), the squad's wiring (`squad.go`: tsnet or dev transport, its settings block, the `squad` event, resume at launch only when joined). |
+| `internal/app` | Creates every part and wires them (`app.go`: log event → raid/gps/events; screenshot → gps or scan, decided by `routeScreenshot`), the backend behind every route (`backend.go`), start-up (`run.go`: data folder, single copy, port 7777→7800, the allowed hosts for that port, banner, browser), the squad's wiring (`squad.go`: tsnet or dev transport, its settings block, the `squad` event, resume at launch only when joined). |
 | `internal/httpapi` | `Guard` (Host/Origin checks) and `jsonBody` (415) in `guard.go`, route table and thin handlers (`routes.go`), static files with explicit content types and an ETag = version (`static.go`), the `Backend` interface listing everything the page can ask for. |
 | `internal/events` | Event names (`names.go`, spelled identically in `web/js/app/event-names.js`; `names_test.go` fails if the lists differ) and the SSE hub: `Deliver` (queued in `squad-task-map-pending.json` until acked) and `Broadcast` (live only). |
 | `internal/storage` | Files next to the exe: settings (unknown fields kept, `tt*` dropped), the page's saved data as opaque text (atomic write + `.bak`), v1 backup. |
@@ -302,7 +302,7 @@ Log task events count only when the log's `Session mode` matches the game-mode s
 
 **Scan:**
 1. `Scan tasks` → capture mode.
-2. New non-GPS images appear as thumbnails.
+2. New images appear as thumbnails, including ones with a position in the name (ticket 21: while capturing, every shot goes to the scan; those are never raid GPS shots, so raid end doesn't delete them).
 3. Done → the page shrinks each image to ≤2048 px JPEG and sends it to `/api/scan/read`, 3 at a time.
 4. Names are matched (exact, else Levenshtein ratio ≥ 0.82, with the trader as tie-break).
 5. Review → confirm **replaces the list** (owner's decision after 2.0.1): new tasks are added, and every active task not in the scan is removed as if it never existed (`forgetTask`: entry, ticks, used counts and sub-tasks), with no list shown first. Removal is skipped if any screenshot failed to read or nothing was recognised. Confirm deletes the files; Cancel deletes nothing.
