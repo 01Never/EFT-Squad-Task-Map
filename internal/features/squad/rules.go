@@ -111,6 +111,9 @@ type Share struct {
 	UpdatedAt int64                   `json:"updatedAt"` // when the content last changed, ms since 1970
 	Draw      map[string][]Stroke     `json:"draw"`      // by map key, the same shape as the page's draw
 	Tasks     map[string]TaskProgress `json:"tasks"`     // by task id; null when "Share my tasks" is off
+	// Mode is the game mode the tasks belong to ("regular", "pve", "pvp-season"; issue #22). Empty
+	// in shares from copies before it; those copies ignore it (unknown fields are skipped).
+	Mode string `json:"mode,omitempty"`
 }
 
 // Player is who a share belongs to.
@@ -166,12 +169,28 @@ func (tick *Tick) UnmarshalJSON(data []byte) error {
 type ShareParts struct {
 	Draw  map[string][]Stroke     `json:"draw"`
 	Tasks map[string]TaskProgress `json:"tasks"`
+	Mode  string                  `json:"mode,omitempty"` // the game mode of Tasks; "" when unknown
+}
+
+// The game modes a share may name (the same names as the gameMode setting). "" means not said:
+// a share from a copy before issue #22.
+var validShareModes = map[string]bool{
+	"":           true,
+	"regular":    true,
+	"pve":        true,
+	"pvp-season": true,
+}
+
+// IsValidShareMode: "", "regular", "pve" or "pvp-season".
+func IsValidShareMode(mode string) bool {
+	return validShareModes[mode]
 }
 
 // StampShare makes my next share from the page's parts. Tasks are dropped when "Share my tasks"
-// is off (the server enforces this, not only the page). rev goes up by one and updatedAt is set
-// only when the content (player, drawings, tasks) differs from the previous share; otherwise the
-// previous share is returned unchanged, with changed = false.
+// is off (the server enforces this, not only the page); the game mode is passed through either
+// way. rev goes up by one and updatedAt is set only when the content (player, drawings, tasks,
+// game mode) differs from the previous share; otherwise the previous share is returned unchanged,
+// with changed = false.
 func StampShare(
 	previous *Share, player Player, parts ShareParts, shareTasks bool, now time.Time,
 ) (Share, bool) {
@@ -180,6 +199,7 @@ func StampShare(
 		Player:  player,
 		Draw:    parts.Draw,
 		Tasks:   parts.Tasks,
+		Mode:    parts.Mode,
 	}
 	if next.Draw == nil {
 		next.Draw = map[string][]Stroke{}
@@ -200,10 +220,10 @@ func StampShare(
 	return next, true
 }
 
-// hasSameContent compares what a friend sees: player, drawings and tasks.
+// hasSameContent compares what a friend sees: player, drawings, tasks and game mode.
 func hasSameContent(a, b Share) bool {
-	contentA, errA := json.Marshal([]any{a.Player, a.Draw, a.Tasks})
-	contentB, errB := json.Marshal([]any{b.Player, b.Draw, b.Tasks})
+	contentA, errA := json.Marshal([]any{a.Player, a.Draw, a.Tasks, a.Mode})
+	contentB, errB := json.Marshal([]any{b.Player, b.Draw, b.Tasks, b.Mode})
 	return errA == nil && errB == nil && bytes.Equal(contentA, contentB)
 }
 
@@ -237,7 +257,7 @@ func DecodeShare(data []byte) (Share, error) {
 	return share, nil
 }
 
-// ValidateShare checks a whole share: format version, player, rev, drawings and tasks.
+// ValidateShare checks a whole share: format version, player, rev, drawings, tasks and game mode.
 func ValidateShare(share Share) error {
 	if share.Version != ShareFormatVersion {
 		return fmt.Errorf("share format v%d, this copy reads v%d", share.Version, ShareFormatVersion)
@@ -248,7 +268,7 @@ func ValidateShare(share Share) error {
 	if share.Rev < 1 || share.UpdatedAt < 0 {
 		return errors.New("share has no valid rev or updatedAt")
 	}
-	return ValidateParts(ShareParts{Draw: share.Draw, Tasks: share.Tasks})
+	return ValidateParts(ShareParts{Draw: share.Draw, Tasks: share.Tasks, Mode: share.Mode})
 }
 
 // ValidatePlayer: a valid player id, a name of 1 to 32 characters and a "#rrggbb" colour.
@@ -265,8 +285,12 @@ func ValidatePlayer(player Player) error {
 	return nil
 }
 
-// ValidateParts checks the drawings and tasks of a share (the page's parts or a friend's).
+// ValidateParts checks the drawings, tasks and game mode of a share (the page's parts or a
+// friend's).
 func ValidateParts(parts ShareParts) error {
+	if !IsValidShareMode(parts.Mode) {
+		return fmt.Errorf("game mode %q isn't regular, pve or pvp-season", parts.Mode)
+	}
 	if len(parts.Draw) > maxMaps {
 		return fmt.Errorf("drawings on %d maps, over the %d limit", len(parts.Draw), maxMaps)
 	}

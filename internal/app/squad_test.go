@@ -137,6 +137,36 @@ func TestTheServerDropsTasksWhenSharingIsOffEvenIfThePageSendsThem(t *testing.T)
 	}
 }
 
+func TestTheGameModeThePageSendsReachesFriendsAndAChangeRaisesTheRev(t *testing.T) {
+	rig, listen := newSquadRigWithDevListener(t)
+	rig.send("PUT", "/api/squad/profile", `{"shareTasks":true}`)
+	status, _ := rig.send("POST", "/api/squad/join", `{"authKey":"tskey-auth-dev"}`)
+	if status != http.StatusOK {
+		t.Fatalf("join: %d", status)
+	}
+
+	inPvE := `{"draw":{},"tasks":null,"mode":"pve"}`
+	status, first := rig.send("PUT", "/api/squad/share", inPvE)
+	if status != http.StatusOK {
+		t.Fatalf("PUT /api/squad/share: %d %v", status, first)
+	}
+	if got := fetchPeerShare(t, listen)["mode"]; got != "pve" {
+		t.Errorf("a friend gets mode %v, want pve", got)
+	}
+
+	_, same := rig.send("PUT", "/api/squad/share", inPvE)
+	if same["changed"] != false || same["rev"] != first["rev"] {
+		t.Errorf("the same mode again: %v, want unchanged rev %v", same, first["rev"])
+	}
+	_, switched := rig.send("PUT", "/api/squad/share", `{"draw":{},"tasks":null,"mode":"regular"}`)
+	if switched["changed"] != true || switched["rev"] != first["rev"].(float64)+1 {
+		t.Errorf("another mode: %v, want rev %v + 1", switched, first["rev"])
+	}
+	if got := fetchPeerShare(t, listen)["mode"]; got != "regular" {
+		t.Errorf("a friend gets mode %v, want regular", got)
+	}
+}
+
 // fetchPeerShare asks the peer API (the separate listener) for the share, as a friend would.
 func fetchPeerShare(t *testing.T, listen string) map[string]any {
 	t.Helper()
@@ -164,6 +194,8 @@ func TestTheShareRouteRefusesWhatItCantTake(t *testing.T) {
 		{"a bad stroke is refused with the reason", "application/json", `{"draw":{"customs":[{"c":"red","w":2,"pts":[[1,2]]}]}}`, http.StatusBadRequest},
 		{"a body not sent as JSON is refused", "text/plain", shareWithTasks, http.StatusUnsupportedMediaType},
 		{"an empty share (nothing drawn) is fine", "application/json", `{"draw":{},"tasks":null}`, http.StatusOK},
+		{"an unknown game mode is refused", "application/json", `{"draw":{},"tasks":null,"mode":"arena"}`, http.StatusBadRequest},
+		{"a known game mode is fine", "application/json", `{"draw":{},"tasks":null,"mode":"pvp-season"}`, http.StatusOK},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -14,6 +14,7 @@ type Files struct {
 	Dir          string // the data folder (next to the exe, or STM_DATA_DIR)
 	State        string // squad-task-map-data.json: the page's saved data
 	V1Backup     string // squad-task-map-data.v1-backup.json: untouched copy before the v1 → v2 migration
+	V2Backup     string // squad-task-map-data.v2-backup.json: untouched copy before the v2 → v3 migration
 	Settings     string // squad-task-map-settings.json
 	Pending      string // squad-task-map-pending.json: game events waiting for the page to acknowledge them
 	WikiCache    string // squad-task-map-wikicache.json
@@ -35,6 +36,7 @@ func FilesIn(dir string) Files {
 		Dir:          dir,
 		State:        join("squad-task-map-data.json"),
 		V1Backup:     join("squad-task-map-data.v1-backup.json"),
+		V2Backup:     join("squad-task-map-data.v2-backup.json"),
 		Settings:     join("squad-task-map-settings.json"),
 		Pending:      join("squad-task-map-pending.json"),
 		WikiCache:    join("squad-task-map-wikicache.json"),

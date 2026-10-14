@@ -7,20 +7,22 @@ import (
 
 func text(s string) *string { return &s }
 
-func TestTaskEventsCountOnlyInTheChosenGameMode(t *testing.T) {
+func TestTaskEventsGoToTheListOfTheGameModeTheyHappenedIn(t *testing.T) {
 	cases := []struct {
 		name                     string
 		sessionMode, settingMode string
-		want                     bool
+		want                     string
 	}{
-		{"same mode", "pvp-season", "pvp-season", true},
-		{"PvE events don't touch the PvP Season list", "pve", "pvp-season", false},
-		{"unknown session mode (app started after the game): counts, as in v2", "", "regular", true},
+		{"same mode as Settings", "pvp-season", "pvp-season", "pvp-season"},
+		{"a PvE event goes to the PvE list, even when Settings says PvP Season", "pve", "pvp-season", "pve"},
+		{"a PvP event goes to the regular list, even when Settings says PvE", "regular", "pve", "regular"},
+		{"unknown session mode (app started after the game): the Settings mode", "", "regular", "regular"},
+		{"unknown session mode with PvE in Settings: the PvE list", "", "pve", "pve"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if got := ModeMatches(testCase.sessionMode, testCase.settingMode); got != testCase.want {
-				t.Errorf("got %v, want %v", got, testCase.want)
+			if got := TaskEventMode(testCase.sessionMode, testCase.settingMode); got != testCase.want {
+				t.Errorf("got %q, want %q", got, testCase.want)
 			}
 		})
 	}
