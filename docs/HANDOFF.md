@@ -437,7 +437,7 @@ Verified on the owner's PC since 2.3.0: folder detection (registry → `E:\Games
 9. **Per-mode lists and live events (issue #22):** switch Settings → Game mode between PvE, PvP and PvP Season: each shows its own list; accept and finish a task in the game while the page shows another mode: the change lands in the mode being played (the log's session mode), not the one shown; a scan changes only the shown mode's list.
 10. **First start after the update:** the old list is under the mode Settings had, the other two are empty, `squad-task-map-data.v2-backup.json` exists and a second start doesn't overwrite it.
 11. **Raid end resets only that mode:** after a raid in one mode the Bring counts of that mode are 0 and the other modes' counts are untouched.
-12. **Squad mode filter:** a friend on another mode shows no tasks ("Also: …") on your map but their drawings do; on the same mode their tasks show.
+12. **Squad mode filter:** a friend on another mode shows no tasks (no colour box, no crosshatched rows) but their drawings do; on the same mode their tasks show.
 13. **Game mode page (issue #23):** `#/` shows PvE, PvP and PvP Season cards with task counts and Last used; the card of the mode the game is in says "Game is in this mode" and follows the log; opening a card saves it as the Settings mode.
 14. **Breadcrumbs and Back:** "PvE / Maps / Customs" links lead back, the browser's Back button follows the pages, on a phone the "‹ Maps" link shows, and an old `#/map/customs` address opens the map of the Settings mode.
 

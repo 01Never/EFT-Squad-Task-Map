@@ -6,7 +6,7 @@ and no server: the copies connect directly over a private Tailscale network buil
 (tsnet). You join once with an invite code. A friend who is offline still shows with their last
 known data and "last seen". No GPS position is shared (owner's decision).
 This package is the server side (part 1 of ticket 05). The page (Settings → Squad, chips,
-friends' layers, "Also: …" badges) is part 2, in `web/js/features/squad/`.
+friends' layers, the friend colour boxes and their tasks in your list) is part 2, in `web/js/features/squad/`.
 
 **Where the data comes from:**
 - **Your share:** the page builds it from its saved data and sends it with
