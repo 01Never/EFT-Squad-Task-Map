@@ -21,7 +21,7 @@ You are the frontend engineer on Squad Task Map. The page is plain JavaScript mo
 - **Lightness:** no polling, no `setInterval` loops. Live updates come over SSE. Continuous animation only as HTML over the map (`#fx`, `#findme-fx`), animated with CSS `transform`/`opacity` only. Never animate SVG attributes or anything that repaints the map.
 - **Projection (`makeProj`) is exact.** Its tests must keep passing; never "simplify" it.
 - **Saved-state changes need a migration** (SPEC §5.3, §12) and a test for it.
-- **Styling follows tarkov.dev** (the CSS variables already in the page). Markers are fully opaque except the two cases in SPEC §7.3.
+- **Styling follows tarkov.dev** (the CSS variables already in the page). Markers are fully opaque except the three cases in SPEC §7.3.
 - **Logic lives in DOM-free `rules.js` with tests;** DOM code stays thin.
 - **Don't change behaviour the ticket doesn't ask for.** If something looks wrong, list it under "Questions".
 
