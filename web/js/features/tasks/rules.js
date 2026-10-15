@@ -428,6 +428,69 @@ export function storeTick(ticks, objective, count) {
 
 // ---------------------------------------------------------------- your task list (saved data)
 
+// What the page says on a control you can't use on a squadmate's task (ticket 26).
+export const NOT_ON_YOUR_LIST_TITLE = "Not on your task list";
+
+/**
+ * Whether a task is on your list (active in this game mode's list). Only those can be worked:
+ * ticked, counted, removed, moved to a category or given sub-tasks. A squadmate's task you don't
+ * have is shown in your list (ticket 26), but it is only looked at and pinned.
+ * @param {TaskList} list
+ * @param {string} taskId
+ */
+export function isTaskOnMyList(list, taskId) {
+  const entry = Object.hasOwn(list.tasks, taskId) ? list.tasks[taskId] : undefined;
+  return !!(entry && entry.active);
+}
+
+/**
+ * Tick an objective of a task on your list: true = done, false = not done, or a count.
+ * Refused (nothing changes) when the task isn't on your list.
+ * @param {TaskList} list changed in place: `ticks`
+ * @param {string} taskId the objective's task
+ * @param {Objective} objective
+ * @param {boolean | number} value
+ * @returns {{ isDone: boolean, countChange: number }} isDone false when refused; countChange
+ *   (new count minus old) is what readiness needs to update the bag
+ */
+export function tickObjective(list, taskId, objective, value) {
+  if (!isTaskOnMyList(list, taskId)) return { isDone: false, countChange: 0 };
+  const oldCount = savedTickCount(objective, list.ticks);
+  const newCount = clampedTickCount(objective, value);
+  storeTick(list.ticks, objective, newCount);
+  return { isDone: true, countChange: newCount - oldCount };
+}
+
+/**
+ * "Remove task": off your list and unpinned (a scan or accepting it in the game brings it back).
+ * Refused for a task that isn't on your list.
+ * @param {TaskList} list
+ * @param {string} taskId
+ * @returns {boolean} false when refused
+ */
+export function removeTaskFromList(list, taskId) {
+  if (!isTaskOnMyList(list, taskId)) return false;
+  const entry = list.tasks[taskId];
+  entry.active = false;
+  entry.pinned = false;
+  return true;
+}
+
+/**
+ * Pin or unpin a task. Works for a squadmate's task too: it then gets an entry that isn't on your
+ * list (`active: false`), only to remember the pin (ticket 26).
+ * @param {TaskList} list
+ * @param {string} taskId
+ * @param {number} [now] ms since 1970, for a new entry
+ * @returns {boolean} whether it is pinned now
+ */
+export function togglePinnedTask(list, taskId, now = Date.now()) {
+  if (!Object.hasOwn(list.tasks, taskId)) list.tasks[taskId] = blankTaskEntry(now);
+  const entry = list.tasks[taskId];
+  entry.pinned = !entry.pinned;
+  return entry.pinned;
+}
+
 /**
  * Put a task on your list (from a scan, the game log, or by hand). A task already on the list
  * keeps where it came from and when; `extra` fields (scan progress…) are always written.
@@ -519,6 +582,42 @@ export function compareRowsByName(first, second) {
   const firstName = first.task.name.replace(/^The /, "");
   const secondName = second.task.name.replace(/^The /, "");
   return firstName.localeCompare(secondName) || first.part.index - second.part.index;
+}
+
+/**
+ * Whether a row is in its category's list (not the Done list): it isn't done and, with "Pinned
+ * only" on, it's pinned. The same for a squadmate's task you don't have (ticket 26): pinning it
+ * keeps it under "Pinned only". ("Shared with squad" is checked by the squad feature.)
+ * @param {PartOnMap} row
+ * @param {boolean} isPinnedOnly
+ */
+export function isRowListed(row, isPinnedOnly) {
+  return !row.done && (!isPinnedOnly || row.pinned);
+}
+
+/**
+ * How many of your tasks have something left on this map (the panel header's "5 tasks").
+ * Squadmates' tasks you don't have never count (ticket 26).
+ * @param {PartOnMap[]} rows
+ */
+export function countMyOpenTasks(rows) {
+  const taskIds = new Set();
+  for (const row of rows) {
+    if (!row.done && !row.notMine) taskIds.add(row.task.id);
+  }
+  return taskIds.size;
+}
+
+/**
+ * How many squadmates' tasks you don't have are listed on this map (the header's "+2 from squad").
+ * @param {PartOnMap[]} rows
+ */
+export function countSquadOnlyTasks(rows) {
+  const taskIds = new Set();
+  for (const row of rows) {
+    if (row.notMine) taskIds.add(row.task.id);
+  }
+  return taskIds.size;
 }
 
 /**

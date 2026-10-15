@@ -2,7 +2,9 @@
 // Sub-tasks: your own notes under a task, optionally pinned on a map with a floor badge.
 // Plain functions only: no DOM, no network.
 
-/** @import { SubTask } from "../../app/types.js" */
+import { isTaskOnMyList } from "../tasks/rules.js";
+
+/** @import { SubTask, TaskList } from "../../app/types.js" */
 
 /** The floor badges a sub-task pin can have ("" = ground, shown as "G"). */
 export const SUB_TASK_FLOOR_OPTIONS = ["", "2", "3", "4", "5", "B"];
@@ -19,6 +21,19 @@ export const SUB_TASK_MAX_LENGTH = 140;
  */
 export function newSubTask(id, taskId, text) {
   return { id, task: taskId, text, done: false, map: null, x: null, z: null, f: "" };
+}
+
+/**
+ * Add a sub-task under its task. Refused when that task isn't on your list (a squadmate's task
+ * you only look at, ticket 26).
+ * @param {TaskList} list changed in place: `subs`
+ * @param {SubTask} subTask
+ * @returns {boolean} false when refused
+ */
+export function addSubTask(list, subTask) {
+  if (!isTaskOnMyList(list, subTask.task)) return false;
+  list.subs.push(subTask);
+  return true;
 }
 
 /**

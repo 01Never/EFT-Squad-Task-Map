@@ -12,6 +12,12 @@ import {
   forgetTask,
   finishTaskEntry,
   applyTaskEventFromGame,
+  tickObjective,
+  isTaskOnMyList,
+  isObjectiveDone,
+  removeTaskFromList,
+  togglePinnedTask,
+  isRowListed,
 } from "./rules.js";
 
 test("kills are sorted into boss, PMC and scav by their targets and wording", () => {
@@ -167,4 +173,45 @@ test("a task accepted again in the game is not new: the toast isn't shown twice"
   const event = { type: "task", taskId: dandies.id, status: "started", mode: "regular" };
   applyTaskEventFromGame(saved, event, dandies, "regular", 1);
   assert.equal(applyTaskEventFromGame(saved, event, dandies, "regular", 2).isNew, false);
+});
+
+// ---------------------------------------------------------------- ticket 26: tasks that aren't yours
+
+test("only a task on your list can be ticked; a squadmate's task (not on it, or only pinned) can't", () => {
+  const dandies = findTask("Dandies");
+  const [firstObjective] = dandies.objs;
+  const list = emptyTaskList();
+  assert.deepEqual(tickObjective(list, dandies.id, firstObjective, true), { isDone: false, countChange: 0 }, "not on the list at all");
+  togglePinnedTask(list, dandies.id, 1);
+  assert.equal(isTaskOnMyList(list, dandies.id), false, "a pin doesn't put it on your list");
+  assert.equal(tickObjective(list, dandies.id, firstObjective, true).isDone, false, "pinned only");
+  assert.deepEqual(list.ticks, {}, "nothing was ticked");
+
+  list.tasks[dandies.id].active = true;
+  const result = tickObjective(list, dandies.id, firstObjective, true);
+  assert.equal(result.isDone, true);
+  assert.ok(result.countChange > 0);
+  assert.ok(isObjectiveDone(firstObjective, list.ticks));
+});
+
+test("a squadmate's task can't be removed or finished: it was never on your list", () => {
+  const dandies = findTask("Dandies");
+  const list = emptyTaskList();
+  togglePinnedTask(list, dandies.id, 1);
+  assert.equal(removeTaskFromList(list, dandies.id), false);
+  assert.equal(list.tasks[dandies.id].pinned, true, "the pin stays");
+  assert.equal(finishTaskEntry(list, dandies.id, dandies), false);
+  assert.equal(removeTaskFromList(list, "not-a-task"), false);
+
+  list.tasks[dandies.id].active = true;
+  assert.equal(removeTaskFromList(list, dandies.id), true, "yours: off the list and unpinned");
+  assert.deepEqual([list.tasks[dandies.id].active, list.tasks[dandies.id].pinned], [false, false]);
+});
+
+test("a row is listed when it isn't done, and pinned under 'Pinned only'", () => {
+  const row = { task: findTask("Dandies"), part: partsOfTask(findTask("Dandies"))[0], cat: null, done: false, pinned: false };
+  assert.equal(isRowListed(row, false), true);
+  assert.equal(isRowListed(row, true), false);
+  assert.equal(isRowListed({ ...row, pinned: true, notMine: true }, true), true);
+  assert.equal(isRowListed({ ...row, done: true }, false), false);
 });

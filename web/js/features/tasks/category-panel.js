@@ -10,7 +10,7 @@ import { currentList } from "../../app/current-list.js";
 import { renderMapPage } from "../../map/map-page.js";
 import { renderPanel } from "../../panel/panel.js";
 import { MARKER_SHAPES, renderShapeSwatch } from "../../map/marker-shapes.js";
-import { compareRowsByName } from "./rules.js";
+import { compareRowsByName, isRowListed } from "./rules.js";
 import {
   recreateMissingDefaults,
   resortEverything,
@@ -22,7 +22,7 @@ import {
 } from "./categories.js";
 import { partsOnMap } from "./task-list.js";
 import { renderTaskRow } from "./panel.js";
-import { isHiddenBySquadFilter } from "../squad/friends.js";
+import { isHiddenBySquadFilter, friendOnlyPartsOnMap } from "../squad/friends.js";
 
 /** @import { Category, PartOnMap } from "../../app/types.js" */
 
@@ -47,30 +47,56 @@ function renderSortMenu() {
 
 /**
  * Every category in your order, each with its rows. A row whose category is missing goes to Unsorted.
- * @param {PartOnMap[]} rows
+ * Squadmates' tasks you don't have (ticket 26) are sorted in the same way and listed after yours.
+ * @param {PartOnMap[]} rows your rows (partsOnMap)
  */
 export function renderCategoryLists(rows) {
   const categories = app.saved.cats;
+  const myRowsByCategory = rowsByCategoryId(categories, rows);
+  const squadRowsByCategory = rowsByCategoryId(categories, friendOnlyPartsOnMap(app.mapView.key));
+  return categories
+    .map((category) => renderCategory(category, myRowsByCategory.get(category.id) || [], squadRowsByCategory.get(category.id) || []))
+    .join("");
+}
+
+/**
+ * Rows grouped by their category's id (a row whose category is missing goes to Unsorted).
+ * @param {Category[]} categories
+ * @param {PartOnMap[]} rows
+ * @returns {Map<string, PartOnMap[]>}
+ */
+function rowsByCategoryId(categories, rows) {
   /** @type {Map<string, PartOnMap[]>} */
   const rowsByCategory = new Map(categories.map((category) => [category.id, []]));
   for (const row of rows) {
     (rowsByCategory.get(row.cat.id) || rowsByCategory.get("unsorted") || []).push(row);
   }
-  return categories.map((category) => renderCategory(category, rowsByCategory.get(category.id) || [])).join("");
+  return rowsByCategory;
+}
+
+/**
+ * Whether a row is in the list: not done, pinned when "Pinned only" is on, and not hidden by
+ * "Shared with squad".
+ * @param {PartOnMap} row
+ */
+function isListed(row) {
+  return isRowListed(row, !!app.saved.pinnedOnly) && !isHiddenBySquadFilter(row.task.id);
 }
 
 /**
  * One category: its header, its ⋯ menu when open, and (unless collapsed) its rows and Done list.
+ * The count in the header is your rows only.
  * @param {Category} category
- * @param {PartOnMap[]} rows
+ * @param {PartOnMap[]} rows yours
+ * @param {PartOnMap[]} squadRows squadmates' tasks you don't have (never done, never counted)
  */
-function renderCategory(category, rows) {
+function renderCategory(category, rows, squadRows) {
   const saved = app.saved;
-  const isListed = (row) => !row.done && (!saved.pinnedOnly || row.pinned) && !isHiddenBySquadFilter(row.task.id);
   const liveRows = rows.filter(isListed).sort(compareRowsByName);
+  const squadLiveRows = squadRows.filter(isListed).sort(compareRowsByName);
   const doneRows = rows.filter((row) => row.done).sort(compareRowsByName);
   const menu = app.mapView.categoryMenuId === category.id ? renderCategoryMenu(category) : "";
-  const list = saved.collapsed[category.id] ? "" : renderCategoryRows(category, liveRows, doneRows);
+  const list = saved.collapsed[category.id] ? "" : renderCategoryRows(category, [...liveRows, ...squadLiveRows], doneRows);
   return `<div class="cat${category.visible ? "" : " hidden"}" data-cat="${escapeHtml(category.id)}">${renderCategoryHeader(category, liveRows)}${menu}${list}</div>`;
 }
 

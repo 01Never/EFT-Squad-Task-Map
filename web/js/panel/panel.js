@@ -47,10 +47,11 @@ import { startScan } from "../features/scan/panel.js";
 import {
   SQUAD_SECTION_ACTIONS,
   renderSquadSection,
-  renderFriendsTasksSection,
   onFriendDrawingsToggled,
   onFriendTasksToggled,
 } from "../features/squad/panel.js";
+import { friendOnlyPartsOnMap } from "../features/squad/friends.js";
+import { countMyOpenTasks, countSquadOnlyTasks } from "../features/tasks/rules.js";
 
 /** @import { PartOnMap } from "../app/types.js" */
 
@@ -64,9 +65,8 @@ const TASKS_TAB_SECTIONS = [
   renderSquadSection, // a chip per friend, "Shared with squad" (features/squad)
   renderExtractsSection, // Extracts & labels (features/extracts)
   renderLootSection, // Loot, closed until opened (features/loot)
-  renderCategoryLists, // the categories and their task rows (features/tasks)
+  renderCategoryLists, // the categories and their task rows, squadmates' tasks too (features/tasks)
   renderNewCategoryBox, // + Category (features/tasks)
-  renderFriendsTasksSection, // friends' tasks you don't have, read-only (features/squad)
 ];
 
 // ---------------------------------------------------------------- drawing
@@ -96,12 +96,14 @@ export function renderPanel() {
  * @param {"tasks" | "bring"} tab
  */
 function renderPanelHeader(rows, tab) {
-  const taskCount = new Set(rows.filter((row) => !row.done).map((row) => row.task.id)).size;
+  const taskCount = countMyOpenTasks(rows);
+  const squadCount = countSquadOnlyTasks(friendOnlyPartsOnMap(app.mapView.key));
+  const squadText = squadCount ? ` <span class="squad-extra" title="Squadmates' tasks you don't have, on this map">+${squadCount} from squad</span>` : "";
   const missingCount = countMissingForShownParts();
   const banner = app.saved.showScanBanner
     ? `<div class="banner sm">Your saved tasks were carried over from the old version. <b>Scan your task list</b> to load exactly what you have now. <button class="lnk" data-act="hidebanner">Dismiss</button></div>`
     : "";
-  return `<div class="phead"><h2>${escapeHtml(app.mapView.config.name)} <span class="hr"><small>${taskCount} task${taskCount === 1 ? "" : "s"}</small><button class="btn sm line hidep" data-act="hidepanel" title="Hide the task list to give the map the whole window">Hide ▸</button></span></h2>
+  return `<div class="phead"><h2>${escapeHtml(app.mapView.config.name)} <span class="hr"><small>${taskCount} task${taskCount === 1 ? "" : "s"}${squadText}</small><button class="btn sm line hidep" data-act="hidepanel" title="Hide the task list to give the map the whole window">Hide ▸</button></span></h2>
     <div class="row"><button class="btn" data-act="scan" title="Read your task list from in-game screenshots">📷 Scan tasks</button>${renderAddTaskBox()}</div>
     ${banner}
     <div class="tabs"><button data-tab="tasks" aria-pressed="${tab === "tasks"}">Tasks</button><button data-tab="bring" aria-pressed="${tab === "bring"}">Bring list${missingCount ? ` <span class="bang">${missingCount}</span>` : ""}</button></div></div>`;

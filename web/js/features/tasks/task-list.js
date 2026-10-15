@@ -2,7 +2,8 @@
 // Your task list as the page reads and changes it: active tasks, their parts on a map, ticks.
 // These use the shared state (the shown game mode's list through currentList(), app.taskById);
 // the rules themselves are in rules.js and categories.js. Nothing here draws or saves: callers
-// call save() and re-render.
+// call save() and re-render. listedPartsOnMap() adds squadmates' tasks you don't have (ticket 26)
+// to your own rows, for selecting and the popup.
 import { app } from "../../app/state.js";
 import { blankTaskEntry } from "../../app/saved-data.js";
 import { currentList } from "../../app/current-list.js";
@@ -13,14 +14,12 @@ import {
   isPartOnMap,
   isPartDone,
   activateTaskEntry,
-  savedTickCount,
-  clampedTickCount,
-  storeTick,
+  tickObjective,
   isRowShownOnMap,
 } from "./rules.js";
-import { categoryOfPart } from "./categories.js";
+import { categoryOfPart, defaultCategoryOfPart } from "./categories.js";
 import { updateBagForTick } from "../readiness/rules.js";
-import { isHiddenBySquadFilter } from "../squad/friends.js";
+import { isHiddenBySquadFilter, friendOnlyPartsOnMap } from "../squad/friends.js";
 
 /** @import { Task, Part, Category, Objective, TaskEntry, TaskList, PartOnMap } from "../../app/types.js" */
 
@@ -80,6 +79,27 @@ export function categoryOf(task, part) {
 }
 
 /**
+ * The parts of a row's task, as the list shows them: as you chose for yours, split by default for
+ * a squadmate's task (ticket 26).
+ * @param {PartOnMap} row
+ * @returns {Part[]}
+ */
+export function partsOfRow(row) {
+  return row.notMine ? partsOfTask(row.task, false) : partsOf(row.task);
+}
+
+/**
+ * The category of another part of a row's task: yours as you sorted it, a squadmate's task's by
+ * the default rules.
+ * @param {PartOnMap} row
+ * @param {Part} part
+ * @returns {Category}
+ */
+export function categoryOfRowPart(row, part) {
+  return row.notMine ? defaultCategoryOfPart(app.saved, part) : categoryOf(row.task, part);
+}
+
+/**
  * Every part of your tasks that's on this map, with its category and whether it's done or pinned.
  * Includes done parts and parts in hidden categories (the list shows them).
  * @param {string} mapKey
@@ -121,15 +141,38 @@ export function activateTask(taskId, source, extra = {}, list = currentList()) {
 }
 
 /**
+ * Every row the list shows on this map: your parts (partsOnMap), then the parts of squadmates'
+ * tasks you don't have (ticket 26, `notMine`). Selecting and the popup look rows up here.
+ * Counts, readiness, the Bring list and your markers use partsOnMap(): yours only.
+ * @param {string} mapKey
+ * @returns {PartOnMap[]}
+ */
+export function listedPartsOnMap(mapKey) {
+  return [...partsOnMap(mapKey), ...friendOnlyPartsOnMap(mapKey)];
+}
+
+/**
+ * The task an objective belongs to, or undefined.
+ * @param {Objective} objective
+ * @returns {Task | undefined}
+ */
+function taskOfObjective(objective) {
+  return Object.values(app.taskById).find((task) => task.objs.includes(objective));
+}
+
+/**
  * Set an objective's tick: true = done, false = not done, or a count. Ticking a marker or a
  * planted item also takes it out of your bag (readiness), and unticking gives it back.
+ * Nothing happens for a task that isn't on your list (a squadmate's, ticket 26).
  * @param {Objective} objective
  * @param {boolean | number} value
+ * @returns {boolean} false when refused
  */
 export function setTick(objective, value) {
   const list = currentList();
-  const oldCount = savedTickCount(objective, list.ticks);
-  const newCount = clampedTickCount(objective, value);
-  storeTick(list.ticks, objective, newCount);
-  updateBagForTick(list, objective, newCount - oldCount);
+  const task = taskOfObjective(objective);
+  if (!task) return false;
+  const { isDone, countChange } = tickObjective(list, task.id, objective, value);
+  if (isDone) updateBagForTick(list, objective, countChange);
+  return isDone;
 }
