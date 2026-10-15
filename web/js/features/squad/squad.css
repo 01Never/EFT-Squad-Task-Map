@@ -1,6 +1,7 @@
-/* Squad: the chips and the "Friends' tasks" block in the panel, "Also:" lines, the Settings box,
-   and the map's friend layers. A friend's colour reaches CSS only as --friend, set from a value
-   that passed the strict #rrggbb check (rules.js: safeFriendColor). Nothing here animates. */
+/* Squad: the chips in the panel, who has a task (colour boxes), squadmates' tasks in the list,
+   the Settings box, and the map's friend layers. A friend's colour reaches CSS only as --friend,
+   set from a value that passed the strict #rrggbb check (rules.js: safeFriendColor).
+   Nothing here animates. */
 
 /* the chips: one row per friend, a colour dot, the name and status, and two toggles */
 .squad-chips{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
@@ -17,22 +18,23 @@
 /* "Shared with squad" while no friend you show shares tasks: it filters nothing (title says why) */
 .sec.squad .chip:disabled{opacity:.45;cursor:default}
 
-/* "Also: Mike, Sam" under a task row's name */
-.squad-name,.trow .also bdi,.pop .squad-also bdi,.pop .squad-progress bdi,.squad-grouphead bdi{unicode-bidi:isolate}
-.trow .also{display:block;font-size:13px;color:var(--accent)}
-.pop .squad-also{color:var(--accent);margin:0 0 2px}
+/* who has a task: a colour box and a name per friend, under a row's name and in the popup */
+.squad-name,.squad-box bdi,.pop .squad-progress bdi{unicode-bidi:isolate}
+.squad-boxes{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:13px;color:var(--gold-one)}
+.trow .squad-boxes{margin-top:1px}
+.pop .squad-boxes{margin:0 0 2px;font-size:14px}
+.squad-box{display:inline-flex;align-items:center;gap:5px}
+.squad-swatch{flex:none;width:10px;height:10px;background:var(--friend,var(--muted));border:1px solid #000}
 .pop .squad-progress{margin:0 0 6px}
 /* a long name with no break points (32 W) wraps instead of pushing the row or popup wider */
-.trow .also,.pop .squad-also,.pop .squad-progress,.squad-grouphead{overflow-wrap:anywhere;min-width:0}
+.squad-boxes,.squad-box,.pop .squad-progress{overflow-wrap:anywhere;min-width:0}
 
-/* the bottom of the list: tasks friends have and you don't (read-only) */
-.squad-group{margin:0 0 10px}
-.squad-grouphead{display:flex;align-items:center;gap:8px;margin-bottom:3px;color:#fff}
-.squad-grouphead small{color:var(--muted);margin-left:auto;font-size:12.5px}
-.squad-task{display:flex;align-items:center;gap:8px;padding:4px 6px 4px 20px;border-left:3px solid var(--friend,var(--muted))}
-.squad-task .nm{flex:1;min-width:0;color:var(--gold-one)}
-.squad-task .tr{display:block;font-size:13px;color:var(--muted)}
-.squad-task .pct{color:var(--muted);font-size:13px}
+/* a squadmate's task you don't have (ticket 26): subtle diagonal stripes, static. Only the image
+   is set (three classes, so it beats ".task.sel"), the row's own background colour stays. */
+.tasks .task.notmine{background-image:repeating-linear-gradient(135deg,rgb(255 255 255 / .075) 0 4px,transparent 4px 10px)}
+.notmine-note{font-style:italic}
+.objs .notmine-tick,.objs .ctr button:disabled{opacity:.5;cursor:not-allowed}
+.phead .squad-extra{color:var(--accent);margin-left:4px;white-space:nowrap}
 
 /* Settings → Squad */
 .sq-row{display:flex;gap:10px;align-items:center;margin-top:8px}

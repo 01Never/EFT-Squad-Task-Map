@@ -51,6 +51,17 @@ export function categoryOfPart(saved, list, task, part) {
     const chosen = saved.cats.find((category) => category.id === choice.cat);
     if (chosen) return chosen;
   }
+  return defaultCategoryOfPart(saved, part);
+}
+
+/**
+ * The category a part gets by the default rules alone: the built-in for its kind of work, else
+ * Unsorted. A squadmate's task you don't have (ticket 26) is always sorted this way.
+ * @param {SavedState} saved its categories
+ * @param {Part} part
+ * @returns {Category}
+ */
+export function defaultCategoryOfPart(saved, part) {
   const builtIn = saved.cats.find((category) => category.builtin === part.action);
   return builtIn || saved.cats.find((category) => category.builtin === "unsorted") || saved.cats[0];
 }
@@ -109,25 +120,33 @@ export function newCategory(categories, id, name, preferred = {}) {
 
 /**
  * Move a part into a category by hand. A whole task's v1 choice ("*") is replaced.
- * @param {TaskEntry} entry
+ * Refused for a task that isn't on your list (a squadmate's task, ticket 26).
+ * @param {TaskEntry | undefined} entry
  * @param {string} partKey
  * @param {Part | undefined} part
  * @param {string} categoryId
+ * @returns {boolean} false when refused
  */
 export function movePartTo(entry, partKey, part, categoryId) {
+  if (!entry || !entry.active) return false;
   entry.partCats = entry.partCats || {};
   if (part && !part.split) delete entry.partCats["*"];
   entry.partCats[partKey] = { cat: categoryId, manual: true };
+  return true;
 }
 
 /**
- * "reset": the part goes back to its default category.
- * @param {TaskEntry} entry
+ * "reset": the part goes back to its default category. Refused for a task that isn't on your list.
+ * @param {TaskEntry | undefined} entry
  * @param {string} partKey
+ * @returns {boolean} false when refused
  */
 export function resetPartCategory(entry, partKey) {
+  if (!entry || !entry.active) return false;
+  entry.partCats = entry.partCats || {};
   delete entry.partCats[partKey];
   delete entry.partCats["*"];
+  return true;
 }
 
 /**

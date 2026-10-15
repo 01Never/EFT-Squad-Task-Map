@@ -172,6 +172,8 @@ export {};
  * @property {Category} cat
  * @property {boolean} done
  * @property {boolean} pinned
+ * @property {boolean} [notMine] a squadmate's task that isn't on your list (ticket 26): shown and
+ *   pinnable, never worked
  */
 
 // ---------------------------------------------------------------- saved data (PUT /api/state)

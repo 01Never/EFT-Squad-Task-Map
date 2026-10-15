@@ -1,8 +1,9 @@
 // @ts-check
 // Squad in the right-hand panel and the task popup: a chip per friend (colour dot, name, "online"
-// or "last seen 2 h", and two toggles: drawings and tasks), the "Shared with squad" filter, the
-// "Also: Mike, Sam" line on rows and in the popup, per-friend progress in the popup, and the
-// "Friends' tasks" block at the bottom of the list. Every friend text goes through escapeHtml(),
+// or "last seen 2 h", and two toggles: drawings and tasks), the "Shared with squad" filter, who
+// has a task (a colour box and name per friend) on rows and in the popup, and per-friend progress
+// in the popup. Squadmates' tasks you don't have are rows of the task list itself (ticket 26:
+// features/tasks, rows from friends.js friendOnlyPartsOnMap). Every friend text goes through escapeHtml(),
 // every colour through safeFriendColor(); a friend's name or colour never goes into a script, a
 // URL or an unescaped attribute. The rules are in rules.js; what is drawn on the map is in
 // map-layer.js.
@@ -13,10 +14,9 @@ import { save } from "../../app/saving.js";
 import { renderMapPage } from "../../map/map-page.js";
 import { partsOnMap } from "../tasks/task-list.js";
 import {
-  isInSquad,
   allFriends,
-  friendsShowingTasks,
   friendsAlsoDoingTask,
+  friendBoxesForTask,
   canSquadFilterApply,
   isSquadFilterInEffect,
 } from "./friends.js";
@@ -30,7 +30,6 @@ import {
   setFriendPref,
   friendTasksOf,
   friendTasksButtonTitle,
-  friendsOwnTasksOnMap,
   isSharedOnlyFilterOn,
   setSharedOnlyFilter,
   progressPieces,
@@ -89,14 +88,6 @@ function skipOnError(what, render) {
   }
 }
 
-/**
- * A friend's name as safe HTML, isolated so its text direction can't leak into the text around it.
- * @param {SquadFriend} friend
- */
-function nameHtml(friend) {
-  return `<bdi>${escapeHtml(friendDisplayName(friend.name))}</bdi>`;
-}
-
 /** @param {SquadFriend} friend */
 function renderFriendChip(friend) {
   const prefs = friendPrefsOf(app.saved, friend.playerId);
@@ -146,8 +137,8 @@ export function onFriendDrawingsToggled(button) {
 }
 
 /**
- * A friend's ☰ Tasks toggle: their tasks join (or leave) the badges, the "Also:" lines, the
- * filter, the "Friends' tasks" block and the map.
+ * A friend's ☰ Tasks toggle: their tasks join (or leave) the badges, the colour boxes on rows,
+ * the filter, the rows of their tasks you don't have, and the map.
  * @param {HTMLElement} button
  */
 export function onFriendTasksToggled(button) {
@@ -170,77 +161,43 @@ export const SQUAD_SECTION_ACTIONS = {
   squadonly: onSharedOnlyClicked,
 };
 
-// ---------------------------------------------------------------- "Also: Mike, Sam" and progress
+// ---------------------------------------------------------------- who has it, and progress
 
 /**
- * "Also: Mike, Sam" under a task row's name; "" when no shown friend has the task.
+ * Who has this task, under a task row's name (ticket 26): a colour box and a name per shown
+ * friend who has it. "" when nobody does.
  * @param {string} taskId
  */
-export function renderAlsoOnRow(taskId) {
-  return skipOnError("also line", () => {
-    const friends = friendsAlsoDoingTask(taskId);
-    return friends.length ? `<span class="also">${alsoHtml(friends)}</span>` : "";
+export function renderFriendBoxesOnRow(taskId) {
+  return skipOnError("friend boxes", () => {
+    const boxes = friendBoxesForTask(taskId);
+    return boxes.length ? `<span class="squad-boxes">${boxes.map(renderFriendBox).join("")}</span>` : "";
   });
 }
 
 /**
- * "Also: Mike, Sam" as HTML, each name isolated.
- * @param {SquadFriend[]} friends
+ * One friend's box: their colour (already checked by safeFriendColor) and their name, isolated.
+ * @param {{ playerId: string, name: string, color: string }} box
  */
-function alsoHtml(friends) {
-  return "Also: " + friends.map(nameHtml).join(", ");
+function renderFriendBox(box) {
+  const id = escapeHtml(box.playerId);
+  return `<span class="squad-box" data-friend="${id}" style="--friend:${box.color}"><span class="squad-swatch"></span><bdi>${escapeHtml(box.name)}</bdi></span>`;
 }
 
 /**
- * The popup's two squad lines: "Also: Mike, Sam" and each friend's progress on this part
- * ("Mike 2/5 · Sam ✓"). Nothing when no shown friend has the task.
+ * The popup's two squad lines: who has the task (colour boxes) and each friend's progress on this
+ * part ("Mike 2/5 · Sam ✓"). Nothing when no shown friend has the task.
  * @param {Task} task
  * @param {Part} part
  */
 export function renderSquadLinesForPopup(task, part) {
   return skipOnError("popup lines", () => {
-    const friends = friendsAlsoDoingTask(task.id);
-    if (!friends.length) return "";
-    const progress = progressPieces(part, task.id, friends)
+    const boxes = friendBoxesForTask(task.id);
+    if (!boxes.length) return "";
+    const progress = progressPieces(part, task.id, friendsAlsoDoingTask(task.id))
       .map((piece) => `<bdi>${escapeHtml(piece.name)}</bdi> ${escapeHtml(piece.text)}`)
       .join(" · ");
-    return `<div class="m squad-also">${alsoHtml(friends)}</div><div class="m squad-progress">${progress}</div>`;
+    const boxesHtml = boxes.map(renderFriendBox).join("");
+    return `<div class="m squad-boxes">${boxesHtml}</div><div class="m squad-progress">${progress}</div>`;
   });
-}
-
-// ---------------------------------------------------------------- the "Friends' tasks" block
-
-/**
- * The bottom of the list: for each friend whose tasks you show, the tasks on this map that you
- * don't have, with their progress. Read-only: you can't open, tick or move them, and they never
- * count for your readiness or Bring list.
- */
-export function renderFriendsTasksSection() {
-  const groups = friendsShowingTasks()
-    .map((friend) => skipOnError("tasks block", () => renderFriendTasksGroup(friend)))
-    .filter(Boolean);
-  if (!groups.length) return "";
-  return `<div class="sec squad-tasks"><h4>Friends' tasks</h4>${groups.join("")}</div>`;
-}
-
-/**
- * @param {SquadFriend} friend
- * @returns {string} "" when the friend has nothing here
- */
-function renderFriendTasksGroup(friend) {
-  const myMode = shownGameMode();
-  const theirTasks = friendsOwnTasksOnMap(friend, app.saved, myMode, app.taskById, app.mapView.key);
-  if (!theirTasks.length) return "";
-  const name = escapeHtml(friendDisplayName(friend.name));
-  const rows = theirTasks.map(({ task, percent }) => renderFriendTaskRow(task, percent)).join("");
-  return `<div class="squad-group" data-friend="${escapeHtml(friend.playerId)}" style="--friend:${safeFriendColor(friend.color)}">
-    <div class="squad-grouphead"><span class="squad-dot"></span><b><bdi>${name}</bdi></b><small>${theirTasks.length} here</small></div>${rows}</div>`;
-}
-
-/**
- * @param {Task} task
- * @param {number} percent
- */
-function renderFriendTaskRow(task, percent) {
-  return `<div class="squad-task"><span class="nm">${escapeHtml(task.name)}<span class="tr">${escapeHtml(task.trader)}</span></span><span class="pct">${percent}%</span></div>`;
 }

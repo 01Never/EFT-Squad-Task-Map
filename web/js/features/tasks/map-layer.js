@@ -13,7 +13,7 @@ import { isObjectiveDone, isObjectiveOnMap, placesNamedByExtractObjective } from
 import { partsOnMap, isShownOnMap } from "./task-list.js";
 import { isObjectivePossible } from "../readiness/rules.js";
 import { subTaskMarkerItems } from "../sub-tasks/map-layer.js";
-import { squadColorsForTask } from "../squad/friends.js";
+import { squadColorsForTask, friendOnlyPartsOnMap } from "../squad/friends.js";
 import { markerIconItem, itemIconUrl, showsItemIcons } from "../icons/rules.js";
 
 /** @import { Task, Part, Objective, PartOnMap } from "../../app/types.js" */
@@ -117,8 +117,23 @@ export function renderTaskMarkers() {
       flashPoints.push({ x: item.x, y: item.y, ox: item.ox, oy: item.oy });
     }
   });
+  if (!flashPoints.length) flashPoints.push(...selectedSquadPartFlashPoints());
   applyView();
   renderSelectionFlash(flashPoints);
+}
+
+/**
+ * The flash for a selected squadmate's task you don't have (ticket 26): it has no markers of
+ * yours (the squad layer draws the friends' smaller ones), so the flash goes on every spot of
+ * the part on this map.
+ * @returns {{ x: number, y: number }[]}
+ */
+function selectedSquadPartFlashPoints() {
+  const selectedKey = app.mapView.selectedPartKey;
+  if (!selectedKey) return [];
+  const row = friendOnlyPartsOnMap(app.mapView.key).find((candidate) => candidate.part.key === selectedKey);
+  if (!row) return [];
+  return spotsOfPart(row.task, row.part, {}).map((spot) => ({ x: spot.x, y: spot.y }));
 }
 
 /**

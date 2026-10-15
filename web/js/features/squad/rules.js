@@ -14,10 +14,14 @@ import {
   tickTarget,
   isObjectiveDone,
 } from "../tasks/rules.js";
+import { defaultCategoryOfPart } from "../tasks/categories.js";
 import { taskListOf } from "../../app/saved-data.js";
 import { GAME_MODE_NAMES } from "../../app/game-modes.js";
 
-/** @import { SavedState, TaskList, Task, Part, Stroke, SquadView, SquadFriend, MyShare, FriendPrefs } from "../../app/types.js" */
+/**
+ * @import { SavedState, TaskList, Task, Part, PartOnMap, Stroke, SquadView, SquadFriend, MyShare,
+ *   FriendPrefs } from "../../app/types.js"
+ */
 
 // ---------------------------------------------------------------- numbers the server enforces
 
@@ -141,9 +145,10 @@ export function friendStatusText(friend, nowMs) {
 
 // ---------------------------------------------------------------- what you choose per friend
 
-// Drawings are shown by default (that is why you joined); tasks only after you switch them on.
+// Drawings and tasks are both shown by default (that is why you joined). Tasks were off by
+// default before ticket 26; the owner chose on. A saved "off" stays off.
 /** @type {FriendPrefs} */
-const DEFAULT_FRIEND_PREFS = Object.freeze({ drawings: true, tasks: false });
+const DEFAULT_FRIEND_PREFS = Object.freeze({ drawings: true, tasks: true });
 
 /**
  * Your two choices for a friend. A saved file without a `squad` block (every file before 2.7.0)
@@ -292,12 +297,29 @@ export function friendsAlsoDoing(taskId, friendsWithTasks) {
 }
 
 /**
- * "Also: Mike, Sam", or "" when nobody is.
+ * "Also: Mike, Sam", or "" when nobody is. (Plain-text form; since ticket 26 the page shows
+ * friendBoxes() instead.)
  * @param {SquadFriend[]} friends
  */
 export function alsoText(friends) {
   if (!friends.length) return "";
   return "Also: " + friends.map((friend) => friendDisplayName(friend.name)).join(", ");
+}
+
+/**
+ * Who has this task, as a row and the popup show it (ticket 26): a colour box and a name for
+ * each shown friend who has it active, in the order of the friends. The colour passed
+ * safeFriendColor() and the name friendDisplayName() (escape it where it goes into HTML).
+ * @param {string} taskId
+ * @param {SquadFriend[]} friendsWithTasks friendsWithTasksOn(): shown and sharing, your game mode
+ * @returns {{ playerId: string, name: string, color: string }[]}
+ */
+export function friendBoxes(taskId, friendsWithTasks) {
+  return friendsAlsoDoing(taskId, friendsWithTasks).map((friend) => ({
+    playerId: friend.playerId,
+    name: friendDisplayName(friend.name),
+    color: safeFriendColor(friend.color),
+  }));
 }
 
 /**
@@ -359,7 +381,8 @@ function ticksOfSharedTask(sharedTask) {
 /**
  * What one friend has that you don't: their active tasks that exist in your game data, aren't on
  * your own list (of the game mode you're shown), and have something on this map. Nothing when
- * their tasks are for another game mode. Shown read-only; they never touch your list.
+ * their tasks are for another game mode. Shown read-only (markers, and rows of your list through
+ * friendOnlyRowsOnMap); they are never put on your list.
  * @param {SquadFriend} friend
  * @param {SavedState} saved
  * @param {string} myMode
@@ -394,6 +417,46 @@ export function openPartsOnMap(task, friendTicks, mapKey) {
   return partsOfTask(task, false).filter(
     (part) => isPartOnMap(part, mapKey, task) && !isPartDone(part, friendTicks),
   );
+}
+
+/**
+ * Squadmates' tasks in your task list (ticket 26): the rows for tasks that only shown friends
+ * have (active in their share, in your game data, not active on your list of the game mode you're
+ * shown), one per part that is on this map and still open for at least one of them. Each part is
+ * in the category the default rules give it (your own moves never apply), split by kind of work
+ * as a new task would be, and pinned when you pinned the task. They are marked `notMine`: you can
+ * look at them and pin them, not work them. A pin is kept even when no friend has the task any
+ * more; then there's no row.
+ * @param {SquadFriend[]} friendsWithTasks friendsWithTasksOn(): shown and sharing, your game mode
+ * @param {SavedState} saved
+ * @param {string} myMode the game mode you're shown
+ * @param {Record<string, Task>} taskById
+ * @param {string} mapKey
+ * @returns {PartOnMap[]} in task-name order, parts in task order
+ */
+export function friendOnlyRowsOnMap(friendsWithTasks, saved, myMode, taskById, mapKey) {
+  /** @type {Map<string, { task: Task, parts: Map<string, Part> }>} */
+  const openPartsByTask = new Map();
+  for (const friend of friendsWithTasks) {
+    for (const { task, ticks } of friendsOwnTasksOnMap(friend, saved, myMode, taskById, mapKey)) {
+      const found = openPartsByTask.get(task.id) || { task, parts: new Map() };
+      for (const part of openPartsOnMap(task, ticks, mapKey)) found.parts.set(part.key, part);
+      openPartsByTask.set(task.id, found);
+    }
+  }
+  const myList = taskListOf(saved, myMode);
+  /** @type {PartOnMap[]} */
+  const rows = [];
+  for (const { task, parts } of openPartsByTask.values()) {
+    const entry = ownValue(myList.tasks, task.id);
+    const isPinned = !!(entry && entry.pinned);
+    const partsInTaskOrder = [...parts.values()].sort((first, second) => first.index - second.index);
+    for (const part of partsInTaskOrder) {
+      const cat = defaultCategoryOfPart(saved, part);
+      rows.push({ task, part, cat, done: false, pinned: isPinned, notMine: true });
+    }
+  }
+  return rows.sort((first, second) => first.task.name.localeCompare(second.task.name));
 }
 
 /**

@@ -5,7 +5,7 @@
 import { app } from "../../app/state.js";
 import { fitViewTo } from "../../map/view.js";
 import { renderMapPage } from "../../map/map-page.js";
-import { partsOnMap } from "./task-list.js";
+import { listedPartsOnMap } from "./task-list.js";
 import { spotsOfPart } from "./map-layer.js";
 import { subTaskPinPoints } from "../sub-tasks/map-layer.js";
 
@@ -23,7 +23,9 @@ export function selectPartFromList(partKey) {
   const row = selectPart(partKey, null);
   if (!row) return;
   const mapView = app.mapView;
-  const points = [...spotsOfPart(row.task, row.part), ...subTaskPinPoints(row.task.id)];
+  // a squadmate's task you don't have: every spot of the part, none of your ticks apply (ticket 26)
+  const ticks = row.notMine ? {} : undefined;
+  const points = [...spotsOfPart(row.task, row.part, ticks), ...subTaskPinPoints(row.task.id)];
   if (!points.length) return;
   const xs = points.map((point) => point.x);
   const ys = points.map((point) => point.y);
@@ -52,7 +54,8 @@ export function selectPartFromMarker(marker) {
 function selectPart(partKey, marker) {
   const mapView = app.mapView;
   if (!mapView) return null;
-  const row = partsOnMap(mapView.key).find((candidate) => candidate.part.key === partKey);
+  // squadmates' tasks you don't have can be selected too (ticket 26)
+  const row = listedPartsOnMap(mapView.key).find((candidate) => candidate.part.key === partKey);
   if (!row) return null;
   mapView.selectedPartKey = partKey;
   mapView.expandedPartKey = partKey;

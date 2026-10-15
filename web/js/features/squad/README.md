@@ -3,14 +3,17 @@
 The server side (tsnet, the peer API, the cache, join/leave) is
 [`internal/features/squad`](../../../../internal/features/squad/README.md); its README is the API
 contract. This folder is everything the player sees: Settings → Squad, the friend chips, friends'
-drawings and tasks on the map, "Also: …", badges, the filter and per-friend progress.
+drawings and tasks on the map, who has each task (colour boxes), squadmates' tasks in your list,
+badges, the filter and per-friend progress.
 
 **What it does (player's view):** see the user guide's "Squad" section. In short: Join with an
 invite code in Settings; a chip per friend in the task list (colour dot, name, "online" /
 "last seen 2 h", **✎ Draw** and **☰ Tasks** switches); friends' lines in their colour under
-yours; with a friend's tasks on, "Also: Mike, Sam" on rows and in the popup, friend-colour dots at
-the bottom left of the marker, **Shared with squad**, "Mike 2/5 · Sam ✓" in the popup, and a
-"Friends' tasks" block with smaller markers for tasks you don't have. No position is shared.
+yours; with a friend's tasks on (the default), a colour box and name per friend on every row they
+have and in the popup, friend-colour dots at the bottom left of your markers, **Shared with
+squad**, "Mike 2/5 · Sam ✓" in the popup, and (ticket 26) the tasks only friends have as
+**crosshatched rows of your own list**, in their default category after your rows, with smaller
+markers in the friend's colour. No position is shared.
 
 **Where the data comes from:** `app.squad`, the server's squad view: loaded with `GET /api/squad`
 at start-up, replaced by every `squad` live event (and by the answers of join / leave / profile).
@@ -25,23 +28,42 @@ Your choices per friend are in the saved data (below). The page never polls.
   checks (`ownValue()`), so `toString` or `__proto__` find nothing; a friend whose data throws is
   skipped with one `console.warn` (`safe.js`). My share carries only 24-hex game ids. Stroke numbers are checked before they reach SVG attributes. Friends' strokes are
   drawn in the **friend's profile colour**, whatever colour the stroke has (owner's default).
-- **Per friend:** drawings **on**, tasks **off** by default (`friendPrefsOf`).
+- **Per friend:** drawings **on** and tasks **on** by default (`friendPrefsOf`; tasks were off
+  by default before ticket 26, the owner chose on). A saved `tasks: false` is kept.
 - **Shown friends for tasks** = tasks switch on **and** they share tasks (`tasks` not null)
   **and** their tasks are for the game mode you're shown (`friendTasksOf`, ticket 22: each mode
   is its own character). A share whose `mode` is absent or "" (a copy from before ticket 22)
-  counts as yours, as before. Everything about tasks (Also, dots, filter, progress, Friends'
-  tasks) uses only those. A friend on another mode keeps their drawings on your map; their
+  counts as yours, as before. Everything about tasks (boxes, dots, filter, progress, squadmates'
+  rows) uses only those. A friend on another mode keeps their drawings on your map; their
   ☰ Tasks is greyed out with the title "Mike's tasks are for PvE" (`friendTasksButtonTitle`).
-- **Also:** a task you have active that a shown friend has active too (`friendsAlsoDoing`,
-  `alsoText`). Dots: up to 3 friend colours (`friends.js: squadColorsForTask`).
+- **Who has it** (`friendBoxes`, ticket 26): every row, yours or a squadmate's, gets a colour box
+  (`safeFriendColor`) and name (`friendDisplayName`, in `<bdi>`, escaped) for each shown friend
+  who has the task active (`friendsAlsoDoing`), in the friends' order; so does the popup. This
+  replaced the "Also: Mike, Sam" text (`alsoText` stays as the plain-text form). Dots: up to 3
+  friend colours (`friends.js: squadColorsForTask`).
 - **Progress on a part** (`friendPartProgress`): "✓" when done, "2/5" when the part's one required
   objective counts (kills, items), else "objectives done/required".
-- **Friends' other tasks** (`friendsOwnTasksOnMap`, `openPartsOnMap`): the friend's tasks that
-  are not active on your list (of the mode you're shown), exist in your game data and have something on this map; markers
-  only for the parts still open for them. Read-only: never in your list, readiness, Bring list,
-  selection, ticks or saved data.
+- **Squadmates' tasks in your list** (`friendOnlyRowsOnMap`, ticket 26): tasks a shown friend has
+  that are not active on your list (of the mode you're shown) and exist in your game data
+  (`friendsOwnTasksOnMap`) become rows (`notMine: true`), one per part on this map that is still
+  open for at least one of those friends (`openPartsOnMap`). Each part is split by kind of work
+  as a new task would be, and sits in the category the default rules give it
+  (`tasks/categories.js defaultCategoryOfPart`; your own moves and Don't split never apply). In
+  each category they come after your rows; category and map-picker counts stay yours only, the
+  header adds "+N from squad" (`tasks/rules.js countSquadOnlyTasks`). You can select them (flash,
+  zoom, popup), read them and **pin** them (`tasks/rules.js togglePinnedTask`: a
+  `blankTaskEntry()` with `active: false, pinned: true` in your list, shown under Pinned only).
+  You can't tick, count, remove, move or add sub-tasks: the controls are disabled or hidden
+  ("Not on your task list") and the rule functions refuse a task that isn't on your list
+  (`tickObjective`, `removeTaskFromList`, `movePartTo`, `resetPartCategory`, `addSubTask`).
+  Never in readiness or the Bring list. A pinned one that no shown friend has any more keeps its
+  pin and has no row.
+- **Friends' markers** for those tasks (`friendsOwnTasksOnMap`, `openPartsOnMap`): small dots in
+  the friend's colour for the parts still open for them; not clickable (select the row). Ticket
+  27 redoes these.
 - **"Shared with squad"** hides, in the list and on the map, every task no shown friend has
-  (`isHiddenBySharedOnlyFilter`, via `friends.js: isHiddenBySquadFilter`). It only applies while
+  (`isHiddenBySharedOnlyFilter`, via `friends.js: isHiddenBySquadFilter`); squadmates' rows are
+  never hidden by it (a friend has them by definition). It only applies while
   at least one shown friend shares tasks (`isSharedOnlyFilterInEffect`); with nobody like that it
   would hide every task you have, so it does nothing and its chip is greyed out (disabled, never
   shown as on, the title says why). Your saved choice is kept and applies again once a shown
@@ -75,8 +97,11 @@ Settings → Leave (confirm) → POST /api/squad/leave → friends gone from the
 file from before 2.7.0 and is only created when you change a switch**, so older files load and
 save back unchanged and everything reads its defaults (`friendPrefsOf`, `isSharedOnlyFilterOn`);
 a block missing a field also reads the defaults. That is this field's migration; tests:
-`rules.test.js` ("a saved file from before the squad…", "a squad block that lost a field…"). No
-`SAVED_DATA_VERSION` change. Your name, colour, "Share my tasks" and "joined" live on the server
+`rules.test.js` ("a saved file from before the squad…", "a squad block that lost a field…",
+"a ☰ Tasks switched off and saved before ticket 26 stays off…"). No `SAVED_DATA_VERSION` change.
+Ticket 26 changed only the default of `tasks` (to on): a saved `true` or `false` reads as before.
+A pinned squadmate's task is an ordinary task entry with `active: false` (a shape the saved data
+already had), so it needs no migration either. Your name, colour, "Share my tasks" and "joined" live on the server
 (`squad-task-map-settings.json`), never the invite code. The choices are kept when you leave
 (they're by friend id, so rejoining the same squad restores them).
 
@@ -90,9 +115,10 @@ deviation).
 
 **Files:**
 - `rules.js`: the rules above. `rules.test.js`: their tests.
-- `friends.js`: which friends are shown, read from `app.squad` and the saved choices.
-- `panel.js`: the chips, "Shared with squad", "Also:" on rows and in the popup, progress line,
-  the "Friends' tasks" block, and their click handlers.
+- `friends.js`: which friends are shown, read from `app.squad` and the saved choices; the boxes
+  for a task (`friendBoxesForTask`) and the squadmates' rows on a map (`friendOnlyPartsOnMap`).
+- `panel.js`: the chips, "Shared with squad", the colour boxes on rows and in the popup, the
+  progress line, and their click handlers.
 - `map-layer.js`: friends' drawings layer and friends' task markers.
 - `share-sync.js`: building and sending my share (debounced, only on change).
 - `settings-section.js`: Settings → Squad (join, profile, share tasks, leave).
@@ -100,11 +126,16 @@ deviation).
 - `squad.css`.
 - Wiring: `app/live-events.js`, `app/saving.js` (schedule the share), `main.js` (load the view,
   first share), `panel/panel.js` (sections and clicks), `map/map-page.js` and `map/layers.js`,
-  `map/markers.js` (badge dots), `features/tasks/{panel,popup,task-list,category-panel,map-layer}.js`
-  (the "Also:" line, popup lines, filter, badge colours), `features/settings/panel.js`.
+  `map/markers.js` (badge dots), `features/tasks/{panel,popup,task-list,category-panel,map-layer,
+  selection,objective-line}.js` (boxes, squadmates' rows and their read-only details, popup
+  lines, filter, badge colours, selecting a squadmate's row and its flash),
+  `features/settings/panel.js`.
 
-**Tests:** `npm test` (rules). `tests/browser/squad.e2e.mjs` runs three real copies on the dev
-transport (Alice, Bob, Cara): drawing and undo travel, B's switch hides A's lines, task sharing on
-in A and off in B, badges, filter, popup progress, Friends' tasks, a friend going offline
-("last seen") and coming back, Leave. **Needs the owner:** a real tailnet with 2+ PCs (see the
+**Tests:** `npm test` (rules; ticket 26: default category, boxes, per map, ☰ Tasks off or another
+mode, pin as an inactive entry and Pinned only, a pin without a friend, counts, the filter).
+`tests/browser/squad.e2e.mjs` runs three real copies on the dev transport (Alice, Bob, Cara):
+drawing and undo travel, B's switch hides A's lines, task sharing on in A and off in B, ☰ Tasks
+on by default, colour boxes, badges, A's tasks B doesn't have as crosshatched rows in their
+default category (select, disabled ticks, pin, Pinned only, A's ☰ Tasks off removes them),
+filter, popup progress, a friend going offline ("last seen") and coming back, Leave. **Needs the owner:** a real tailnet with 2+ PCs (see the
 server README and HANDOFF §3c).

@@ -9,7 +9,7 @@ import { newId } from "../../app/saved-data.js";
 import { mapDisplayName } from "../../app/game-data.js";
 import { renderMapPage, setMapMode } from "../../map/map-page.js";
 import { renderPanel } from "../../panel/panel.js";
-import { SUB_TASK_FLOOR_OPTIONS, SUB_TASK_MAX_LENGTH, newSubTask, unpinSubTask, pinPlace } from "./rules.js";
+import { SUB_TASK_FLOOR_OPTIONS, SUB_TASK_MAX_LENGTH, newSubTask, addSubTask, unpinSubTask, pinPlace } from "./rules.js";
 
 /** @import { Task, SubTask } from "../../app/types.js" */
 
@@ -67,7 +67,7 @@ function onAddClicked(button) {
   const input = taskRow.querySelector("[data-addsub]");
   const text = input.value.trim();
   if (!text) return;
-  currentList().subs.push(newSubTask(newId(), taskId, text));
+  if (!addSubTask(currentList(), newSubTask(newId(), taskId, text))) return;
   save();
   renderPanel();
   findElement("#panel").querySelector(`[data-addsub="${CSS.escape(taskId)}"]`)?.focus();

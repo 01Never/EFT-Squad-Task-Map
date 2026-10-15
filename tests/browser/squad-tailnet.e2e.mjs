@@ -334,24 +334,23 @@ test("three copies on a simulated Tailscale network", { skip: skip || false, tim
       assert.ok(paths.some((row) => row.direct), "at least one direct path");
     });
 
-    await t.test("tasks are shared from Alice only: 'Also:', badges and the filter", async () => {
-      await bob.page.click(`[data-squad-tasks="${alice.id}"]`);
-      assert.equal(await bob.page.locator(".also").count(), 0, "Alice isn't sharing tasks yet");
+    await t.test("tasks are shared from Alice only: colour boxes, badges and the filter", async () => {
+      // ☰ Tasks is on by default (ticket 26)
+      assert.equal(await bob.page.locator("#panel .squad-boxes").count(), 0, "Alice isn't sharing tasks yet");
       await alice.openSettings();
       await alice.page.check("#sSquadShareTasks");
       await alice.closeSettings();
       const bobRow = `#panel .task[data-task="${revision.id}"]`;
-      await eventually(async () => (await bob.page.locator(bobRow + " .also").count()) === 1, "Bob's Revision row says 'Also: Alice'");
-      assert.equal((await bob.page.textContent(bobRow + " .also")).trim(), "Also: Alice");
+      await eventually(async () => (await bob.page.locator(bobRow + " .squad-box").count()) === 1, "Bob's Revision row has Alice's box");
+      assert.equal((await bob.page.textContent(bobRow + " .squad-box")).trim(), "Alice");
       const dots = await bob.page.locator("svg.map g.mk .squad-dot").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("fill")));
       assert.equal(dots.length, revision.objs.length, "a dot on each of Revision's markers");
       assert.ok(dots.every((fill) => fill === "#e03131"));
       await bob.page.click('[data-act="squadonly"]');
-      assert.equal(await bob.page.locator("#panel .cat .task").count(), 1, "the filter keeps only Revision");
+      assert.equal(await bob.page.locator("#panel .cat .task:not(.notmine)").count(), 1, "the filter keeps only Revision of Bob's own");
       await bob.page.click('[data-act="squadonly"]');
-      await alice.page.click(`[data-squad-tasks="${bob.id}"]`);
       await sleep(1500);
-      assert.equal(await alice.page.locator(".also").count(), 0, "Bob shares no tasks");
+      assert.equal(await alice.page.locator("#panel .squad-boxes").count(), 0, "Bob shares no tasks");
       assert.equal((await alice.view()).friends.find((friend) => friend.playerId === bob.id).share.tasks, null);
       await bob.shot("tasks-shared");
     });

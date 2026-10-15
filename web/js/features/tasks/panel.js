@@ -9,14 +9,33 @@ import { save } from "../../app/saving.js";
 import { mapDisplayName } from "../../app/game-data.js";
 import { renderMapPage } from "../../map/map-page.js";
 import { renderShapeSwatch } from "../../map/marker-shapes.js";
-import { ACTION_LABELS, partLabel, mapsOfTask, isObjectiveOnMap, partProgressPercent, canTaskSplit } from "./rules.js";
+import {
+  ACTION_LABELS,
+  NOT_ON_YOUR_LIST_TITLE,
+  partLabel,
+  mapsOfTask,
+  isObjectiveOnMap,
+  partProgressPercent,
+  canTaskSplit,
+  isTaskOnMyList,
+  removeTaskFromList,
+  togglePinnedTask,
+} from "./rules.js";
 import { isMovedByHand, movePartTo, resetPartCategory } from "./categories.js";
-import { taskEntry, partsOf, partsOnMap, categoryOf, activateTask } from "./task-list.js";
+import {
+  taskEntry,
+  partsOf,
+  partsOnMap,
+  listedPartsOnMap,
+  partsOfRow,
+  categoryOfRowPart,
+  activateTask,
+} from "./task-list.js";
 import { selectPartFromList, clearSelectionAndOpenRow } from "./selection.js";
 import { renderObjectiveLine, onTickCounterClicked } from "./objective-line.js";
 import { isPartPossible, countKeysNeeded } from "../readiness/rules.js";
 import { renderSubTasksBox } from "../sub-tasks/panel.js";
-import { renderAlsoOnRow } from "../squad/panel.js";
+import { renderFriendBoxesOnRow } from "../squad/panel.js";
 
 /** @import { PartOnMap, Task } from "../../app/types.js" */
 
@@ -30,22 +49,34 @@ export function renderTaskRow(row) {
   const mapView = app.mapView;
   const isOpen = mapView.expandedPartKey === row.part.key;
   const isSelected = mapView.selectedPartKey === row.part.key;
-  const classes = `task${isSelected ? " sel" : ""}${row.done ? " isdone" : ""}`;
+  const classes = `task${isSelected ? " sel" : ""}${row.done ? " isdone" : ""}${row.notMine ? " notmine" : ""}`;
   const details = isOpen ? renderTaskDetails(row) : "";
   return `<div class="${classes}" data-part="${escapeHtml(row.part.key)}" data-task="${escapeHtml(row.task.id)}">
     <div class="trow-wrap">${renderRowButton(row)}${renderPinButton(row.task)}</div>${details}</div>`;
 }
 
-/** The clickable row: shape, name (and part), trader line, "!" when not ready, keys, progress. */
+/**
+ * The clickable row: shape, name (and part), trader line, who in the squad has it, "!" when not
+ * ready, keys, progress. A squadmate's task you don't have (ticket 26) has no readiness, keys or
+ * progress of yours: it isn't yours to work.
+ */
 function renderRowButton(row) {
-  const { task, part, cat } = row;
+  const { task, cat } = row;
+  const name = `<span class="nm">${renderRowName(row)}<span class="tr">${renderRowSubtitle(row)}</span>${renderFriendBoxesOnRow(task.id)}</span>`;
+  const badges = row.notMine ? "" : renderMyRowBadges(row);
+  return `<button class="trow" data-act="open">${renderShapeSwatch(cat.icon, cat.color, 15)}${name}${badges}</button>`;
+}
+
+/** "!" when you're not ready, 🔑 keys needed, and your progress ("40%", "✓"). */
+function renderMyRowBadges(row) {
+  const { task, part } = row;
   const list = currentList();
   const isReady = row.done || isPartPossible(part, list.ticks, list.have);
   const keysNeeded = countKeysNeeded(task, part, app.mapView.key);
   const notReadyBadge = !isReady ? '<span class="bang" title="You don\'t have everything this needs">!</span>' : "";
   const keysBadge = keysNeeded ? `<span class="kb" title="Keys needed">🔑 ${keysNeeded}</span>` : "";
   const progress = row.done ? "✓" : partProgressPercent(part, list.ticks) + "%";
-  return `<button class="trow" data-act="open">${renderShapeSwatch(cat.icon, cat.color, 15)}<span class="nm">${renderRowName(row)}<span class="tr">${renderRowSubtitle(row)}</span>${renderAlsoOnRow(task.id)}</span>${notReadyBadge}${keysBadge}<span class="pct">${progress}</span></button>`;
+  return `${notReadyBadge}${keysBadge}<span class="pct">${progress}</span>`;
 }
 
 /** The task's name, plus "◫ part 2/3" for a split part. */
@@ -81,16 +112,27 @@ function renderPinButton(task) {
 
 // ---------------------------------------------------------------- an open row
 
-/** The open row: wiki link, notes about splitting and other maps, objectives, sub-tasks, actions. */
+/**
+ * The open row: wiki link, notes about splitting and other maps, objectives, sub-tasks, actions.
+ * A squadmate's task you don't have (ticket 26): objectives read-only, no sub-tasks or actions.
+ */
 function renderTaskDetails(row) {
+  const workParts = row.notMine
+    ? renderNotMineNote()
+    : `${renderSubTasksBox(row.task)}
+    ${renderDetailsActions(row)}`;
   return `<div class="tbody">
     ${renderDetailsTopLine(row.task)}
     ${renderSplitNote(row)}
     ${renderOtherMapsNote(row.task)}
     ${renderObjectiveList(row)}
-    ${renderSubTasksBox(row.task)}
-    ${renderDetailsActions(row)}
+    ${workParts}
   </div>`;
+}
+
+/** In place of sub-tasks and actions on a squadmate's task you don't have. */
+function renderNotMineNote() {
+  return `<div class="acts notmine-note" title="${NOT_ON_YOUR_LIST_TITLE}">A squadmate's task, not on your task list: you can look at it and pin it.</div>`;
 }
 
 /** @param {Task} task */
@@ -107,9 +149,9 @@ function renderDetailsTopLine(task) {
 function renderSplitNote(row) {
   const { task, part } = row;
   if (!part.split) return "";
-  const otherParts = partsOf(task).filter((candidate) => candidate.key !== part.key);
+  const otherParts = partsOfRow(row).filter((candidate) => candidate.key !== part.key);
   const chips = otherParts.map((otherPart) => {
-    const category = categoryOf(task, otherPart);
+    const category = categoryOfRowPart(row, otherPart);
     return `<button class="pchip" data-goto="${escapeHtml(otherPart.key)}" style="--pc:${category.color}">${escapeHtml(ACTION_LABELS[otherPart.action])} → ${escapeHtml(category.name)}</button>`;
   });
   return `<div class="meta">This task is split by kind of work. This row is <b>${escapeHtml(partLabel(part))}</b>. Other parts: ${chips.join(" ")}</div>`;
@@ -128,7 +170,10 @@ function renderObjectiveList(row) {
   const mapKey = app.mapView.key;
   const here = part.objs.filter((objective) => isObjectiveOnMap(objective, mapKey, task));
   const away = part.objs.filter((objective) => !isObjectiveOnMap(objective, mapKey, task));
-  const lines = here.map((objective) => renderObjectiveLine(objective)).join("") + away.map((objective) => renderObjectiveLine(objective, false)).join("");
+  const canTick = !row.notMine;
+  const lines =
+    here.map((objective) => renderObjectiveLine(objective, true, canTick)).join("") +
+    away.map((objective) => renderObjectiveLine(objective, false, canTick)).join("");
   return `<ul class="objs">${lines}</ul>`;
 }
 
@@ -200,10 +245,12 @@ export function togglePinnedOnly() {
   renderMapPage();
 }
 
-/** @param {HTMLElement} button */
+/**
+ * 📌 on a row: yours, or a squadmate's task you don't have (kept as a pin only, ticket 26).
+ * @param {HTMLElement} button
+ */
 function onPinClicked(button) {
-  const entry = taskEntry(button.closest(".task").getAttribute("data-task"));
-  entry.pinned = !entry.pinned;
+  togglePinnedTask(currentList(), button.closest(".task").getAttribute("data-task"));
   save();
   renderMapPage();
 }
@@ -230,7 +277,7 @@ function onRowClicked(button) {
 /** An "other part" chip in a split task's details. */
 export function onOtherPartClicked(button) {
   const partKey = button.dataset.goto;
-  const isOnThisMap = partsOnMap(app.mapView.key).some((row) => row.part.key === partKey);
+  const isOnThisMap = listedPartsOnMap(app.mapView.key).some((row) => row.part.key === partKey);
   if (isOnThisMap) selectPartFromList(partKey);
   else showToast("That part isn't on this map");
 }
@@ -243,8 +290,8 @@ export function onCounterButtonClicked(button) {
 /** "reset": back to the default category. */
 function onResetCategoryClicked(button) {
   const row = button.closest(".task");
-  const entry = taskEntry(row.getAttribute("data-task"));
-  resetPartCategory(entry, row.getAttribute("data-part"));
+  const entry = currentList().tasks[row.getAttribute("data-task")];
+  if (!resetPartCategory(entry, row.getAttribute("data-part"))) return;
   save();
   renderMapPage();
 }
@@ -253,10 +300,9 @@ function onResetCategoryClicked(button) {
 function onRemoveTaskClicked(button) {
   const taskId = button.closest(".task").getAttribute("data-task");
   const task = app.taskById[taskId];
+  if (!isTaskOnMyList(currentList(), taskId)) return;
   if (!confirm(`Take “${task.name}” off your list? (A scan or accepting it in-game brings it back.)`)) return;
-  const entry = currentList().tasks[taskId];
-  entry.active = false;
-  entry.pinned = false;
+  removeTaskFromList(currentList(), taskId);
   clearSelectionAndOpenRow();
   save();
   renderMapPage();
@@ -269,10 +315,9 @@ function onRemoveTaskClicked(button) {
 export function onMoveToChanged(select) {
   const partKey = select.dataset.move;
   const [taskId] = partKey.split(":");
-  const entry = taskEntry(taskId);
-  entry.partCats = entry.partCats || {};
+  const entry = currentList().tasks[taskId];
   const part = partsOf(app.taskById[taskId]).find((candidate) => candidate.key === partKey);
-  movePartTo(entry, partKey, part, select.value);
+  if (!movePartTo(entry, partKey, part, select.value)) return;
   save();
   renderMapPage();
 }
@@ -282,6 +327,7 @@ export function onMoveToChanged(select) {
  * @param {HTMLInputElement} checkbox
  */
 export function onDontSplitChanged(checkbox) {
+  if (!isTaskOnMyList(currentList(), checkbox.dataset.nosplit)) return;
   const entry = taskEntry(checkbox.dataset.nosplit);
   entry.noSplit = checkbox.checked;
   clearSelectionAndOpenRow();

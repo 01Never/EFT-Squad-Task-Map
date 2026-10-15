@@ -12,9 +12,12 @@ import {
   isSharedOnlyFilterInEffect,
   isHiddenBySharedOnlyFilter,
   safeFriendColor,
+  friendBoxes,
+  friendOnlyRowsOnMap,
 } from "./rules.js";
+import { warnOnce } from "./safe.js";
 
-/** @import { SquadFriend } from "../../app/types.js" */
+/** @import { SquadFriend, PartOnMap } from "../../app/types.js" */
 
 // At most this many friend dots fit in a marker's bottom-left badge slot.
 const MAX_SQUAD_DOTS_ON_MARKER = 3;
@@ -59,6 +62,33 @@ export function squadColorsForTask(taskId) {
   return friendsAlsoDoingTask(taskId)
     .slice(0, MAX_SQUAD_DOTS_ON_MARKER)
     .map((friend) => safeFriendColor(friend.color));
+}
+
+/**
+ * Who has this task: a colour box and name per shown friend (rules.js: friendBoxes).
+ * @param {string} taskId
+ */
+export function friendBoxesForTask(taskId) {
+  if (!isInSquad()) return [];
+  return friendBoxes(taskId, friendsShowingTasks());
+}
+
+/**
+ * The rows of squadmates' tasks you don't have on this map (ticket 26, rules.js:
+ * friendOnlyRowsOnMap). A friend's data that breaks it shows none of them (noted once).
+ * @param {string} mapKey
+ * @returns {PartOnMap[]}
+ */
+export function friendOnlyPartsOnMap(mapKey) {
+  if (!isInSquad()) return [];
+  const friends = friendsShowingTasks();
+  if (!friends.length) return [];
+  try {
+    return friendOnlyRowsOnMap(friends, app.saved, shownGameMode(), app.taskById, mapKey);
+  } catch (error) {
+    warnOnce("friend-only rows", error);
+    return [];
+  }
 }
 
 /**
