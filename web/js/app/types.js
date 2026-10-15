@@ -177,7 +177,7 @@ export {};
 // ---------------------------------------------------------------- saved data (PUT /api/state)
 
 /**
- * @typedef {object} PartCategoryChoice Where the owner (or AI Categorize) put a part.
+ * @typedef {object} PartCategoryChoice Where the owner put a part.
  * @property {string} cat category id
  * @property {boolean} manual
  */
@@ -246,7 +246,7 @@ export {};
  * @property {boolean} panelHidden
  * @property {string} dcolor drawing colour
  * @property {number} dwidth drawing width in screen pixels
- * @property {boolean} aiOpen
+ * @property {number} [catsResetAt] ms since 1970 when every part went back to its default category (the one-time reset of issue #25); absent = not yet run
  * @property {boolean} [taskIcons] false = task markers keep their category shapes; absent = item icons (Settings → Task markers; features/icons)
  * @property {boolean} [showScanBanner]
  * @property {number} [migratedFrom]
@@ -298,7 +298,6 @@ export {};
  * @property {boolean} hasKey
  * @property {string | null} key masked
  * @property {string} model
- * @property {string} [effort]
  */
 
 /**

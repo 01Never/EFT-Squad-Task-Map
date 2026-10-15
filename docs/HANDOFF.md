@@ -188,7 +188,7 @@ Friends' copies ◄─(tailnet :7777, peer API; only when joined)─► features
   - `broadcast(ev)`: transient events (`gps`, `capture`, `raidStart`, `raidMap`, `mode`, `keybind`, `data`, `updates`, `squad`). They're dropped if no page is open.
 - The page handles events in `web/js/app/live-events.js`: one named handler per event name (`app/event-names.js`, checked against `internal/events/names.go` by `names_test.go`).
 - **Only the app's own page is answered** (ticket 04d, `internal/httpapi/guard.go`). Every request goes through `httpapi.Guard` with the allowed hosts `internal/app` builds for the bound port (`127.0.0.1:<port>`, `localhost:<port>`): another Host → 421 (blocks DNS rebinding); a state-changing request (not GET/HEAD/OPTIONS) whose `Origin` isn't `http://` + an allowed host, or, without `Origin`, whose `Sec-Fetch-Site` isn't `same-origin`/`none` → 403 (blocks cross-site POSTs); a body not sent as `application/json` on a JSON-body route → 415. Clients that send neither header (curl, tests, the single-copy check) pass. The page sends every JSON body with `Content-Type: application/json` (`app/api.js`, `app/saving.js`, `features/updates/panel.js`). Ticket 05's peer API is not on this server: it is a separate listener (the tailnet, or a 127.0.0.1 port with the dev transport) with its own checks (`Host` must be its own IP address and port, which blocks DNS rebinding; `tag:stm` nodes via tsnet `WhoIs`, or loopback only; never a request carrying `Origin` or `Sec-Fetch-Site`; ≤ 2 streams per machine; at most one share a second taken from each friend), in `internal/features/squad/peerapi.go`.
-- **The page never polls.**
+- **The page never polls.** Live updates come over SSE.
 
 ### Server (Go; start with `internal/app/app.go`)
 | Package | Role |
@@ -242,7 +242,7 @@ and `npm run typecheck`. Each feature folder has a README.
 - `web/js/panel/panel.js`: the panel's header, the Tasks tab's sections in order, the footer,
   hide/show, and the one router for its clicks and changes (each feature lists its handlers).
 - `web/js/features/<name>/`: `tasks`, `readiness`, `sub-tasks`, `drawing`, `extracts`, `find-me`,
-  `picker`, `raid`, `scan`, `ai-categorize`, `settings`, `loot` (ticket 08). Each has `README.md`, `rules.js` (no DOM,
+  `picker`, `raid`, `scan`, `settings`, `loot` (ticket 08). Each has `README.md`, `rules.js` (no DOM,
   tested in `rules.test.js`), `panel.js` and/or `map-layer.js`, and its `<name>.css`. See
   `docs/FEATURES.md`.
 - **Rendering model:** `renderMapPage()` rebuilds the panel's innerHTML (keeping its scroll position)
@@ -320,7 +320,7 @@ Log task events carry the game mode they belong to (issue #22: one task list per
 The raw json.tarkov.dev format (`{mode}/tasks`, `tasks_en`, `maps`, `maps_en`, `traders`, `traders_en`, `items_en`; names are translation keys) was first **inferred**, then **checked against the real files on 2026-10-05**: the assumptions hold, nothing is left untranslated, 515 tasks with the same ids as the snapshot, payload ~1.8 MB. The real files are kept (gzip) in `testdata/jsontarkovdev/`, and the Go converter is JSON-equal to v2 on them (`internal/gamedata/convert_test.go`).
 
 ### 6.2 Saved state (`squad-task-map-data.json`, `version: 3`)
-See SPEC §12. Fields: `cats`, `modes{regular, pve, "pvp-season": {tasks{id: {active, source, addedAt, gamePct, scannedAt, noSplit, pinned, partCats}}, ticks, have, used, subs}}` (issue #22: one list per game mode), then shared by all modes: `draw`, `prefs{map: {ext, extMarked, labels, drawOn, loot?}}` (`loot` only once you change a loot chip, ticket 08), `pinnedOnly`, `panelTab`, `panelHidden`, `collapsed`, `dcolor`, `dwidth`, `aiOpen`, `showScanBanner`, `migratedFrom`. Categories, drawings, map settings and the other choices are shared; only a field that belongs to one character's progress goes in `emptyTaskList()`.
+See SPEC §12. Fields: `cats`, `modes{regular, pve, "pvp-season": {tasks{id: {active, source, addedAt, gamePct, scannedAt, noSplit, pinned, partCats}}, ticks, have, used, subs}}` (issue #22: one list per game mode), then shared by all modes: `draw`, `prefs{map: {ext, extMarked, labels, drawOn, loot?}}` (`loot` only once you change a loot chip, ticket 08), `pinnedOnly`, `panelTab`, `panelHidden`, `collapsed`, `dcolor`, `dwidth`, `catsResetAt` (issue #25: when the one-time reset of part moves ran; absent = not yet), `showScanBanner`, `migratedFrom`. Categories, drawings, map settings and the other choices are shared; only a field that belongs to one character's progress goes in `emptyTaskList()`.
 - **v2 → v3 (issue #22):** the old top-level `tasks`, `ticks`, `used`, `have`, `subs` become the list of the game mode in Settings when the page first loads 2.9.0; the other two modes start empty. Before the page saves, the server keeps the untouched v2 file once as `squad-task-map-data.v2-backup.json` (`internal/storage/state.go`; never overwritten). A v2 file is recognised by its `version`; a v1 file goes v1 → v2 → v3. An older app (2.8.x) reading a v3 file does not find the old fields, so going back is not supported without the backup.
 - **Adding a field:** add its default to `freshState()`. `fill()` adds missing defaults when loading. Only bump `version` and add a `migrate` step for structural changes; keep the v1 → v2 → v3 path working (fixture: `tests/fixtures/v1-data.json`, the owner's real v1 file).
 
@@ -389,7 +389,7 @@ Measured idle cost with the page open (2 min, 2026-10-05): **Go 2.4.0: 0.000% of
   `docs/handoff-05-tailscale-test.md`; only real PCs show NAT traversal, the real console and
   Windows Firewall.
 
-**Page:** `npm test` (`node --test`): every `*.test.js` next to the rules it tests: `map/projection.test.js` (tarkov.dev vectors), `app/saved-data.test.js` (v1 → v2 → v3, missing fields), `app/addresses.test.js`, `app/current-list.test.js`, and `features/<name>/rules.test.js` (parts, categories, readiness and the Bring list, name matching, drawing, extracts, find-me, raid, picker, settings, AI Categorize, sub-tasks). Shared test data loading is in `tests/support/game-data.js`. `npm run typecheck` type-checks the page.
+**Page:** `npm test` (`node --test`): every `*.test.js` next to the rules it tests: `map/projection.test.js` (tarkov.dev vectors), `app/saved-data.test.js` (v1 → v2 → v3, missing fields), `app/addresses.test.js`, `app/current-list.test.js`, and `features/<name>/rules.test.js` (parts, categories, readiness and the Bring list, name matching, drawing, extracts, find-me, raid, picker, settings, sub-tasks). Shared test data loading is in `tests/support/game-data.js`. `npm run typecheck` type-checks the page.
 
 **Golden files** (`testdata/golden/`) were captured from the v2 TypeScript code before it was removed: converter outputs, the mock's raw documents, log events, GPS names. If a rule changes on purpose, regenerate the affected golden and say so in the commit.
 

@@ -31,7 +31,7 @@ export function freshState() {
     panelHidden: false,
     dcolor: "#ff4d4d",
     dwidth: 4,
-    aiOpen: true,
+    catsResetAt: Date.now(), // a new file never needs the one-time category reset
   };
 }
 
@@ -98,7 +98,11 @@ export function blankTaskEntry(addedAt = Date.now()) {
  */
 export function fillMissingFields(saved) {
   const defaults = freshState();
+  // The AI Categorize box is gone: its open/closed choice has no use.
+  delete /** @type {any} */ (saved).aiOpen;
   for (const field of Object.keys(defaults)) {
+    // catsResetAt stays absent in an older file: its absence is what starts the one-time reset.
+    if (field === "catsResetAt") continue;
     if (saved[field] === undefined) {
       saved[field] = defaults[field];
     }
@@ -230,7 +234,6 @@ function migrateFromV1(old, now) {
   }
   if (old.dcolor) saved.dcolor = old.dcolor;
   if (old.dwidth) saved.dwidth = old.dwidth;
-  if (old.aiOpen === false) saved.aiOpen = false;
   saved.migratedFrom = 1;
   saved.showScanBanner = true;
   return saved;

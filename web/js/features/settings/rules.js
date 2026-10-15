@@ -8,14 +8,6 @@ import { GAME_MODE_NAMES } from "../../app/game-modes.js";
 // The model the OpenAI dialog suggests when none is saved (the server uses the same default).
 export const DEFAULT_AI_MODEL = "gpt-5.4-mini";
 
-/** The reasoning effort choices: value sent to the server, and its name. "" = the model's default. */
-export const REASONING_EFFORTS = [
-  ["", "Default"],
-  ["low", "Low"],
-  ["medium", "Medium"],
-  ["high", "High"],
-];
-
 const SECOND_MS = 1000;
 const MINUTE_SECONDS = 60;
 const HOUR_SECONDS = 3600;

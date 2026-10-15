@@ -15,7 +15,7 @@ import { showExtractsNoticeIfDue } from "../extracts/notice.js";
 import { renderUpdatesSectionBox, bindUpdatesSection } from "../updates/panel.js";
 import { renderSquadSettingsBox, bindSquadSection } from "../squad/settings-section.js";
 import { sendShare } from "../squad/share-sync.js";
-import { DEFAULT_AI_MODEL, REASONING_EFFORTS, gameDataDescription } from "./rules.js";
+import { DEFAULT_AI_MODEL, gameDataDescription } from "./rules.js";
 
 /** @import { FolderStatus, Status } from "../../app/types.js" */
 
@@ -125,12 +125,11 @@ function renderGameDataStatus(status) {
   return `<p class="mnote">${escapeHtml(gameDataDescription(data, Date.now()))}${error}</p>`;
 }
 
-/** "Key sk-…abcd · gpt-5.4-mini · low", or that there's no key yet. */
+/** "Key sk-…abcd · gpt-5.4-mini", or that there's no key yet. */
 function renderAiStatus(status) {
   const ai = status.ai;
-  if (!ai.hasKey) return "No key yet — needed for Scan tasks and AI Categorize.";
-  const effort = ai.effort ? " · " + escapeHtml(ai.effort) : "";
-  return `Key ${escapeHtml(ai.key)} · ${escapeHtml(ai.model)}${effort}`;
+  if (!ai.hasKey) return "No key yet — needed for Scan tasks (and reading your extracts).";
+  return `Key ${escapeHtml(ai.key)} · ${escapeHtml(ai.model)}`;
 }
 
 /**
@@ -191,7 +190,7 @@ async function onSaveClicked(dialog, close) {
 
 // ---------------------------------------------------------------- the OpenAI key dialog
 
-/** The OpenAI dialog: key, model, reasoning effort; "Save & test" and "Remove key". */
+/** The OpenAI dialog: key and model; "Save & test" and "Remove key". */
 export function openAiKeyDialog() {
   const { el: dialog, close } = openModal(renderAiKeyDialog(app.status.ai));
   findElement("#aiclose", dialog).onclick = close;
@@ -204,18 +203,15 @@ export function openAiKeyDialog() {
 /** @param {import("../../app/types.js").AiStatus} ai */
 function renderAiKeyDialog(ai) {
   const keyPlaceholder = ai.hasKey ? escapeHtml(ai.key) + " (saved — leave blank to keep)" : "sk-…";
-  const effortOptions = REASONING_EFFORTS.map(
-    ([value, name]) => `<option value="${value}" ${(ai.effort || "") === value ? "selected" : ""}>${name}</option>`,
-  ).join("");
   const removeButton = ai.hasKey ? '<button class="btn danger" id="aidel">Remove key</button>' : "<span></span>";
   return `<h3>OpenAI</h3>
-    <p class="mnote">Used for <b>Scan tasks</b> (reading your task-list screenshots) and <b>AI Categorize</b>.</p>
+    <p class="mnote">Used for <b>Scan tasks</b> (reading your task-list screenshots) and reading your <b>extracts</b>.</p>
     <ol><li>Create a key at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys</a> (the account needs API credit).</li><li>Paste it here. The default model is fine; change it if your account uses a different one.</li></ol>
     <div class="row" style="margin-bottom:8px"><input type="password" id="aikey" placeholder="${keyPlaceholder}" autocomplete="off"></div>
     <div class="row" style="margin-bottom:8px"><label style="font-size:14px;color:var(--muted);width:80px">Model</label><input type="text" id="aimodel" value="${escapeHtml(ai.model || DEFAULT_AI_MODEL)}"></div>
-    <div class="row"><label style="font-size:14px;color:var(--muted);width:80px">Reasoning</label><select id="aieffort" style="flex:1">${effortOptions}</select><button class="btn" id="aisave">Save & test</button></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="aisave">Save & test</button></div>
     <div class="err" id="aierr"></div>
-    <p class="mnote" style="margin-top:12px">Scanning sends each screenshot (shrunk to 2048 px) to OpenAI; reading your extracts sends the first in-raid screenshot of each raid (also shrunk; you can turn that off in Settings); AI Categorize sends task data plus wiki excerpts. Both are billed to this key's account. The key is stored in plain text in <code>squad-task-map-settings.json</code> next to the program and only sent to api.openai.com.</p>
+    <p class="mnote" style="margin-top:12px">Scanning sends each screenshot (shrunk to 2048 px) to OpenAI; reading your extracts sends the first in-raid screenshot of each raid (also shrunk; you can turn that off in Settings). Both are billed to this key's account. The key is stored in plain text in <code>squad-task-map-settings.json</code> next to the program and only sent to api.openai.com.</p>
     <div class="row" style="margin-top:14px;justify-content:space-between">${removeButton}<button class="btn line" id="aiclose">Close</button></div>`;
 }
 
@@ -229,9 +225,9 @@ async function onSaveKeyClicked(dialog, close) {
   const field = (selector) => findElement(selector, dialog);
   errorLine.textContent = "Testing key…";
   try {
-    const body = { key: field("#aikey").value.trim(), model: field("#aimodel").value.trim(), effort: field("#aieffort").value };
+    const body = { key: field("#aikey").value.trim(), model: field("#aimodel").value.trim() };
     const answer = await callApi("/api/ai/key", { method: "PUT", body });
-    app.status.ai = { hasKey: answer.hasKey, key: answer.key, model: answer.model, effort: answer.effort };
+    app.status.ai = { hasKey: answer.hasKey, key: answer.key, model: answer.model };
     app.status = await fetchJson("/api/status"); // the one-time extracts notice may now be due
     close();
     showToast("OpenAI key saved");

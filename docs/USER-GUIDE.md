@@ -47,6 +47,8 @@ A scan makes the list of the mode shown match the game (see Scan tasks above) an
 
 **Upgrading from an earlier 2.x:** your one list was kept as the list of the mode Settings had when you first opened the new version; the other two modes start empty (scan to fill them). The program also keeps an untouched copy of your old file as `squad-task-map-data.v2-backup.json`. Going back to an older version won't read the new file correctly; use that copy for that.
 
+**Upgrading to the version without AI Categorize:** the AI Categorize box is gone; tasks still sort into the default categories by themselves. Once, the first time you open the new version, every part moved by hand or by the AI goes back to its default category (in all three game modes). Your categories all stay, including any the AI made (now empty, delete them if you like). Moving parts by hand, **Auto-sort** and **Re-sort everything** work as before. The OpenAI key stays, for Scan tasks and reading your extracts.
+
 ## Parts and categories
 Tasks that mix kinds of work are split into **parts**, and each part goes in its own category. For example, Dandies is "kills" (Scav / any kills) plus "placing" (Plant / stash). A split row shows **◫ part 1/2**. Tasks marked "(In one raid)" are never split, and **Don't split** in a task's details keeps one whole.
 
@@ -116,7 +118,7 @@ You need a **screenshot key** bound in Tarkov's control settings. The app warns 
 - **Center the map on me when I take a screenshot:** off by default. When on, every new position pans the map so you're in the middle, keeping your zoom, like a minimap. Same as **◎ Follow** on the map toolbar. If you're dragging the map when a screenshot comes in, it waits until you let go.
 - **Task markers:** **Item icons** (default) or **Category shapes only**. With icons, a spot where you place something shows that item (an MS2000 marker, a camera, a quest item, the item to stash) in a tile with the category colour as its border. If an icon can't be loaded, the marker shows its shape instead.
 - **Game data:** where it came from and **Update game data now**.
-- **OpenAI:** key, model and reasoning level.
+- **OpenAI:** key and model.
 - **Read my extracts from my first raid screenshot:** only shown once you have an OpenAI key. On by default (after a one-time notice that explains what is sent). Untick it to stop sending that screenshot. See "Your extracts, read from a screenshot" below.
 - **Updates:** the version you're on and **Check for updates** (see "Updating" below).
 
@@ -161,19 +163,13 @@ If something goes wrong (no internet, GitHub unreachable, no release yet, "This 
 
 **Going back:** the old exe stays next to the new one as `SquadTaskMap.previous.exe`; close the app, rename the two files and start it. Your data before each update is kept as `squad-task-map-data.before-<version>.json` (the newest three).
 
-## AI Categorize (OpenAI)
-The **🤖 AI Categorize** box in the panel sorts parts by your instructions, e.g. "Make a Key runs category for parts that need a key on this map". It checks each task's objectives and its wiki page, proposes moves with reasons, and you pick which to apply. **Undo** reverts an applied batch.
-
-**Setup:** **Add OpenAI key** and paste a key from platform.openai.com/api-keys (the account needs API credit). The default model is `gpt-5.4-mini`; Reasoning sets how hard it thinks.
-
 ## Privacy and cost
 - Everything stays on your PC except:
   - Game data downloads from **json.tarkov.dev**.
-  - Wiki pages from **escapefromtarkov.fandom.com** (AI Categorize).
   - Item icons from **assets.tarkov.dev**: the app downloads each icon once (on the first view) into `squad-task-map-icons/` and shows it from there afterwards; your browser never contacts assets.tarkov.dev itself. Only the 24-character item id is sent.
   - **github.com**, only when you click **Check for updates** (or Download and restart). The app contacts GitHub only when you click Check for updates.
-  - Requests to **api.openai.com**: each scanned screenshot (shrunk to 2048 px); **the first in-raid screenshot of each raid** (also shrunk to 2048 px; up to 3 if the extract list wasn't on the first), so your extracts can be marked for you (Settings: "Read my extracts from my first raid screenshot", only with a key, you can turn it off); and for AI Categorize, task data plus wiki excerpts.
-- OpenAI is billed to your key's account. A scan costs roughly 1–2k input tokens per screenshot; reading your extracts about 1–2k per raid; an AI Categorize request roughly 5–30k.
+  - Requests to **api.openai.com**: each scanned screenshot (shrunk to 2048 px); **the first in-raid screenshot of each raid** (also shrunk to 2048 px; up to 3 if the extract list wasn't on the first), so your extracts can be marked for you (Settings: "Read my extracts from my first raid screenshot", only with a key, you can turn it off).
+- OpenAI is billed to your key's account. A scan costs roughly 1–2k input tokens per screenshot; reading your extracts about 1–2k per raid.
 - The OpenAI key is stored in plain text in `squad-task-map-settings.json` next to the exe, and only sent to api.openai.com.
 - **Squad (only if you join one):** your friends' copies get your **drawings** (all maps, every line) and your name and colour; your **active tasks with their ticks and progress** only if you turn **Share my tasks** on. Nothing else is shared: not your OpenAI key, folders, screenshots, settings, Bring list counts, categories, or your position. Only copies in your squad can connect (the network accepts only machines you let in with the invite code), and what a friend sends is only ever shown as drawings and text; it can't change your data. The data is encrypted between PCs. Tailscale can see that your PC is on its network and how it connects (it relays traffic through its own servers when two PCs can't connect directly, but it can't read it); log uploads to Tailscale are switched off in this program. If you never join a squad, none of this runs and nothing is sent.
 - The program on 127.0.0.1 only answers its own page: only the app's own page can use it; other websites open in your browser can't.
@@ -189,7 +185,6 @@ While idle the program uses practically no CPU (measured 0.00% of one core over 
 | `squad-task-map-settings.json` | Settings and OpenAI key (including whether to read your extracts from the first raid screenshot) |
 | `squad-task-map-gamedata-<mode>.json` | Downloaded game data per mode |
 | `squad-task-map-pending.json` | Game events waiting for the page (usually empty) |
-| `squad-task-map-wikicache.json` | Wiki pages, kept 7 days |
 | `squad-task-map-icons/` | Item icons (one small `<id>.webp` each), downloaded once from assets.tarkov.dev. Safe to delete: they download again when needed |
 | `squad-task-map-data.v1-backup.json` | Your v1 file, from the upgrade |
 | `squad-task-map-data.v2-backup.json` | Your file from before the one-list-per-game-mode update (2.9.0), kept once |

@@ -43,12 +43,6 @@ import {
   onLootChipClicked,
   onLootSectionToggled,
 } from "../features/loot/panel.js";
-import {
-  renderAiCategorizeBox,
-  onAiCategorizeClicked,
-  onAiCategorizeKeyDown,
-  onAiScopeChanged,
-} from "../features/ai-categorize/panel.js";
 import { startScan } from "../features/scan/panel.js";
 import {
   SQUAD_SECTION_ACTIONS,
@@ -68,7 +62,6 @@ import {
 const TASKS_TAB_SECTIONS = [
   renderListTools, // 📌 Pinned only, Clear pins, ⇅ Auto-sort (features/tasks)
   renderSquadSection, // a chip per friend, "Shared with squad" (features/squad)
-  renderAiCategorizeBox, // 🤖 AI Categorize (features/ai-categorize)
   renderExtractsSection, // Extracts & labels (features/extracts)
   renderLootSection, // Loot, closed until opened (features/loot)
   renderCategoryLists, // the categories and their task rows (features/tasks)
@@ -186,12 +179,11 @@ function onTabClicked(button) {
 }
 
 /**
- * A click anywhere in the panel: AI Categorize first, then the nearest button with one of the
+ * A click anywhere in the panel: the nearest button with one of the
  * attributes above.
  * @param {MouseEvent} event
  */
 function onPanelClicked(event) {
-  if (onAiCategorizeClicked(event)) return;
   const button = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest(ANY_PANEL_BUTTON));
   if (!button) return;
   for (const [attribute, handler] of PANEL_BUTTONS_BY_ATTRIBUTE) {
@@ -218,7 +210,6 @@ function onPanelChanged(event) {
   if (field.hasAttribute("data-subfloor")) return onFloorChanged(/** @type {any} */ (field));
   if (field.hasAttribute("data-catcolor")) return onCategoryColorChanged(field);
   if (field.id === "addtask") addTaskByName(field.value);
-  if (field.id === "aiscope") onAiScopeChanged(/** @type {any} */ (field));
 }
 
 /**
@@ -236,7 +227,6 @@ function onPanelInput(event) {
  * @param {KeyboardEvent} event
  */
 function onPanelKeyDown(event) {
-  if (onAiCategorizeKeyDown(event)) return;
   if (event.key !== "Enter") return;
   const field = /** @type {HTMLInputElement} */ (event.target);
   if (field.dataset.addsub !== undefined) onAddBoxEnter(field);

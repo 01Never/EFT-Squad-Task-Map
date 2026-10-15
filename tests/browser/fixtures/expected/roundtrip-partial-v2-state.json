@@ -83,6 +83,5 @@
   "panelTab": "tasks",
   "panelHidden": false,
   "dcolor": "#ff4d4d",
-  "dwidth": 4,
-  "aiOpen": true
+  "dwidth": 4
 }

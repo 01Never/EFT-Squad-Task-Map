@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { findTask } from "../../../../tests/support/game-data.js";
-import { freshState } from "../../app/saved-data.js";
+import { freshState, blankTaskEntry } from "../../app/saved-data.js";
 import { partsOfTask } from "./rules.js";
 import {
   categoryOfPart,
@@ -13,6 +13,7 @@ import {
   deleteCategory,
   newCategory,
   insertBeforeUnsorted,
+  resetPartCategoriesOnce,
 } from "./categories.js";
 
 test("a part lands in its default category unless you moved it", () => {
@@ -76,4 +77,29 @@ test("deleting a category sends parts back to their defaults in every game mode'
   assert.deepEqual(saved.modes.pve.tasks[dandies.id].partCats, {});
   assert.deepEqual(saved.modes["pvp-season"].tasks[dandies.id].partCats, {});
   assert.equal(saved.cats.some((category) => category.id === "c-keys"), false);
+});
+
+test("the one-time reset sends every part of every mode back to its default category, once", () => {
+  const saved = freshState();
+  delete saved.catsResetAt; // an older file
+  const custom = { id: "cx", name: "Key runs", color: "#fff", icon: "circle", builtin: null, visible: true };
+  saved.cats.splice(saved.cats.length - 1, 0, custom);
+  for (const mode of ["regular", "pve"]) {
+    saved.modes[mode].tasks.t1 = { ...blankTaskEntry(1), partCats: { "*": { cat: "cx", manual: true } } };
+  }
+
+  assert.equal(resetPartCategoriesOnce(saved, 1234), true);
+  assert.deepEqual(saved.modes.regular.tasks.t1.partCats, {});
+  assert.deepEqual(saved.modes.pve.tasks.t1.partCats, {});
+  assert.ok(saved.cats.some((category) => category.id === "cx"), "categories stay");
+  assert.equal(saved.catsResetAt, 1234);
+
+  saved.modes.regular.tasks.t1.partCats = { "*": { cat: "cx", manual: true } };
+  assert.equal(resetPartCategoriesOnce(saved, 5678), false);
+  assert.equal(saved.modes.regular.tasks.t1.partCats["*"].cat, "cx", "a later move is kept");
+  assert.equal(saved.catsResetAt, 1234);
+});
+
+test("a new file never needs the reset", () => {
+  assert.equal(resetPartCategoriesOnce(freshState(), 1), false);
 });

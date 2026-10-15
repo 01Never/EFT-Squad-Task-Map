@@ -435,7 +435,7 @@ export async function startApp(options) {
     const environment = {
       ...environmentWithoutAppSettings(),
       STM_DATA_DIR: dataDir, STM_LOGS_DIR: logsDir, STM_SCREENSHOTS_DIR: shotsDir, STM_NO_BROWSER: "1", PORT: String(port),
-      STM_JSON_BASE: MOCK_BASE, STM_OPENAI_API: MOCK_BASE + "/v1", STM_WIKI_API: MOCK_BASE + "/wiki", STM_ASSETS_BASE: MOCK_BASE + "/assets",
+      STM_JSON_BASE: MOCK_BASE, STM_OPENAI_API: MOCK_BASE + "/v1", STM_ASSETS_BASE: MOCK_BASE + "/assets",
       ...(PAGE_FROM_DISK ? { STM_ASSETS_DIR: REPO_ROOT } : {}),
       ...(options.env || {}),
     };

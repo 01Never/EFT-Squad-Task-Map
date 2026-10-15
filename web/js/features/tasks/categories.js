@@ -22,12 +22,12 @@ export const DEFAULT_CATEGORIES = [
   { id: "unsorted", name: "Unsorted", color: "#c7c5b3", icon: "hexagon", builtin: "unsorted" },
 ];
 
-// Colours for categories you add (and AI Categorize adds without a colour), taken in turn by how
+// Colours for categories you add (without a colour of their own), taken in turn by how
 // many categories exist, so neighbours differ.
 export const NEW_CATEGORY_COLORS = ["#f783ac", "#ff922b", "#66d9e8", "#a9e34b", "#e599f7", "#ffe084", "#4dabf7"];
 
 /**
- * The owner's (or the AI's) choice for a part: the part's own key, else "*" (the whole task,
+ * The owner's choice for a part: the part's own key, else "*" (the whole task,
  * carried over from v1). Undefined when there's none.
  * @param {TaskEntry | undefined} entry
  * @param {Part} part
@@ -56,7 +56,7 @@ export function categoryOfPart(saved, list, task, part) {
 }
 
 /**
- * Whether you (or AI Categorize) moved this part by hand, so "reset" is offered.
+ * Whether you moved this part by hand, so "reset" is offered.
  * @param {TaskList} list
  * @param {Task} task
  * @param {Part} part
@@ -93,7 +93,7 @@ export function insertBeforeUnsorted(categories, category) {
 }
 
 /**
- * A new category made by you or by AI Categorize. Without a colour or shape of its own, it takes
+ * A new category made by you. Without a colour or shape of its own, it takes
  * the next one in turn.
  * @param {Category[]} categories the existing ones
  * @param {string} id
@@ -181,4 +181,25 @@ export function restoreCategories(saved, list, snapshot) {
   for (const [taskId, partCats] of Object.entries(restored.pc)) {
     if (list.tasks[taskId]) list.tasks[taskId].partCats = /** @type {any} */ (partCats);
   }
+}
+
+/**
+ * The one-time reset to the default categories (issue #25, when AI Categorize was removed): every part
+ * of every game mode's list goes back to its default category, by clearing the moves. Every
+ * category stays (the ones the AI made are now empty custom categories). `catsResetAt` records
+ * that it ran, so it never runs again; a file that has it (a new one, or one already reset)
+ * is left alone. Changes the saved data in place.
+ * @param {SavedState} saved
+ * @param {number} now ms since 1970
+ * @returns {boolean} whether it ran (the caller then saves)
+ */
+export function resetPartCategoriesOnce(saved, now) {
+  if (saved.catsResetAt !== undefined) return false;
+  for (const list of Object.values(saved.modes)) {
+    for (const entry of Object.values(list.tasks)) {
+      entry.partCats = {};
+    }
+  }
+  saved.catsResetAt = now;
+  return true;
 }

@@ -6,6 +6,7 @@ import { app } from "./app/state.js";
 import { findElement, escapeHtml } from "./app/dom.js";
 import { fetchJson } from "./app/api.js";
 import { migrateSavedData, SAVED_DATA_VERSION } from "./app/saved-data.js";
+import { resetPartCategoriesOnce } from "./features/tasks/categories.js";
 import { shownGameMode } from "./app/current-list.js";
 import { flush, saveMigratedData, saveUnsavedChangesOnClose } from "./app/saving.js";
 import { indexGameData } from "./app/game-data.js";
@@ -50,7 +51,9 @@ async function start() {
     // A v2 file's one task list goes to the game mode in Settings (ticket 22).
     app.saved = migrateSavedData(savedData, shownGameMode());
     indexGameData();
-    if (isOlderData) await saveMigratedData();
+    // The one-time reset to the default categories (ticket 25); saved straight away like a migration.
+    const didReset = resetPartCategoriesOnce(app.saved, Date.now());
+    if (isOlderData || didReset) await saveMigratedData();
     findElement("#saved").textContent = savedData ? "Saved ✓" : "";
     findElement("#settings").onclick = openSettings;
     renderNav();
