@@ -1,4 +1,4 @@
-// Command mock is an offline stand-in for json.tarkov.dev, the OpenAI API and the Tarkov wiki,
+// Command mock is an offline stand-in for json.tarkov.dev and the OpenAI API,
 // for end-to-end tests. It is the Go port of v2's tests/mock-server.ts and answers the same way.
 // Run it from the repo root: go run ./cmd/mock (see README.md for endpoints and settings).
 package main

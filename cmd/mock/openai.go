@@ -22,7 +22,7 @@ const (
 )
 
 // The app's categorize request puts the parts to sort, as JSON, after this marker in the first
-// message (server/ai.ts in v2, internal/features/aicategorize in Go).
+// message.
 const partsMarker = "PARTS:\n"
 
 // The app's extract-list request asks "Read the extract list in this screenshot." (ticket 06);
@@ -177,7 +177,7 @@ func categorizeAnswer(input jsValue) (jsValue, error) {
 }
 
 // partsFromInput reads the parts list from the first message's text, after "PARTS:\n".
-// No marker (for example a follow-up request carrying wiki tool results) means no parts.
+// No marker means no parts.
 func partsFromInput(input jsValue) (jsValue, error) {
 	content := input.at(0).get("content")
 	if content.kind != jsString {

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"squadtaskmap/internal/events"
-	"squadtaskmap/internal/features/aicategorize"
 	"squadtaskmap/internal/features/taskscan"
 	"squadtaskmap/internal/features/updates"
 	"squadtaskmap/internal/gamedata"
@@ -18,17 +17,6 @@ import (
 // This file is what the page can ask for (httpapi.Backend).
 
 var _ httpapi.Backend = (*App)(nil)
-
-// Map names for AI Categorize's prompt (the page's map list plus maps without a page).
-func (app *App) mapName(key string) string {
-	if name, known := mapDisplayNames[key]; known {
-		return name
-	}
-	return key
-}
-
-// mapDisplayNames is filled from assets/maps-config.json at start-up.
-var mapDisplayNames = map[string]string{"the-lab": "The Lab", "terminal": "Terminal"}
 
 // Status is /api/status.
 func (app *App) Status() any {
@@ -170,34 +158,6 @@ func (app *App) RemoveAIKey() {
 	app.settingsMutex.Unlock()
 	_ = storage.WriteSettings(app.files.Settings, saved)
 }
-
-// StartCategorize starts an AI Categorize job.
-func (app *App) StartCategorize(request aicategorize.Request) (string, error) {
-	settings := app.currentSettings()
-	if settings.OpenAIKey == "" {
-		return "", httpapi.ErrNoAIKey
-	}
-	if request.Instruction == "" {
-		return "", errType("Type an instruction")
-	}
-	tasksByID := map[string]gamedata.Task{}
-	for _, task := range app.gameData.Current().Tasks {
-		tasksByID[task.ID] = task
-	}
-	model := settings.OpenAIModel
-	if model == "" {
-		model = openai.DefaultModel
-	}
-	id := app.jobs.Start(func(report func(string)) (aicategorize.Result, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), aicategorize.JobTimeout)
-		defer cancel()
-		return app.categorizer.Categorize(ctx, request, tasksByID, app.mapName, settings.OpenAIKey, model, settings.OpenAIEffort, report)
-	})
-	return id, nil
-}
-
-// Job reports an AI Categorize job.
-func (app *App) Job(id string) (*aicategorize.Job, bool) { return app.jobs.Get(id) }
 
 // Scan is the task scan.
 func (app *App) Scan() *taskscan.Scan { return app.scan }

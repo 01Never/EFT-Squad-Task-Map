@@ -4,7 +4,7 @@
 //	Tarkov logs ──(5 s size check)──► gamelog ──┐
 //	Screenshots ──(file notifications)► screenshots ─┤                      ┌─► page (SSE events)
 //	json.tarkov.dev ──(hourly check)──► gamedata ───┼─► app (this package) ─┤
-//	OpenAI ◄──(scan, categorize)────── taskscan / aicategorize ─┘           └─◄ page (HTTP API)
+//	OpenAI ◄──(scan, extracts)──────── taskscan / extracts ────┘           └─◄ page (HTTP API)
 //	Friends ◄─(tailnet peer API, only when joined)─► squad ─► app (squad.go) ─► page ("squad" event)
 package app
 
@@ -12,7 +12,6 @@ import (
 	"sync"
 
 	"squadtaskmap/internal/events"
-	"squadtaskmap/internal/features/aicategorize"
 	"squadtaskmap/internal/features/extracts"
 	"squadtaskmap/internal/features/gamelog"
 	"squadtaskmap/internal/features/gps"
@@ -44,8 +43,6 @@ type App struct {
 	position    *gps.Tracker
 	scan        *taskscan.Scan
 	extracts    *extracts.Reader // ticket 06: my extracts from the first raid screenshot
-	categorizer *aicategorize.Categorizer
-	jobs        *aicategorize.Jobs
 	ai          *openai.Client
 	updates     *updates.Updater
 	squad       *squad.Squad // ticket 05: started only when the player is in a squad (squad.go)
@@ -80,8 +77,6 @@ func newApp(version, updatedFrom string, files storage.Files, builtInGameData fu
 	app.settings = storage.ReadSettings(files.Settings)
 	app.hub = events.NewHub(files.Pending)
 	app.ai = openai.NewClient(userAgent)
-	app.jobs = aicategorize.NewJobs()
-	app.categorizer = aicategorize.New(app.ai, aicategorize.NewWiki(files.WikiCache, userAgent))
 
 	app.gameData = gamedata.NewStore(files, builtInGameData, userAgent, app.onGameDataChanged)
 	app.logs = gamelog.NewWatcher(app.onLogEvent)

@@ -1,6 +1,6 @@
 # Offline mock (`cmd/mock`)
 
-**What it does:** stands in for json.tarkov.dev, the OpenAI API and the Escape from Tarkov wiki,
+**What it does:** stands in for json.tarkov.dev, and the OpenAI API,
 so the app can be tested end to end with no internet and no real API key. It's the Go port of
 v2's `tests/mock-server.ts`. It answers byte for byte the same, and its request log has the same
 lines.
@@ -11,7 +11,7 @@ go run ./cmd/mock          # from the repo root; prints "mock up" once it's list
 
 Point the app at it:
 ```
-STM_JSON_BASE=http://127.0.0.1:7820  STM_OPENAI_API=http://127.0.0.1:7820/v1  STM_WIKI_API=http://127.0.0.1:7820/wiki
+STM_JSON_BASE=http://127.0.0.1:7820  STM_OPENAI_API=http://127.0.0.1:7820/v1
 ```
 (plus `STM_DATA_DIR`, `STM_LOGS_DIR`, `STM_SCREENSHOTS_DIR` and `STM_NO_BROWSER=1` for scratch
 folders, as in `docs/HANDOFF.md`).
@@ -44,10 +44,6 @@ The HTTP method is ignored, as in v2. Paths are checked in this order.
   when it's loaded. That gives exactly the bytes v2 sent.
 - `real` docs are `testdata/jsontarkovdev/regular-<name>.json.gz`, served unchanged.
 
-**Wiki:** `GET /wiki?page=<title>` answers
-`{"parse":{"title":<title>,"wikitext":"==Objectives==\n*Do the thing\n==Guide==\nIt's upstairs."}}`
-for any title. Logged as `wiki <title>` (`wiki null` without `page`).
-
 **OpenAI** (`/v1/...`):
 - The `Authorization` header must be exactly `Bearer sk-test_1234567890abcdefghijkl`.
   Otherwise: 401 `{"error":{"message":"Incorrect API key provided"}}`.
@@ -63,7 +59,7 @@ for any title. Logged as `wiki <title>` (`wiki null` without `page`).
     `{"visible": true, "extracts": [...]}`: by default five Customs entries (two exact names, one
     misread by a letter, one transit, one that is on no map). `/set-extracts` replaces it. The log
     line ends with ` extracts=true`, so tests can count these calls apart from the task scan's.
-  - **AI Categorize:** any other request. It reads the parts JSON after `PARTS:\n` in the first
+  - **Categorize (the app no longer sends these; kept so old checks still pass):** any other request. It reads the parts JSON after `PARTS:\n` in the first
     message. It creates a "Key runs" category (`#4dabf7`, star) and moves every part with an
     objective that has `keys` into it, with the reason `Needs <first key>`. The reply is
     `Moved N parts that need keys.` A request without `PARTS:` (the follow-up that carries wiki
@@ -137,7 +133,7 @@ which keeps JavaScript's rules:
 
 ## Files
 - `main.go`: settings and start-up.
-- `server.go`: path dispatch, test controls, json.tarkov.dev files, wiki.
+- `server.go`: path dispatch, test controls, json.tarkov.dev files.
 - `openai.go`: key check, models, vision and categorize answers.
 - `github.go`: the fake GitHub Releases (ticket 04c).
 - `documents.go`: loading the snapshot or real files.
@@ -145,7 +141,7 @@ which keeps JavaScript's rules:
 
 ## Tests
 `go test ./cmd/mock`:
-- each endpoint: files, outage, key check, vision and `/set-rows`, categorize, log lines, wiki,
+- each endpoint: files, outage, key check, vision and `/set-rows`, categorize, log lines,
   bad bodies;
 - loading both doc sets from `testdata/`;
 - the fake GitHub (`github_test.go`), driven by the app's own update code: published release,
@@ -157,7 +153,6 @@ which keeps JavaScript's rules:
 this mock on another, with the same requests sent to both:
 - every doc for `regular` and `pve`;
 - unknown docs and paths;
-- the wiki;
 - models with good, bad and no key;
 - vision, including a body escaped Go-style (`<`);
 - categorize with keyed, unkeyed, `keys: []` and `keys: null` parts;

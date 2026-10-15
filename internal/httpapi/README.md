@@ -25,7 +25,7 @@ and `Guard` makes sure only the app's own page in the browser can use it).
     tests, a second copy checking for the first) the request passes. This blocks cross-site
     "simple" POSTs, which a browser sends without asking first.
   - **JSON-body routes** (`jsonBody` in the route table: events/ack, state, settings, ai/key,
-    ai/categorize, scan/remove, scan/read, scan/confirm, updates/download, squad/share,
+    scan/remove, scan/read, scan/confirm, updates/download, squad/share,
     squad/join, squad/profile) take a body only as
     `application/json` (a charset is fine), or `415`. A request with no body and no Content-Type
     passes and reads as `{}`. So a form or `text/plain` POST can't reach them even from a
@@ -60,8 +60,6 @@ and `Guard` makes sure only the app's own page in the browser can use it).
 | `PUT /api/settings` | change settings → `{ok, status}` | only fields sent with the right type: `gameMode` (regular, pve or pvp-season), `logsPath`, `screenshotsPath` (trimmed), `followPosition`, `autoCenter`. A new mode switches the game data; a new folder restarts both watchers. |
 | `PUT /api/ai/key {key, model, effort}` | check and save the OpenAI key | an empty key keeps the saved one; an empty model is the default; effort is "", low, medium or high (anything else becomes ""); 400 with the reason |
 | `DELETE /api/ai/key` | forget the key | |
-| `POST /api/ai/categorize` | start an AI Categorize job → `{ok, job}` | instruction ≤ 2000 characters; last 8 turns ≤ 4000 each; ≤ 50 categories; ≤ 500 parts |
-| `GET /api/ai/job/{id}` | a job's progress or result | 404 `{status: "error", error: "Job not found"}` |
 | `POST /api/scan/start` | capture on → `{ok, dir}` | 400 `{error, dir}` when the screenshots folder isn't watched |
 | `POST /api/scan/stop` | capture off → `{ok, files}` | |
 | `POST /api/scan/cancel` | forget the list | broadcasts `capture` with `cancelled: true` |
