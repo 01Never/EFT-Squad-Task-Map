@@ -1,24 +1,16 @@
 // @ts-check
-// What the squad draws on the map: each friend's drawings (read-only, in the friend's colour,
-// under your own) and, for friends whose tasks you show, small markers for the tasks you don't
-// have. Neither layer can be clicked, and neither touches your task list, readiness, Bring list,
-// selection or saved data. Everything here came from friends, so numbers are checked before they
-// reach an SVG attribute and colours go through safeFriendColor().
+// What the squad draws on the map of its own: each friend's drawings (read-only, in the friend's
+// colour, under your own). They can't be clicked and touch nothing of yours. Everything here came
+// from friends, so numbers are checked before they reach an SVG attribute and colours go through
+// safeFriendColor(). Squadmates' tasks are task markers (features/tasks/map-layer.js, ticket 27).
 import { app } from "../../app/state.js";
-import { shownGameMode } from "../../app/current-list.js";
 import { createSvgElement } from "../../app/dom.js";
-import { applyView } from "../../map/view.js";
-import { spotsOfPart } from "../tasks/map-layer.js";
-import { friendsShowingDrawings, friendsShowingTasks } from "./friends.js";
-import { safeFriendColor, friendsOwnTasksOnMap, openPartsOnMap, ownValue } from "./rules.js";
+import { friendsShowingDrawings } from "./friends.js";
+import { safeFriendColor, ownValue } from "./rules.js";
 import { warnOnce } from "./safe.js";
 
 /** @import { SquadFriend, Stroke } from "../../app/types.js" */
 
-// A friend's marker is smaller than yours (a task spot is 8.5), a plain dot in the friend's colour.
-const FRIEND_MARKER_RADIUS = 5;
-// Two friends on the same spot are drawn this many screen pixels apart.
-const FRIEND_MARKER_SPREAD_PIXELS = 6;
 // Used when a stroke's width isn't a usable number (game units).
 const FALLBACK_STROKE_WIDTH = 2;
 
@@ -114,74 +106,4 @@ function svgPointsOfStroke(stroke) {
     pairs.push(`${x.toFixed(2)},${y.toFixed(2)}`);
   }
   return pairs.join(" ");
-}
-
-// ---------------------------------------------------------------- friends' other tasks
-
-/**
- * Small markers for the open parts of tasks a shown friend has and you don't, on the open map,
- * in the friend's colour. Drawn under your own markers; not clickable.
- */
-export function renderFriendTaskMarkers() {
-  const mapView = app.mapView;
-  const layer = mapView.layers.friendTasks;
-  layer.innerHTML = "";
-  const friends = friendsShowingTasks();
-  friends.forEach((friend, friendIndex) => {
-    try {
-      drawFriendTaskMarkers(layer, friend, friendIndex, friends.length);
-    } catch (error) {
-      warnOnce("task markers", error);
-    }
-  });
-}
-
-/** Redraw the friends' markers and put them at screen size (after a change that isn't a full redraw). */
-export function renderFriendTaskMarkersAndApplyView() {
-  renderFriendTaskMarkers();
-  applyView();
-}
-
-/**
- * @param {SVGGElement} layer
- * @param {SquadFriend} friend
- * @param {number} friendIndex which of the shown friends this is (spreads markers on one spot)
- * @param {number} friendCount
- */
-function drawFriendTaskMarkers(layer, friend, friendIndex, friendCount) {
-  const mapView = app.mapView;
-  const color = safeFriendColor(friend.color);
-  const spreadPixels = (friendIndex - (friendCount - 1) / 2) * FRIEND_MARKER_SPREAD_PIXELS;
-  const myMode = shownGameMode();
-  const theirTasks = friendsOwnTasksOnMap(friend, app.saved, myMode, app.taskById, mapView.key);
-  for (const { task, ticks } of theirTasks) {
-    for (const part of openPartsOnMap(task, ticks, mapView.key)) {
-      for (const spot of spotsOfPart(task, part, ticks)) {
-        drawFriendMarker(layer, spot, color, spreadPixels);
-      }
-    }
-  }
-}
-
-/**
- * One small dot at a spot: filled for an exact spot, white with a coloured edge for a possible one.
- * @param {SVGGElement} layer
- * @param {{ x: number, y: number, kind: string }} spot
- * @param {string} color
- * @param {number} spreadPixels
- */
-function drawFriendMarker(layer, spot, color, spreadPixels) {
-  const group = createSvgElement(
-    "g",
-    { class: "sc friend-marker", "data-x": spot.x, "data-y": spot.y, "data-ox": spreadPixels, "pointer-events": "none" },
-    layer,
-  );
-  const isPossible = spot.kind === "possible";
-  const circle = {
-    r: FRIEND_MARKER_RADIUS,
-    fill: isPossible ? "#fff" : color,
-    stroke: isPossible ? color : "#000",
-    "stroke-width": isPossible ? 2.4 : 1.6,
-  };
-  createSvgElement("circle", circle, group);
 }

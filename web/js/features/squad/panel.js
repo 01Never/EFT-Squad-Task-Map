@@ -97,7 +97,7 @@ function renderFriendChip(friend) {
   const isSharingTasks = friendTasksOf(friend, myMode) !== null;
   const tasksTitle = escapeHtml(friendTasksButtonTitle(friend, myMode));
   return `<div class="squad-chip${friend.online ? " online" : ""}" data-friend="${id}" style="--friend:${safeFriendColor(friend.color)}">
-    <span class="squad-dot"></span>
+    <span class="squad-chip-dot"></span>
     <span class="squad-who"><b class="squad-name"><bdi>${name}</bdi></b><span class="squad-state">${escapeHtml(friendStatusText(friend, Date.now()))}</span></span>
     <button class="squad-toggle" data-squad-drawings="${id}" aria-pressed="${prefs.drawings}" title="Show ${name}'s drawings">✎ Draw</button>
     <button class="squad-toggle${isSharingTasks ? "" : " dim"}" data-squad-tasks="${id}" aria-pressed="${prefs.tasks}" title="${tasksTitle}">☰ Tasks</button>

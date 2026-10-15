@@ -343,9 +343,9 @@ test("three copies on a simulated Tailscale network", { skip: skip || false, tim
       const bobRow = `#panel .task[data-task="${revision.id}"]`;
       await eventually(async () => (await bob.page.locator(bobRow + " .squad-box").count()) === 1, "Bob's Revision row has Alice's box");
       assert.equal((await bob.page.textContent(bobRow + " .squad-box")).trim(), "Alice");
-      const dots = await bob.page.locator("svg.map g.mk .squad-dot").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("fill")));
-      assert.equal(dots.length, revision.objs.length, "a dot on each of Revision's markers");
-      assert.ok(dots.every((fill) => fill === "#e03131"));
+      const revisionSquares = `svg.map g.mk[data-part^="${revision.id}:"] .squad-square`;
+      const squares = await bob.page.locator(revisionSquares).evaluateAll((nodes) => nodes.map((node) => node.getAttribute("fill")));
+      assert.deepEqual(squares, ["#e03131"], "Alice's square under Revision's main spot (ticket 27)");
       await bob.page.click('[data-act="squadonly"]');
       assert.equal(await bob.page.locator("#panel .cat .task:not(.notmine)").count(), 1, "the filter keeps only Revision of Bob's own");
       await bob.page.click('[data-act="squadonly"]');

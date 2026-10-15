@@ -25,7 +25,7 @@ function iconMarkers(page) {
     const image = marker.querySelector("image");
     return {
       href: image ? image.getAttribute("href") : null,
-      hasShape: !!marker.querySelector(":scope > path, :scope > g > path"),
+      hasShape: !!marker.querySelector(":scope > g > path, :scope > g > g > path"), // shape, or the shape an icon fell back to
       plus: !!marker.querySelector("circle[r='3.4']"),
     };
   }));

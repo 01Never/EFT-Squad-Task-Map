@@ -468,6 +468,93 @@ function wholeTaskPercent(task, ticks) {
   return partProgressPercent(partsOfTask(task, true)[0], ticks);
 }
 
+// ---------------------------------------------------------------- squadmates on the markers
+
+// Under a marker there is room for this many friend squares; more friends show as "+N" after
+// them (owner, ticket 27 mock review).
+export const MAX_SQUAD_SQUARES_ON_MARKER = 4;
+
+/**
+ * The squares under a marker: the colours (safeFriendColor) of the first friends who have the
+ * task, in the friends' (chips') order, and how many more there are for the "+N".
+ * @param {SquadFriend[]} friendsWithTask friendsAlsoDoing() for the marker's task
+ * @returns {{ colors: string[], moreCount: number }}
+ */
+export function squadSquaresOf(friendsWithTask) {
+  const colors = [];
+  for (const friend of friendsWithTask.slice(0, MAX_SQUAD_SQUARES_ON_MARKER)) {
+    colors.push(safeFriendColor(friend.color));
+  }
+  const moreCount = Math.max(0, friendsWithTask.length - MAX_SQUAD_SQUARES_ON_MARKER);
+  return { colors, moreCount };
+}
+
+/**
+ * Which of a part's spots on this map is its main spot, the one that gets the squad squares
+ * (ticket 27: one set of squares per part, not one per spot): the first exact spot; when the
+ * part has only possible spots, the possible spot nearest the middle (average) of all its spots.
+ * -1 when there are no spots.
+ * Example: a quest item with five possible spots → the one closest to the middle of the five.
+ * @param {{ x: number, y: number, kind: string }[]} spots the part's spots on this map, in order
+ * @returns {number} an index into `spots`
+ */
+export function mainSpotIndex(spots) {
+  const firstExact = spots.findIndex((spot) => spot.kind === "exact");
+  if (firstExact >= 0) return firstExact;
+  if (!spots.length) return -1;
+  const middleX = spots.reduce((sum, spot) => sum + spot.x, 0) / spots.length;
+  const middleY = spots.reduce((sum, spot) => sum + spot.y, 0) / spots.length;
+  let nearestIndex = -1;
+  let nearestDistance = Infinity;
+  spots.forEach((spot, index) => {
+    if (spot.kind !== "possible") return;
+    const distance = Math.hypot(spot.x - middleX, spot.y - middleY);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestIndex = index;
+    }
+  });
+  return nearestIndex;
+}
+
+/**
+ * What the squad adds to one task marker (ticket 27). A squadmate's task you don't have
+ * (`notMine`) is drawn like yours but see-through (SPEC §7.3, the third case). The part's main
+ * spot gets a square per friend who has the task (up to four, then "+N"); other spots get none.
+ * @param {PartOnMap} row the marker's row
+ * @param {SquadFriend[]} friendsWithTask friendsAlsoDoing() for the row's task
+ * @param {boolean} isMainSpot mainSpotIndex() picked this marker's spot
+ * @returns {{ isSeeThrough: boolean, squares: { colors: string[], moreCount: number } | null }}
+ */
+export function squadMarkerLook(row, friendsWithTask, isMainSpot) {
+  const isSeeThrough = !!row.notMine;
+  if (!isMainSpot || !friendsWithTask.length) return { isSeeThrough, squares: null };
+  return { isSeeThrough, squares: squadSquaresOf(friendsWithTask) };
+}
+
+/**
+ * The ticks a squadmate's task you don't have is drawn with: an objective counts as done only
+ * when every friend who has the task has done it, so its spot shows while anyone still needs it.
+ * (A count is the lowest of theirs; `true` beats any count.)
+ * @param {string} taskId
+ * @param {SquadFriend[]} friendsWithTask friendsAlsoDoing() for the task
+ * @returns {Record<string, true | number>}
+ */
+export function squadTicksOfTask(taskId, friendsWithTask) {
+  const ticksOfEach = friendsWithTask.map((friend) => ticksOfSharedTask(ownValue(sharedTasksOf(friend), taskId)));
+  if (!ticksOfEach.length) return {};
+  /** @type {Record<string, true | number>} */
+  const together = {};
+  for (const objectiveId of Object.keys(ticksOfEach[0])) {
+    if (!GAME_ID.test(objectiveId)) continue; // only game ids (never "__proto__")
+    const values = ticksOfEach.map((ticks) => ownValue(ticks, objectiveId));
+    if (values.some((value) => value !== true && typeof value !== "number")) continue;
+    const counts = values.filter((value) => typeof value === "number");
+    together[objectiveId] = counts.length ? Math.min(...counts) : true;
+  }
+  return together;
+}
+
 // ---------------------------------------------------------------- my share
 
 /**
