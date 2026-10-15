@@ -1,6 +1,6 @@
 // The mock's HTTP side: one handler that checks paths in the same order as v2's
 // tests/mock-server.ts, plus the test controls (/log, /set-rows, /fail), the json.tarkov.dev
-// files and the wiki. The fake OpenAI API is in openai.go.
+// files. The fake OpenAI API is in openai.go.
 
 package main
 
@@ -23,9 +23,6 @@ const (
 
 // json.tarkov.dev serves each game mode's files at /<mode>/<name>, e.g. /pve/tasks_en.
 var gameDataPathPattern = regexp.MustCompile(`^/(regular|pve|pvp-season)/(\w+)$`)
-
-// The page text every wiki request gets: one objective and a short guide.
-const fakeWikiText = "==Objectives==\n*Do the thing\n==Guide==\nIt's upstairs."
 
 // What the fake vision model "reads" from a screenshot until a test replaces it with
 // POST /set-rows. Kept exactly as v2's mock had them: the misspelled "Seizing the Initative"
@@ -59,7 +56,7 @@ type mockServer struct {
 	documents map[string][]byte // json.tarkov.dev files by URL name ("tasks_en"); read-only
 
 	mutex       sync.Mutex
-	requestLog  []string    // one line per json.tarkov.dev, wiki and /v1/responses request
+	requestLog  []string    // one line per json.tarkov.dev and /v1/responses request
 	visionRows  jsValue     // what the fake vision model answers; POST /set-rows replaces it
 	extractList jsValue     // what it answers for an extract-list screenshot; POST /set-extracts replaces it
 	isFailing   bool        // set by POST /fail: json.tarkov.dev answers 503 while true
@@ -106,8 +103,6 @@ func (mock *mockServer) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 		mock.handleGitHub(writer, request, path)
 	case gameDataPathPattern.MatchString(path):
 		mock.handleGameDataFile(writer, path)
-	case path == "/wiki":
-		mock.handleWiki(writer, request)
 	case strings.HasPrefix(path, "/v1/"):
 		mock.handleOpenAI(writer, request, path)
 	default:
@@ -192,23 +187,6 @@ func (mock *mockServer) handleGameDataFile(writer http.ResponseWriter, path stri
 	writer.Header().Set("Content-Type", jsonContentType)
 	writer.WriteHeader(http.StatusOK)
 	writer.Write(document)
-}
-
-// handleWiki answers like the MediaWiki parse API: GET /wiki?page=<title> gets the same short
-// page for every title. Without ?page= the title is null and the log says "wiki null", as in v2.
-func (mock *mockServer) handleWiki(writer http.ResponseWriter, request *http.Request) {
-	title := jsNullValue()
-	pageValues := request.URL.Query()["page"]
-	if len(pageValues) > 0 {
-		title = jsStringValue(pageValues[0])
-	}
-
-	mock.addToLog("wiki " + title.toJavaScriptString())
-	answer := jsObjectValue(field("parse", jsObjectValue(
-		field("title", title),
-		field("wikitext", jsStringValue(fakeWikiText)),
-	)))
-	writeJSON(writer, http.StatusOK, answer)
 }
 
 func (mock *mockServer) addToLog(line string) {

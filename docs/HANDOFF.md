@@ -65,7 +65,7 @@ Go dependencies: `github.com/fsnotify/fsnotify` (screenshots folder notification
 | `PORT` | First port to try (default 7777; tries up to 7800) |
 | `STM_LOGS_DIR` / `STM_SCREENSHOTS_DIR` | Override detected game folders |
 | `STM_JSON_BASE` | Game-data base URL (default `https://json.tarkov.dev`) |
-| `STM_OPENAI_API` / `STM_WIKI_API` | OpenAI and wiki endpoints (for the mock server) |
+| `STM_OPENAI_API` | OpenAI endpoint (for the mock server) |
 | `STM_ASSETS_BASE` | Where item icons come from (default `https://assets.tarkov.dev`; the mock serves `http://127.0.0.1:7820/assets`) |
 | `STM_UPDATES_BASE` | Replaces `https://github.com/01Never/EFT-Squad-Task-Map` for "Check for updates" (the mock serves a fake GitHub at `http://127.0.0.1:7820/github/01Never/EFT-Squad-Task-Map`) |
 | `STM_UPDATES_PUBLIC_KEY` | Only when `STM_UPDATES_BASE` is on this PC (127.0.0.1, ::1, localhost); otherwise ignored: trust this base64 public key instead of the built-in one (the mock's test key is in `testdata/updates/mock-public-key.txt`) |
@@ -178,7 +178,7 @@ then join each with any `tskey-…` text (the dev transport doesn't use it).
 Tarkov logs ──(5 s size check)──► features/gamelog ─┐
 Screenshots ──(OS notifications)─► screenshots ─────┤
 json.tarkov.dev ──(hourly check)─► gamedata ────────┼─► internal/app ──httpapi (HTTP/SSE)──► page (web/js) ──PUT /api/state──► squad-task-map-data.json
-OpenAI ◄──(scan, categorize)───── taskscan / aicategorize ┘          127.0.0.1 only
+OpenAI ◄──(scan, extracts)─────── taskscan / extracts ┘          127.0.0.1 only
 Friends' copies ◄─(tailnet :7777, peer API; only when joined)─► features/squad ─► internal/app ─► "squad" event ─► page
 ```
 
@@ -188,7 +188,7 @@ Friends' copies ◄─(tailnet :7777, peer API; only when joined)─► features
   - `broadcast(ev)`: transient events (`gps`, `capture`, `raidStart`, `raidMap`, `mode`, `keybind`, `data`, `updates`, `squad`). They're dropped if no page is open.
 - The page handles events in `web/js/app/live-events.js`: one named handler per event name (`app/event-names.js`, checked against `internal/events/names.go` by `names_test.go`).
 - **Only the app's own page is answered** (ticket 04d, `internal/httpapi/guard.go`). Every request goes through `httpapi.Guard` with the allowed hosts `internal/app` builds for the bound port (`127.0.0.1:<port>`, `localhost:<port>`): another Host → 421 (blocks DNS rebinding); a state-changing request (not GET/HEAD/OPTIONS) whose `Origin` isn't `http://` + an allowed host, or, without `Origin`, whose `Sec-Fetch-Site` isn't `same-origin`/`none` → 403 (blocks cross-site POSTs); a body not sent as `application/json` on a JSON-body route → 415. Clients that send neither header (curl, tests, the single-copy check) pass. The page sends every JSON body with `Content-Type: application/json` (`app/api.js`, `app/saving.js`, `features/updates/panel.js`). Ticket 05's peer API is not on this server: it is a separate listener (the tailnet, or a 127.0.0.1 port with the dev transport) with its own checks (`Host` must be its own IP address and port, which blocks DNS rebinding; `tag:stm` nodes via tsnet `WhoIs`, or loopback only; never a request carrying `Origin` or `Sec-Fetch-Site`; ≤ 2 streams per machine; at most one share a second taken from each friend), in `internal/features/squad/peerapi.go`.
-- **The page never polls,** with one exception: it polls `/api/ai/job/:id` while an AI Categorize request runs.
+- **The page never polls.**
 
 ### Server (Go; start with `internal/app/app.go`)
 | Package | Role |
@@ -206,11 +206,10 @@ Friends' copies ◄─(tailnet :7777, peer API; only when joined)─► features
 | `internal/features/raid` | Raid state (loading map, start, end, session mode) and that raid's GPS shots; `rules.go`: `TaskEventMode`, `EndsOnMenuReturn`. |
 | `internal/features/gps` | Position from screenshot names (`rules.go`), last position + trail (`tracker.go`). |
 | `internal/features/taskscan` | Capture mode, serving captured images, the vision read, confirm/cancel. |
-| `internal/features/aicategorize` | AI Categorize (prompt, tool loop, review of the answer), wiki fetch/clean/cache (7 days), jobs. |
 | `internal/features/updates` | "Check for updates" (ticket 04c): signed manifest from GitHub Releases, background download, rename-and-replace with rollback, restart. Starts only from a click: no timers. README has the full API. |
 | `internal/features/extracts` | Ticket 06: the first in-raid screenshot (up to 3 per raid) is shrunk to a 2048 px JPEG, read by the OpenAI vision model for the extract list, matched to the raid map's extracts and transits (Levenshtein ≥ 0.82), and `deliver`ed as `extracts`. Only with a key and the setting on (`readExtracts`; default on after the one-time notice). README has the rules. |
 | `internal/features/squad` | Squad sharing over a private tailnet (ticket 05): your share (rev stamping, tasks dropped unless shared), the peer API on its own listener (`GET /squad/v1/share`, `/squad/v1/stream`), friends found on the IPN bus and held on SSE streams with 1 s → 60 s backoff, everything received validated, friends cached with `lastSeen`; tsnet or dev transport (picked in `internal/app/squad.go`). Starts only when joined. README has the full API for the page. |
-| `cmd/mock` | Offline stand-ins for json.tarkov.dev, OpenAI, the wiki and a fake GitHub Releases (byte-equal to v2's Bun mock for the first three). |
+| `cmd/mock` | Offline stand-ins for json.tarkov.dev, OpenAI and a fake GitHub Releases (byte-equal to v2's Bun mock for the first three). |
 | `cmd/release` | The owner's release tool: version check, tests, Windows build, signed `latest.json`. See "Publishing an update". |
 | `cmd/faketailnet` | Test-only stand-in for Tailscale (ticket 05 tests): Tailscale's own test control server, a DERP relay and STUN on 127.0.0.1, with invite codes (tagged, expired, untagged), unique `-1` names, the `tag:stm` → `tag:stm` :7777 policy, online tracking, relay-only mode, and an admin API (list, delete, expire, test nodes). App copies join it with `STM_SQUAD_CONTROL_URL`. README has the API. |
 
@@ -326,7 +325,7 @@ See SPEC §12. Fields: `cats`, `modes{regular, pve, "pvp-season": {tasks{id: {ac
 - **Adding a field:** add its default to `freshState()`. `fill()` adds missing defaults when loading. Only bump `version` and add a `migrate` step for structural changes; keep the v1 → v2 → v3 path working (fixture: `tests/fixtures/v1-data.json`, the owner's real v1 file).
 
 ### 6.3 Files next to the exe
-`squad-task-map-data.json` (+ `.bak`), `squad-task-map-settings.json` (OpenAI key/model/effort, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`, ticket 06: `readExtracts`, `extractsNoticeSeen`), `squad-task-map-gamedata-<mode>.json`, `squad-task-map-pending.json`, `squad-task-map-wikicache.json`, `squad-task-map-data.v1-backup.json`, `squad-task-map-data.v2-backup.json` (issue #22: untouched v2 file before the page's v3 migration), `squad-task-map-instance.json` (port of the running copy), `squad-task-map-data.before-<version>.json` (newest 3, made before an update), `squad-task-map-update-notice.json` (release notes for the copy an update starts), `squad-task-map-squad.json` (ticket 05: my last squad share, friends' last shares with `lastSeen`), `squad-task-map-tailscale/` (ticket 05: tsnet's state folder with the node key, secret; deleted by Leave squad); the settings file's `squad` block holds `playerId`, `name`, `color`, `shareTasks`, `joined` (never the invite code); next to the exe, `SquadTaskMap.download.exe` and `SquadTaskMap.previous.exe` during/after an update.
+`squad-task-map-data.json` (+ `.bak`), `squad-task-map-settings.json` (OpenAI key/model/effort, `gameMode`, `logsPath`, `screenshotsPath`, `followPosition`, `autoCenter`, ticket 06: `readExtracts`, `extractsNoticeSeen`), `squad-task-map-gamedata-<mode>.json`, `squad-task-map-pending.json`, `squad-task-map-data.v1-backup.json`, `squad-task-map-data.v2-backup.json` (issue #22: untouched v2 file before the page's v3 migration), `squad-task-map-instance.json` (port of the running copy), `squad-task-map-data.before-<version>.json` (newest 3, made before an update), `squad-task-map-update-notice.json` (release notes for the copy an update starts), `squad-task-map-squad.json` (ticket 05: my last squad share, friends' last shares with `lastSeen`), `squad-task-map-tailscale/` (ticket 05: tsnet's state folder with the node key, secret; deleted by Leave squad); the settings file's `squad` block holds `playerId`, `name`, `color`, `shareTasks`, `joined` (never the invite code); next to the exe, `SquadTaskMap.download.exe` and `SquadTaskMap.previous.exe` during/after an update.
 
 ---
 
@@ -394,10 +393,10 @@ Measured idle cost with the page open (2 min, 2026-10-05): **Go 2.4.0: 0.000% of
 
 **Golden files** (`testdata/golden/`) were captured from the v2 TypeScript code before it was removed: converter outputs, the mock's raw documents, log events, GPS names. If a rule changes on purpose, regenerate the affected golden and say so in the commit.
 
-**Offline end-to-end:** `go run ./cmd/mock` (port 7820) fakes json.tarkov.dev (the snapshot-based documents v2's mock served; `MOCK_DOCS=real` serves the real files in `testdata/jsontarkovdev`), OpenAI (accepted key `sk-test_1234567890abcdefghijkl`; vision returns preset rows, changeable via `POST /set-rows`; categorize moves keyed parts to "Key runs"), and the wiki. `POST /fail {"fail":true}` simulates a json.tarkov.dev outage; `GET /log` lists requests. Then run the app with:
+**Offline end-to-end:** `go run ./cmd/mock` (port 7820) fakes json.tarkov.dev (the snapshot-based documents v2's mock served; `MOCK_DOCS=real` serves the real files in `testdata/jsontarkovdev`), OpenAI (accepted key `sk-test_1234567890abcdefghijkl`; vision returns preset rows, changeable via `POST /set-rows`; categorize moves keyed parts to "Key runs"; the app no longer sends those). `POST /fail {"fail":true}` simulates a json.tarkov.dev outage; `GET /log` lists requests. Then run the app with:
 ```
 STM_DATA_DIR=<scratch>  STM_LOGS_DIR=<scratch>\logs  STM_SCREENSHOTS_DIR=<scratch>\shots  STM_NO_BROWSER=1
-STM_JSON_BASE=http://127.0.0.1:7820  STM_OPENAI_API=http://127.0.0.1:7820/v1  STM_WIKI_API=http://127.0.0.1:7820/wiki
+STM_JSON_BASE=http://127.0.0.1:7820  STM_OPENAI_API=http://127.0.0.1:7820/v1
 ```
 Create `<scratch>\logs\log_2026.10.01_10-00-00_1.1.5.1\` containing empty `x push-notifications_000.log` and `x application_000.log` (the real names end like that), then **append** lines to simulate the game (real format, see `testdata/logs/real-session`):
 ```
@@ -452,7 +451,6 @@ Verified on the owner's PC since 2.3.0: folder detection (registry → `E:\Games
 - **Don't split vs moved parts:** a manual move stored on `<id>:<action>` doesn't apply once the task is unsplit (`<id>:*`); it falls back to the precedence default.
 - GPS trail labels ("x min ago") overlap when zoomed far out.
 - Item icons (ticket 07) are downloaded by the app into `squad-task-map-icons/` and served as `/icons/<id>.webp`; with none kept and no network, markers fall back to shapes and Bring list pictures remove themselves (`onerror`).
-- AI Categorize jobs live in server memory (`aicategorize.Jobs`); a restart drops a running job.
 - Story chapters on the in-game Tasks screen aren't in tarkov.dev data, so they show as "Not recognised" in scans. That's expected.
 - The map SVGs are CC BY-NC-SA 4.0: non-commercial only.
 - The pending-event `seq` restarts at the highest queued id (0 if the queue is empty) when the server restarts, while an open page keeps its old `ackUpTo`.

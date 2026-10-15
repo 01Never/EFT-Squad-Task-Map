@@ -1,14 +1,12 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"regexp"
 	"strings"
 
-	"squadtaskmap/internal/features/aicategorize"
 	"squadtaskmap/internal/features/taskscan"
 )
 
@@ -55,11 +53,9 @@ func NewServer(backend Backend, static *staticFiles) *Server {
 		{"PUT /api/state", jsonBody(server.writeState)},
 		{"PUT /api/settings", jsonBody(server.updateSettings)},
 
-		// OpenAI key and AI Categorize.
+		// OpenAI key.
 		{"PUT /api/ai/key", jsonBody(server.setAIKey)},
 		{"DELETE /api/ai/key", server.removeAIKey},
-		{"POST /api/ai/categorize", jsonBody(server.startCategorize)},
-		{"GET /api/ai/job/{id}", server.job},
 
 		// Scan tasks.
 		{"POST /api/scan/start", server.startScan},
@@ -176,7 +172,7 @@ func (server *Server) updateSettings(writer http.ResponseWriter, request *http.R
 	writeJSON(writer, http.StatusOK, map[string]any{"ok": true, "status": server.backend.UpdateSettings(change)})
 }
 
-// ---------------------------------------------------------------- OpenAI key and AI Categorize
+// ---------------------------------------------------------------- OpenAI key
 
 // setAIKey: an empty key keeps the saved one (changing only the model or effort). The backend checks
 // the key and model shapes, then asks OpenAI whether they work.
@@ -203,58 +199,6 @@ func (server *Server) setAIKey(writer http.ResponseWriter, request *http.Request
 func (server *Server) removeAIKey(writer http.ResponseWriter, _ *http.Request) {
 	server.backend.RemoveAIKey()
 	writeJSON(writer, http.StatusOK, okAnswer())
-}
-
-// Limits on what the page sends for AI Categorize.
-const (
-	maxInstructionLength = 2000
-	maxHistoryTurns      = 8
-	maxHistoryTurnLength = 4000
-	maxCategories        = 50
-	maxParts             = 500
-)
-
-func (server *Server) startCategorize(writer http.ResponseWriter, request *http.Request) {
-	var body struct {
-		Instruction any                     `json:"instruction"`
-		History     []map[string]any        `json:"history"`
-		MapName     any                     `json:"mapName"`
-		Categories  []aicategorize.Category `json:"categories"`
-		Parts       []aicategorize.Part     `json:"parts"`
-	}
-	_ = json.NewDecoder(request.Body).Decode(&body)
-	categorizeRequest := aicategorize.Request{
-		Instruction: limitRunes(strings.TrimSpace(textOrEmpty(body.Instruction)), maxInstructionLength),
-		MapName:     textOrEmpty(body.MapName),
-		Categories:  firstN(body.Categories, maxCategories),
-		Parts:       firstN(body.Parts, maxParts),
-	}
-	history := body.History
-	if len(history) > maxHistoryTurns {
-		history = history[len(history)-maxHistoryTurns:]
-	}
-	for _, turn := range history {
-		role := "user"
-		if turn["role"] == "assistant" {
-			role = "assistant"
-		}
-		categorizeRequest.History = append(categorizeRequest.History, aicategorize.Turn{Role: role, Content: limitRunes(textOrEmpty(turn["content"]), maxHistoryTurnLength)})
-	}
-	id, err := server.backend.StartCategorize(categorizeRequest)
-	if err != nil {
-		writeError(writer, http.StatusBadRequest, err)
-		return
-	}
-	writeJSON(writer, http.StatusOK, map[string]any{"ok": true, "job": id})
-}
-
-func (server *Server) job(writer http.ResponseWriter, request *http.Request) {
-	job, found := server.backend.Job(request.PathValue("id"))
-	if !found {
-		writeJSON(writer, http.StatusNotFound, map[string]any{"status": "error", "error": "Job not found"})
-		return
-	}
-	writeJSON(writer, http.StatusOK, job)
 }
 
 // ---------------------------------------------------------------- scan tasks

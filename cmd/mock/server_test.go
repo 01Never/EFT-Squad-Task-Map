@@ -157,7 +157,6 @@ func TestCategorizeMovesOnlyPartsThatNeedKeys(t *testing.T) {
 func TestRequestLogListsRequestsInOrder(t *testing.T) {
 	mock := newTestMock(t)
 	send(mock, "GET", "/regular/tasks", "", nil)
-	send(mock, "GET", "/wiki?page=Dandies", "", nil)
 	visionRequest := `{"model":"gpt-5.4-mini","reasoning":{"effort":"low"},"input":"input_image <&>"}`
 	send(mock, "POST", "/v1/responses", visionRequest, goodKey)
 	send(mock, "POST", "/v1/responses", `{"input":[]}`, goodKey)
@@ -165,21 +164,11 @@ func TestRequestLogListsRequestsInOrder(t *testing.T) {
 
 	recorder := send(mock, "GET", "/log", "", nil)
 	// imgBytes is the input's length as JSON: "input_image <&>" with its quotes is 17.
-	want := `["json /regular/tasks","wiki Dandies",` +
+	want := `["json /regular/tasks",` +
 		`"responses model=gpt-5.4-mini vision=true reasoning={\"effort\":\"low\"} imgBytes=17",` +
 		`"responses model=undefined vision=false reasoning=null imgBytes=0"]`
 	if got := recorder.Body.String(); got != want {
 		t.Errorf("log:\n got %s\nwant %s", got, want)
-	}
-}
-
-func TestWikiAnswersTheSamePageForEveryTitle(t *testing.T) {
-	recorder := send(newTestMock(t), "GET", "/wiki?page=Dandies", "", nil)
-	want := `{"parse":{"title":"Dandies",` +
-		`"wikitext":"==Objectives==\n*Do the thing\n==Guide==\nIt's upstairs."}}`
-	contentType := recorder.Header().Get("Content-Type")
-	if recorder.Body.String() != want || contentType != jsonContentType {
-		t.Errorf("got %s (%s), want %s", recorder.Body.String(), contentType, want)
 	}
 }
 

@@ -7,7 +7,6 @@ import (
 	"context"
 	"net/http"
 
-	"squadtaskmap/internal/features/aicategorize"
 	"squadtaskmap/internal/features/squad"
 	"squadtaskmap/internal/features/taskscan"
 	"squadtaskmap/internal/features/updates"
@@ -42,10 +41,6 @@ type Backend interface {
 	SetAIKey(ctx context.Context, key, model, effort string) (any, error)
 	// RemoveAIKey forgets the OpenAI key.
 	RemoveAIKey()
-	// StartCategorize starts an AI Categorize job and returns its id.
-	StartCategorize(request aicategorize.Request) (string, error)
-	// Job reports a running or finished AI Categorize job.
-	Job(id string) (*aicategorize.Job, bool)
 
 	// Scan is "Scan tasks" (capture mode, reading, confirm/cancel).
 	Scan() *taskscan.Scan

@@ -21,7 +21,7 @@ temporary build is recognised by `go-build` or `\temp\` in the exe's path.
 | `squad-task-map-data.v2-backup.json` | an untouched copy of v2 data, made once before the page moves to v3 (one task list per game mode, issue #22) | `BackupV2IfNeeded` |
 | `squad-task-map-settings.json` | settings | the app, through `WriteSettings` |
 | `squad-task-map-pending.json` | events waiting for the page | `events` |
-| `squad-task-map-wikicache.json` | wiki pages for AI Categorize | `aicategorize` |
+| `squad-task-map-wikicache.json` | (old, no longer written or read: AI Categorize was removed; an existing file is left on disk) | none |
 | `squad-task-map-gamedata-<mode>.json` | the game data cache | `gamedata` |
 | `squad-task-map-instance.json` | the port of the running copy (one copy at a time) | `internal/app/run.go` |
 | `squad-task-map-data.before-<version>.json` | copy of the saved data made before a new version's first start; the newest 3 are kept | `BackupStateBeforeUpdate` (called by `updates`) |
