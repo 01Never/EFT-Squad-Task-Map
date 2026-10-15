@@ -63,7 +63,7 @@ Safes, weapon boxes, PC blocks, jackets, filing cabinets and notable loose loot 
 ### Squad
 Join friends with an invite code: a private Tailscale network is built into the exe, nothing else to install. See each other's drawings live, and each other's tasks right in your task list: a colour box with the name of every friend who has a task, their progress, and their tasks you don't have yourself in the usual categories with a crosshatched background (you can open and pin those, not tick them).
 
-![A friend's drawing in their colour, and their name on a shared task](docs/images/squad.png)
+![A friend's drawing in their colour, their colour square under a task you share, and a task only they have, drawn see-through](docs/images/squad.png)
 
 ### And more
 - **Scan your task list:** screenshot the in-game Tasks screen, in the menus or in a raid, and an OpenAI vision model reads it, so your list matches the game exactly (optional, your own API key).

@@ -10,10 +10,11 @@ badges, the filter and per-friend progress.
 invite code in Settings; a chip per friend in the task list (colour dot, name, "online" /
 "last seen 2 h", **✎ Draw** and **☰ Tasks** switches); friends' lines in their colour under
 yours; with a friend's tasks on (the default), a colour box and name per friend on every row they
-have and in the popup, friend-colour dots at the bottom left of your markers, **Shared with
-squad**, "Mike 2/5 · Sam ✓" in the popup, and (ticket 26) the tasks only friends have as
-**crosshatched rows of your own list**, in their default category after your rows, with smaller
-markers in the friend's colour. No position is shared.
+have and in the popup, **Shared with squad**, "Mike 2/5 · Sam ✓" in the popup, and
+(ticket 26) the tasks only friends have as **crosshatched rows of your own list**, in their
+default category after your rows. On the map (ticket 27) those tasks are ordinary task markers,
+see-through, and every task a friend has gets a small square in their colour under its main
+spot. No position is shared.
 
 **Where the data comes from:** `app.squad`, the server's squad view: loaded with `GET /api/squad`
 at start-up, replaced by every `squad` live event (and by the answers of join / leave / profile).
@@ -39,8 +40,7 @@ Your choices per friend are in the saved data (below). The page never polls.
 - **Who has it** (`friendBoxes`, ticket 26): every row, yours or a squadmate's, gets a colour box
   (`safeFriendColor`) and name (`friendDisplayName`, in `<bdi>`, escaped) for each shown friend
   who has the task active (`friendsAlsoDoing`), in the friends' order; so does the popup. This
-  replaced the "Also: Mike, Sam" text (`alsoText` stays as the plain-text form). Dots: up to 3
-  friend colours (`friends.js: squadColorsForTask`).
+  replaced the "Also: Mike, Sam" text (`alsoText` stays as the plain-text form).
 - **Progress on a part** (`friendPartProgress`): "✓" when done, "2/5" when the part's one required
   objective counts (kills, items), else "objectives done/required".
 - **Squadmates' tasks in your list** (`friendOnlyRowsOnMap`, ticket 26): tasks a shown friend has
@@ -58,9 +58,21 @@ Your choices per friend are in the saved data (below). The page never polls.
   (`tickObjective`, `removeTaskFromList`, `movePartTo`, `resetPartCategory`, `addSubTask`).
   Never in readiness or the Bring list. A pinned one that no shown friend has any more keeps its
   pin and has no row.
-- **Friends' markers** for those tasks (`friendsOwnTasksOnMap`, `openPartsOnMap`): small dots in
-  the friend's colour for the parts still open for them; not clickable (select the row). Ticket
-  27 redoes these.
+- **On the map** (ticket 27; drawn by `tasks/map-layer.js`, the rules here):
+  - A squadmate's task you don't have is drawn **exactly like your own** markers (category
+    shape and colour or item icon, size, floor and split badges, zone), **see-through**
+    (`squadMarkerLook().isSeeThrough`, the same 50% as not ready; SPEC §7.3's third case), with
+    a solid, faded zone outline, no "!", **under your own** markers. Clicking one selects it
+    like its row (flash and popup). It uses the same rows, so category visibility, Pinned only
+    and Shared with squad hide and show it exactly like its row.
+  - Its spots: an objective counts as done only when every shown friend who has the task did it
+    (`squadTicksOfTask`: lowest count; only game-id keys), so a spot shows while anyone needs it.
+  - **Squares** (`squadSquaresOf`): one small square per shown friend who has the task
+    (`friendsAlsoDoing`), in chip order, `safeFriendColor`, thin black outline, bottom centre;
+    up to 4 (`MAX_SQUAD_SQUARES_ON_MARKER`), then "+N". Your own tasks and squadmates' alike.
+    Only on each part's **main spot** (`mainSpotIndex`: the first exact spot; with only possible
+    spots, the one nearest their average), so a part shows its squares once. The squares sit
+    outside the faded group (`map/markers.js`), so they stay opaque.
 - **"Shared with squad"** hides, in the list and on the map, every task no shown friend has
   (`isHiddenBySharedOnlyFilter`, via `friends.js: isHiddenBySquadFilter`); squadmates' rows are
   never hidden by it (a friend has them by definition). It only applies while
@@ -107,35 +119,39 @@ already had), so it needs no migration either. Your name, colour, "Share my task
 
 **Light:** no polling; the only timer is the 1 s share debounce. A friend's update redraws only
 what it changed (their `<g>` of lines, the chips, or the page once for changed tasks). Friends'
-lines are plain SVG polylines (no animation); their task markers are in the same screen-size
-layer system as yours (`.sc`, `applyView`). Layer order (`map/layers.js`): friends' drawings sit
-**under** your drawings; friends' task markers sit **under** your task markers (so a friend
-never hides your own marker; CODE-STYLE listed squad above task markers, this is the small
-deviation).
+lines are plain SVG polylines (no animation). Squadmates' markers and the squares are static
+SVG drawn once per render with your markers, in the same layer and screen-size system (`.sc`,
+`applyView`); nothing new animates and there are no new timers. Layer order (`map/layers.js`):
+friends' drawings sit **under** your drawings; squadmates' task markers are drawn first in the
+task-marker layer, so they sit **under** yours.
 
 **Files:**
 - `rules.js`: the rules above. `rules.test.js`: their tests.
 - `friends.js`: which friends are shown, read from `app.squad` and the saved choices; the boxes
-  for a task (`friendBoxesForTask`) and the squadmates' rows on a map (`friendOnlyPartsOnMap`).
+  for a task (`friendBoxesForTask`), the squadmates' rows on a map (`friendOnlyPartsOnMap`) and
+  the ticks their markers are drawn with (`squadTicksForTask`).
 - `panel.js`: the chips, "Shared with squad", the colour boxes on rows and in the popup, the
   progress line, and their click handlers.
-- `map-layer.js`: friends' drawings layer and friends' task markers.
+- `map-layer.js`: friends' drawings layer. (Squadmates' task markers: `tasks/map-layer.js`.)
 - `share-sync.js`: building and sending my share (debounced, only on change).
 - `settings-section.js`: Settings → Squad (join, profile, share tasks, leave).
 - `live-event.js`: the `squad` event and the redraw choice.
 - `squad.css`.
 - Wiring: `app/live-events.js`, `app/saving.js` (schedule the share), `main.js` (load the view,
   first share), `panel/panel.js` (sections and clicks), `map/map-page.js` and `map/layers.js`,
-  `map/markers.js` (badge dots), `features/tasks/{panel,popup,task-list,category-panel,map-layer,
+  `map/markers.js` (squares, see-through), `features/tasks/{panel,popup,task-list,category-panel,map-layer,
   selection,objective-line}.js` (boxes, squadmates' rows and their read-only details, popup
   lines, filter, badge colours, selecting a squadmate's row and its flash),
   `features/settings/panel.js`.
 
 **Tests:** `npm test` (rules; ticket 26: default category, boxes, per map, ☰ Tasks off or another
-mode, pin as an inactive entry and Pinned only, a pin without a friend, counts, the filter).
+mode, pin as an inactive entry and Pinned only, a pin without a friend, counts, the filter;
+ticket 27: squares in chip order, 4 then "+N", main spot, see-through, squad ticks, filters).
 `tests/browser/squad.e2e.mjs` runs three real copies on the dev transport (Alice, Bob, Cara):
 drawing and undo travel, B's switch hides A's lines, task sharing on in A and off in B, ☰ Tasks
 on by default, colour boxes, badges, A's tasks B doesn't have as crosshatched rows in their
 default category (select, disabled ticks, pin, Pinned only, A's ☰ Tasks off removes them),
+A's tasks on B's map as see-through markers of the category's shape and colour with A's square
+under each part's main spot, a shared task fully opaque with one square, clicking one selects it,
 filter, popup progress, a friend going offline ("last seen") and coming back, Leave. **Needs the owner:** a real tailnet with 2+ PCs (see the
 server README and HANDOFF §3c).

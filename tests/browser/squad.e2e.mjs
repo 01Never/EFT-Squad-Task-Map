@@ -3,8 +3,9 @@
 // Checks the acceptance list: drawings travel and undo, the per-friend toggle, task sharing on in
 // one copy and off in another, who has a task (colour boxes), badges, the filter, the popup's
 // progress, squadmates' tasks as crosshatched rows of your own list (ticket 26: selectable,
-// pinnable, never tickable; ☰ Tasks on by default), a friend going offline and coming back, and
-// Leave.
+// pinnable, never tickable; ☰ Tasks on by default) and as see-through task markers with the
+// friend's colour square under each part's main spot (ticket 27), a friend going offline and
+// coming back, and Leave.
 // STM_E2E_SHOTS=<dir> also saves screenshots there.
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -15,6 +16,8 @@ import { test } from "node:test";
 import { browserSuite, Scenario, startApp, stateWithTasks, taskNamed, waitUntil } from "./harness.js";
 import { partsOfTask } from "../../web/js/features/tasks/rules.js";
 import { DEFAULT_CATEGORIES } from "../../web/js/features/tasks/categories.js";
+import { requirementsOf } from "../../web/js/features/readiness/rules.js";
+import { markerShapePath } from "../../web/js/map/marker-shapes.js";
 
 browserSuite();
 
@@ -128,6 +131,42 @@ function taskNamedById(taskId) {
   return [revision, glory, ballet, dandies].find((task) => task.id === taskId);
 }
 
+/**
+ * Bob's start: Revision and Dandies, carrying what Revision's marks need, so its markers are ready
+ * (fully opaque) and only a squadmate's task is see-through.
+ */
+function bobsState() {
+  const state = stateWithTasks([revision.name, dandies.name]);
+  for (const objective of revision.objs) {
+    for (const requirement of requirementsOf(objective)) state.have[requirement.key] = 3;
+  }
+  return state;
+}
+
+// A task spot's radius in SVG units (map/markers.js).
+const TASK_MARKER_RADIUS = 8.5;
+
+/**
+ * Every task marker on a page's map: its part, whether it's a squadmate's task you don't have
+ * (.notmine), the opacity of its shape and badges, its shape, and the friend squares on it.
+ * @param {import("playwright-core").Page} page
+ */
+function mapMarkers(page) {
+  return page.$$eval("svg.map g.mk", (markers) => markers.map((marker) => {
+    const body = marker.querySelector(":scope > g");
+    const shape = body.querySelector(":scope > path");
+    return {
+      part: marker.getAttribute("data-part"),
+      isNotMine: marker.classList.contains("notmine"),
+      bodyOpacity: Number(body.getAttribute("opacity")),
+      markerOpacity: Number(getComputedStyle(marker).opacity),
+      shape: shape ? { d: shape.getAttribute("d"), fill: shape.getAttribute("fill"), stroke: shape.getAttribute("stroke") } : null,
+      squares: [...marker.querySelectorAll(":scope > .squad-square")].map((square) => square.getAttribute("fill")),
+      squaresInsideBody: body.querySelectorAll(".squad-square").length,
+    };
+  }));
+}
+
 /** The colour of the first friend box in a row, as the browser draws it. */
 function swatchColor(page, rowSelector) {
   return page.locator(rowSelector + " .squad-swatch").first().evaluate((swatch) => getComputedStyle(swatch).backgroundColor);
@@ -136,7 +175,7 @@ function swatchColor(page, rowSelector) {
 test("three copies: drawings, task sharing, offline and back, and leaving", { timeout: 240_000 }, async (t) => {
   const ports = [await freePort(), await freePort(), await freePort()];
   const alice = new Player("Alice", "#e03131", ports[0], [ports[1], ports[2]], stateWithTasks([revision.name, glory.name, ballet.name]));
-  const bob = new Player("Bob", "#1c7ed6", ports[1], [ports[0], ports[2]], stateWithTasks([revision.name, dandies.name]));
+  const bob = new Player("Bob", "#1c7ed6", ports[1], [ports[0], ports[2]], bobsState());
   const cara = new Player("Cara", "#2f9e44", ports[2], [ports[0], ports[1]], stateWithTasks([glory.name]));
   const players = [alice, bob, cara];
   try {
@@ -201,7 +240,7 @@ test("three copies: drawings, task sharing, offline and back, and leaving", { ti
     assert.equal(await bob.page.locator(".squad-tasks").count(), 0, "the old Friends' tasks block is gone");
     assert.equal(await bob.page.locator("#panel .squad-boxes").count(), 0, "Alice isn't sharing tasks yet");
     assert.equal(await bob.page.locator("#panel .task.notmine").count(), 0);
-    assert.equal(await bob.page.locator("svg.map .squad-dot").count(), 0);
+    assert.equal(await bob.page.locator("svg.map .squad-square, svg.map g.mk.notmine").count(), 0, "no squares, no squad markers");
 
     await alice.openSettings();
     await alice.page.check("#sSquadShareTasks");
@@ -213,11 +252,15 @@ test("three copies: drawings, task sharing, offline and back, and leaving", { ti
     assert.equal(await bob.page.locator(`#panel .task[data-task="${dandies.id}"] .squad-box`).count(), 0, "Dandies isn't shared");
     assert.equal(await bob.page.locator(`${bobRow}.notmine`).count(), 0, "Revision is Bob's own row");
 
-    // badges: a dot in Alice's colour on each of Bob's Revision markers, and none on Dandies
-    const dots = await bob.page.locator("svg.map g.mk .squad-dot").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("fill")));
-    assert.ok(dots.length >= 1);
-    assert.ok(dots.every((fill) => fill === "#e03131"), "dots are in Alice's colour");
-    assert.equal(dots.length, revision.objs.length, "one dot on each of Revision's markers");
+    // ticket 27: Alice's square under the main spot of Revision (both have it), none on Dandies;
+    // Revision is Bob's, so fully opaque
+    const markers = await mapMarkers(bob.page);
+    const revisionMarkers = markers.filter((marker) => marker.part.startsWith(revision.id + ":"));
+    assert.equal(revisionMarkers.length, revision.objs.length);
+    assert.ok(revisionMarkers.every((marker) => !marker.isNotMine && marker.bodyOpacity === 1), "Revision is fully opaque");
+    assert.deepEqual(revisionMarkers.flatMap((marker) => marker.squares), ["#e03131"], "one square in Alice's colour, on the main spot only");
+    assert.ok(markers.filter((marker) => marker.part.startsWith(dandies.id + ":")).every((marker) => !marker.squares.length), "none on Dandies");
+    assert.equal(await bob.page.locator("svg.map .squad-dot").count(), 0, "the old bottom-left dots are gone");
 
     // Alice's tasks Bob doesn't have are rows of his list: crosshatched, in their default category
     const squadRows = bob.page.locator("#panel .cat .task.notmine");
@@ -236,7 +279,34 @@ test("three copies: drawings, task sharing, offline and back, and leaving", { ti
     assert.match(await bob.page.textContent("#panel .phead"), /\+\d+ from squad/, "the header says how many are the squad's");
     const headerCount = Number((await bob.page.textContent("#panel .phead small")).match(/^(\d+) task/)[1]);
     assert.equal(headerCount, 2, "Bob's own count stays his two tasks");
-    assert.ok(await bob.page.locator("svg.map .friend-marker").count() > 0, "smaller markers for Alice's other tasks");
+    // ticket 27: on the map they are task markers like Bob's own (the category's shape and
+    // colour), see-through, with Alice's opaque square under each part's main spot only
+    const friendOnlyMarkers = (await mapMarkers(bob.page)).filter((marker) => marker.isNotMine);
+    assert.ok(friendOnlyMarkers.length > 0, "Alice's other tasks are on Bob's map");
+    assert.equal(await bob.page.locator("svg.map .friend-marker").count(), 0, "the old small friend markers are gone");
+    const bobsCategories = bob.scenario.savedState().cats;
+    for (const marker of friendOnlyMarkers) {
+      assert.ok([ballet.id, glory.id].some((id) => marker.part.startsWith(id + ":")), `${marker.part} is one of Alice's tasks`);
+      const category = bobsCategories.find((candidate) => candidate.id === defaultCategoryIdOf(marker.part));
+      assert.equal(marker.shape.d, markerShapePath(category.icon, TASK_MARKER_RADIUS), `${marker.part} has its category's shape`);
+      const isPossibleSpot = marker.shape.fill === "#fff";
+      assert.equal(isPossibleSpot ? marker.shape.stroke : marker.shape.fill, category.color, `${marker.part} in its category's colour`);
+      assert.equal(marker.bodyOpacity, 0.5, `${marker.part} is see-through`);
+      assert.equal(marker.markerOpacity, 1, "the marker's group itself (and so its squares) is opaque");
+      assert.equal(marker.squaresInsideBody, 0);
+    }
+    const friendOnlyParts = new Set(friendOnlyMarkers.map((marker) => marker.part));
+    for (const part of friendOnlyParts) {
+      const squares = friendOnlyMarkers.filter((marker) => marker.part === part).flatMap((marker) => marker.squares);
+      assert.deepEqual(squares, ["#e03131"], `${part}: Alice's square under its main spot only`);
+    }
+    const squadMarker = bob.page.locator(`svg.map g.mk.notmine[data-part^="${squadTask.id}:"]`).first();
+    await squadMarker.click({ force: true });
+    await bob.page.waitForSelector(`${squadRow}.sel`);
+    assert.equal((await bob.page.textContent("#pop h3")).trim(), squadTask.name, "clicking it selects it");
+    assert.ok((await bob.page.locator("#fx > *").count()) > 0, "and flashes it");
+    await bob.shot("squad-markers");
+    await bob.page.keyboard.press("Escape");
     assert.equal(bob.scenario.savedList().tasks[squadTask.id], undefined, "nothing in Bob's saved data");
     if (SHOTS_DIR) await bob.page.evaluate(() => document.querySelector("#panel .cat").scrollIntoView());
     await bob.shot("squad-rows-in-list");
@@ -285,7 +355,8 @@ test("three copies: drawings, task sharing, offline and back, and leaving", { ti
     assert.equal(await bob.page.locator(ownRows).count(), 1, "only Revision of Bob's own");
     assert.equal(await bob.page.locator(ownRows).first().getAttribute("data-task"), revision.id);
     assert.ok(await bob.page.locator("#panel .cat .task.notmine").count() > 0, "Alice's tasks stay listed");
-    assert.equal(await bob.page.locator("svg.map g.mk").count(), revision.objs.length, "only Revision's markers");
+    assert.equal(await bob.page.locator("svg.map g.mk:not(.notmine)").count(), revision.objs.length, "only Revision's markers of Bob's own");
+    assert.ok(await bob.page.locator("svg.map g.mk.notmine").count() > 0, "Alice's tasks stay on the map");
     await bob.page.click('[data-act="squadonly"]');
 
     // Alice sees nothing of Bob's tasks (he shares none), with his toggle on by default
@@ -297,9 +368,11 @@ test("three copies: drawings, task sharing, offline and back, and leaving", { ti
     await bob.page.click(`[data-squad-tasks="${aliceId}"]`);
     assert.equal(await bob.page.locator("#panel .task.notmine").count(), 0, "Alice's rows are gone");
     assert.equal(await bob.page.locator("#panel .squad-boxes").count(), 0);
+    assert.equal(await bob.page.locator("svg.map g.mk.notmine, svg.map .squad-square").count(), 0, "her markers and squares are gone");
     await eventually(() => bob.scenario.savedState().squad?.friends[aliceId]?.tasks === false, "the choice is saved");
     await bob.page.click(`[data-squad-tasks="${aliceId}"]`);
     assert.ok(await bob.page.locator("#panel .task.notmine").count() > 0, "back on");
+    assert.ok(await bob.page.locator("svg.map g.mk.notmine").count() > 0, "her markers are back");
 
     // ---- Cara goes offline: the others show "last seen"; she comes back with new data
     const caraSlug = cara.scenario.slug;
@@ -323,7 +396,7 @@ test("three copies: drawings, task sharing, offline and back, and leaving", { ti
     await alice.closeSettings();
     assert.equal(await alice.page.locator(".squad-chip").count(), 0);
     assert.equal(await alice.page.locator("svg.map g[data-friend]").count(), 0);
-    assert.equal(await alice.page.locator(".squad-boxes, .squad-dot, .task.notmine").count(), 0);
+    assert.equal(await alice.page.locator(".squad-boxes, .squad-square, .task.notmine, g.mk.notmine").count(), 0);
     const cache = JSON.parse(fs.readFileSync(path.join(alice.scenario.app.dataDir, "squad-task-map-squad.json"), "utf8"));
     assert.deepEqual(cache.friends || {}, {}, "friends' cache is cleared");
     assert.equal((await alice.scenario.api("/api/squad")).settings.joined, false);

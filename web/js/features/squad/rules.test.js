@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { freshState, migrateSavedData, blankTaskEntry } from "../../app/saved-data.js";
-import { partsOfTask, togglePinnedTask, isRowListed, countMyOpenTasks, countSquadOnlyTasks } from "../tasks/rules.js";
+import { partsOfTask, togglePinnedTask, isRowListed, isRowShownOnMap, countMyOpenTasks, countSquadOnlyTasks, isObjectiveDone } from "../tasks/rules.js";
 import {
   NEUTRAL_FRIEND_COLOR,
   safeFriendColor,
@@ -33,6 +33,11 @@ import {
   friendTasksButtonTitle,
   friendBoxes,
   friendOnlyRowsOnMap,
+  MAX_SQUAD_SQUARES_ON_MARKER,
+  squadSquaresOf,
+  mainSpotIndex,
+  squadMarkerLook,
+  squadTicksOfTask,
 } from "./rules.js";
 
 // ---------------------------------------------------------------- fixtures
@@ -715,4 +720,100 @@ test("'Shared with squad' never hides a squadmate's task (a friend has it by def
     assert.equal(isHiddenBySharedOnlyFilter(row.task.id, saved, shown), false);
   }
   assert.equal(isHiddenBySharedOnlyFilter(killScavs.id, saved, shown), true, "your own task nobody else has");
+});
+
+// ---------------------------------------------------------------- ticket 27: squadmates on the markers
+
+function coloured(playerId, color) {
+  return friend(playerId, playerId, { color });
+}
+
+test("a marker's squares are the colours of the friends who have the task, in the chips' order", () => {
+  const friends = [coloured("ann", "#e03131"), coloured("bob", "#1c7ed6"), coloured("cat", "#2f9e44")];
+  assert.deepEqual(squadSquaresOf(friends), { colors: ["#e03131", "#1c7ed6", "#2f9e44"], moreCount: 0 });
+});
+
+test("a friend's colour that isn't #rrggbb is a grey square", () => {
+  assert.deepEqual(squadSquaresOf([coloured("eve", "red;x")]).colors, [NEUTRAL_FRIEND_COLOR]);
+});
+
+test("after four squares, the other friends are a '+N'", () => {
+  assert.equal(MAX_SQUAD_SQUARES_ON_MARKER, 4);
+  const colors = ["#000001", "#000002", "#000003", "#000004", "#000005", "#000006"];
+  const six = colors.map((color, index) => coloured("f" + index, color));
+  assert.deepEqual(squadSquaresOf(six), { colors: colors.slice(0, 4), moreCount: 2 });
+  assert.equal(squadSquaresOf(six.slice(0, 4)).moreCount, 0, "exactly four: no +N");
+});
+
+test("a part's main spot is its first exact spot", () => {
+  const spots = [
+    { x: 0, y: 0, kind: "possible" },
+    { x: 50, y: 50, kind: "exact" },
+    { x: 90, y: 90, kind: "exact" },
+  ];
+  assert.equal(mainSpotIndex(spots), 1);
+});
+
+test("with only possible spots, the main spot is the one nearest the middle of them", () => {
+  // the middle of the four is (25, 10); the spot at (30, 10) is nearest
+  const spots = [
+    { x: 0, y: 0, kind: "possible" },
+    { x: 30, y: 10, kind: "possible" },
+    { x: 70, y: 40, kind: "possible" },
+    { x: 0, y: -10, kind: "possible" },
+  ];
+  assert.equal(mainSpotIndex(spots), 1);
+  assert.equal(mainSpotIndex([]), -1, "no spots, no main spot");
+});
+
+test("only the main spot gets squares; a squadmate's task you don't have is see-through", () => {
+  const ann = coloured("ann", "#e03131");
+  const mine = /** @type {any} */ ({});
+  const theirs = /** @type {any} */ ({ notMine: true });
+  const annsSquare = { colors: ["#e03131"], moreCount: 0 };
+  assert.deepEqual(squadMarkerLook(mine, [ann], true), { isSeeThrough: false, squares: annsSquare });
+  assert.deepEqual(squadMarkerLook(mine, [ann], false), { isSeeThrough: false, squares: null });
+  assert.deepEqual(squadMarkerLook(mine, [], true), { isSeeThrough: false, squares: null }, "nobody else has it");
+  assert.deepEqual(squadMarkerLook(theirs, [ann], true), { isSeeThrough: true, squares: annsSquare });
+  assert.deepEqual(squadMarkerLook(theirs, [ann], false), { isSeeThrough: true, squares: null });
+});
+
+test("a squadmate's task shows a spot while any friend who has it still needs it", () => {
+  const [mark, visit] = markThenVisit.objs;
+  const mikeMarked = friendSharing("mike", "Mike", { [markThenVisit.id]: { ticks: { [mark.id]: true }, pct: 50 } });
+  const samNothing = friendSharing("sam", "Sam", { [markThenVisit.id]: noTicks });
+  const mikeAlone = squadTicksOfTask(markThenVisit.id, [mikeMarked]);
+  assert.equal(isObjectiveDone(mark, mikeAlone), true, "Mike alone: the mark is done");
+  const together = squadTicksOfTask(markThenVisit.id, [mikeMarked, samNothing]);
+  assert.equal(isObjectiveDone(mark, together), false, "Sam still has to mark it");
+  assert.equal(isObjectiveDone(visit, together), false);
+});
+
+test("on a counter, the squad's progress is the lowest of theirs", () => {
+  const [kills] = killScavs.objs;
+  const mike = friendSharing("mike", "Mike", { [killScavs.id]: { ticks: { [kills.id]: 4 }, pct: 80 } });
+  const sam = friendSharing("sam", "Sam", { [killScavs.id]: { ticks: { [kills.id]: 2 }, pct: 40 } });
+  assert.deepEqual(squadTicksOfTask(killScavs.id, [mike, sam]), { [kills.id]: 2 });
+});
+
+test("squad ticks ignore keys that aren't game ids", () => {
+  const odd = JSON.parse('{"__proto__": true, "toString": 3}');
+  const mike = friendSharing("mike", "Mike", { [killScavs.id]: { ticks: odd, pct: 0 } });
+  const together = squadTicksOfTask(killScavs.id, [mike]);
+  assert.deepEqual(Object.keys(together), []);
+  assert.equal(Object.getPrototypeOf(together), Object.prototype);
+});
+
+test("Pinned only and hidden categories hide a squadmate's markers like its rows", () => {
+  const saved = freshState();
+  const mike = friendSharing("mike", "Mike", { [markThenVisit.id]: noTicks });
+  const rows = squadRows([mike], saved);
+  assert.ok(rows.every((row) => isRowShownOnMap(row, false)), "shown by default");
+  assert.ok(rows.every((row) => !isRowShownOnMap(row, true)), "not pinned: hidden under Pinned only");
+  togglePinnedTask(saved.modes.regular, markThenVisit.id, NOW);
+  const pinnedRows = squadRows([mike], saved);
+  assert.ok(pinnedRows.every((row) => isRowShownOnMap(row, true)), "pinned: shown under Pinned only");
+  const [markRow] = pinnedRows;
+  const inHiddenCategory = { ...markRow, cat: { ...markRow.cat, visible: false } };
+  assert.equal(isRowShownOnMap(inHiddenCategory, false), false, "its category is hidden");
 });

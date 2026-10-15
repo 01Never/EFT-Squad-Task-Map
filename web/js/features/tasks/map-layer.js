@@ -1,7 +1,9 @@
 // @ts-check
 // Tasks on the map: a marker per spot of every shown part (plus sub-task pins), zones as outlines,
 // overlapping markers spread around their spot, the selected part's markers bigger and flashing.
-// The "!" and fading come from readiness; the drawing itself is map/markers.js.
+// The "!" and fading come from readiness; the drawing itself is map/markers.js. Squadmates' tasks
+// you don't have (ticket 27) are drawn the same way, see-through and under yours, and each part's
+// main spot gets a square per friend who has the task (squad/rules.js: squadMarkerLook).
 import { app } from "../../app/state.js";
 import { currentList } from "../../app/current-list.js";
 import { createSvgElement } from "../../app/dom.js";
@@ -13,7 +15,8 @@ import { isObjectiveDone, isObjectiveOnMap, placesNamedByExtractObjective } from
 import { partsOnMap, isShownOnMap } from "./task-list.js";
 import { isObjectivePossible } from "../readiness/rules.js";
 import { subTaskMarkerItems } from "../sub-tasks/map-layer.js";
-import { squadColorsForTask, friendOnlyPartsOnMap } from "../squad/friends.js";
+import { friendOnlyPartsOnMap, friendsAlsoDoingTask, squadTicksForTask } from "../squad/friends.js";
+import { mainSpotIndex, squadMarkerLook } from "../squad/rules.js";
 import { markerIconItem, itemIconUrl, showsItemIcons } from "../icons/rules.js";
 
 /** @import { Task, Part, Objective, PartOnMap } from "../../app/types.js" */
@@ -28,8 +31,15 @@ const OVERLAP_SPREAD_PIXELS = 11;
 const SELECTED_MARKER_SCALE = 1.5;
 
 // Zones: a light fill in the category's colour; a dotted, faded outline when you're not ready.
+// A squadmate's task you don't have fades its zone the same way, with a solid outline.
 const ZONE_FILL_OPACITY = 0.13;
 const NOT_READY_ZONE_OPACITY = 0.55;
+
+// Draw order inside the marker layer, bottom to top: squadmates' tasks you don't have, yours,
+// then the selected part (ticket 27: a friend's marker never covers yours).
+const DRAW_RANK_FRIEND_ONLY = 0;
+const DRAW_RANK_MINE = 1;
+const DRAW_RANK_SELECTED = 2;
 
 /**
  * @typedef {object} Spot A place on the open map where an objective happens.
@@ -76,7 +86,7 @@ function spotsOfObjective(task, objective) {
 
 /**
  * The spots of a part's objectives on the open map that aren't done yet, each with its objective.
- * `ticks` are yours unless the squad layer asks for a friend's.
+ * `ticks` are yours, or the squad's for a squadmate's task you don't have (squadTicksForTask).
  * @param {Task} task
  * @param {Part} part
  * @param {Record<string, true | number>} [ticks]
@@ -102,7 +112,11 @@ export function renderTaskMarkers() {
   items.push(...subTaskMarkerItems(firstShownRowByTask));
   spreadOverlappingMarkers(items);
   const isSelected = (item) => mapView.selectedPartKey === item.part.key;
-  items.sort((first, second) => Number(isSelected(first)) - Number(isSelected(second))); // the selected part on top
+  const drawRank = (item) => {
+    if (isSelected(item)) return DRAW_RANK_SELECTED;
+    return item.seeThrough ? DRAW_RANK_FRIEND_ONLY : DRAW_RANK_MINE;
+  };
+  items.sort((first, second) => drawRank(first) - drawRank(second));
   const flashPoints = [];
   items.forEach((item, index) => {
     const markerKey = "m" + index;
@@ -117,28 +131,14 @@ export function renderTaskMarkers() {
       flashPoints.push({ x: item.x, y: item.y, ox: item.ox, oy: item.oy });
     }
   });
-  if (!flashPoints.length) flashPoints.push(...selectedSquadPartFlashPoints());
   applyView();
   renderSelectionFlash(flashPoints);
 }
 
 /**
- * The flash for a selected squadmate's task you don't have (ticket 26): it has no markers of
- * yours (the squad layer draws the friends' smaller ones), so the flash goes on every spot of
- * the part on this map.
- * @returns {{ x: number, y: number }[]}
- */
-function selectedSquadPartFlashPoints() {
-  const selectedKey = app.mapView.selectedPartKey;
-  if (!selectedKey) return [];
-  const row = friendOnlyPartsOnMap(app.mapView.key).find((candidate) => candidate.part.key === selectedKey);
-  if (!row) return [];
-  return spotsOfPart(row.task, row.part, {}).map((spot) => ({ x: spot.x, y: spot.y }));
-}
-
-/**
  * A marker item per spot of every shown part (drawing each spot's zone on the way), and the first
- * shown row of each task (sub-task pins take its look).
+ * shown row of each of your tasks (sub-task pins take its look). Squadmates' tasks you don't have
+ * come first, so their zones and markers sit under yours.
  * @returns {{ items: MarkerItem[], firstShownRowByTask: Map<string, PartOnMap> }}
  */
 function partMarkerItems() {
@@ -147,19 +147,51 @@ function partMarkerItems() {
   const withIcons = showsItemIcons(app.saved);
   const items = [];
   const firstShownRowByTask = new Map();
+  for (const row of friendOnlyPartsOnMap(mapView.key)) {
+    if (!isShownOnMap(row)) continue;
+    const spots = spotsOfPart(row.task, row.part, squadTicksForTask(row.task.id));
+    items.push(...markerItemsOfRow(row, spots, bag, withIcons));
+  }
   for (const row of partsOnMap(mapView.key)) {
     if (!isShownOnMap(row)) continue;
-    const { task, part, cat } = row;
-    if (!firstShownRowByTask.has(task.id)) firstShownRowByTask.set(task.id, row);
-    const squadColors = squadColorsForTask(task.id);
-    for (const spot of spotsOfPart(task, part)) {
-      const isReady = isObjectivePossible(spot.o, bag);
-      if (spot.ol) drawZone(spot.ol, cat.color, isReady);
-      const iconItem = iconItemOfSpot(spot, withIcons);
-      items.push({ ...spot, task, part, icon: cat.icon, color: cat.color, squadColors, iconItem, ready: isReady, split: part.split });
-    }
+    if (!firstShownRowByTask.has(row.task.id)) firstShownRowByTask.set(row.task.id, row);
+    items.push(...markerItemsOfRow(row, spotsOfPart(row.task, row.part), bag, withIcons));
   }
   return { items, firstShownRowByTask };
+}
+
+/**
+ * The marker items of one row's spots, drawing their zones. Readiness is yours only: a
+ * squadmate's task you don't have is never "not ready", it's see-through instead (ticket 27).
+ * @param {PartOnMap} row
+ * @param {Spot[]} spots
+ * @param {Record<string, number>} bag your bag counts (readiness)
+ * @param {boolean} withIcons
+ * @returns {MarkerItem[]}
+ */
+function markerItemsOfRow(row, spots, bag, withIcons) {
+  const { task, part, cat } = row;
+  const friendsWithTask = friendsAlsoDoingTask(task.id);
+  const mainIndex = mainSpotIndex(spots);
+  const items = [];
+  spots.forEach((spot, index) => {
+    const look = squadMarkerLook(row, friendsWithTask, index === mainIndex);
+    const isReady = row.notMine ? true : isObjectivePossible(spot.o, bag);
+    if (spot.ol) drawZone(spot.ol, cat.color, isReady, look.isSeeThrough);
+    items.push({
+      ...spot,
+      task,
+      part,
+      icon: cat.icon,
+      color: cat.color,
+      iconItem: iconItemOfSpot(spot, withIcons),
+      ready: isReady,
+      split: part.split,
+      seeThrough: look.isSeeThrough,
+      squadSquares: look.squares,
+    });
+  });
+  return items;
 }
 
 /**
@@ -176,12 +208,14 @@ function iconItemOfSpot(spot, withIcons) {
 }
 
 /**
- * A zone's outline (SPEC §7.3: zones are see-through, one of the two allowed cases).
+ * A zone's outline (SPEC §7.3: zones are see-through). Not ready: dotted and faded. A
+ * squadmate's task you don't have: faded, solid outline.
  * @param {number[][]} outline game [x, z] points
  * @param {string} color
  * @param {boolean} isReady
+ * @param {boolean} isFriendOnly
  */
-function drawZone(outline, color, isReady) {
+function drawZone(outline, color, isReady, isFriendOnly) {
   const projection = app.mapView.projection;
   const points = outline.map((point) => projection.toSvg(point[0], point[1]).map((value) => value.toFixed(2)).join(",")).join(" ");
   createSvgElement(
@@ -194,7 +228,7 @@ function drawZone(outline, color, isReady) {
       "stroke-width": 1.8,
       "stroke-dasharray": isReady ? null : "4 3",
       "vector-effect": "non-scaling-stroke",
-      opacity: isReady ? 1 : NOT_READY_ZONE_OPACITY,
+      opacity: isReady && !isFriendOnly ? 1 : NOT_READY_ZONE_OPACITY,
       "pointer-events": "none",
     },
     app.mapView.layers.zones,
