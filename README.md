@@ -67,7 +67,6 @@ Join friends with an invite code: a private Tailscale network is built into the 
 
 ### And more
 - **Scan your task list:** screenshot the in-game Tasks screen, in the menus or in a raid, and an OpenAI vision model reads it, so your list matches the game exactly (optional, your own API key).
-- **AI Categorize:** sort tasks by plain-English instructions, checked against each task's wiki page (optional).
 - **Draw** on the map, **pin** tasks, add **sub-tasks**, and switch between game modes (PvP, PvE, PvP Season), each with its own task list.
 - **Check for updates** in Settings: signed releases from this repo, installed with one click.
 
@@ -75,7 +74,7 @@ The full manual is the **[user guide](docs/USER-GUIDE.md)**: setup, every featur
 
 ## Privacy
 
-The app contacts GitHub only when you click Check for updates. If you join a squad, your drawings (and your tasks, only if you turn that on) go directly to your friends' copies over a private Tailscale network; Tailscale relays traffic when two PCs can't connect directly but can't read it. Never joined, nothing of this runs. Everything else stays on your PC except downloads of game data (json.tarkov.dev), item icons (assets.tarkov.dev), wiki pages for AI Categorize, and, only if you add a key, requests to api.openai.com (the task scan's screenshots, AI Categorize, and **the first in-raid screenshot of each raid** so your extracts can be marked for you; that one can be turned off in Settings). Your OpenAI key stays in the settings file on your PC and is sent nowhere else. The app deletes only screenshots you confirmed in a scan, and the GPS screenshots of the raid that just ended.
+The app contacts GitHub only when you click Check for updates. If you join a squad, your drawings (and your tasks, only if you turn that on) go directly to your friends' copies over a private Tailscale network; Tailscale relays traffic when two PCs can't connect directly but can't read it. Never joined, nothing of this runs. Everything else stays on your PC except downloads of game data (json.tarkov.dev), item icons (assets.tarkov.dev), and, only if you add a key, requests to api.openai.com (the task scan's screenshots and **the first in-raid screenshot of each raid** so your extracts can be marked for you; that one can be turned off in Settings). Your OpenAI key stays in the settings file on your PC and is sent nowhere else. The app deletes only screenshots you confirmed in a scan, and the GPS screenshots of the raid that just ended.
 
 ## Building from source
 

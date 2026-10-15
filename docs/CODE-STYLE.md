@@ -52,7 +52,7 @@ web/js/
   features/
     tasks/                 parts, categories, ticks, pins; the task list; task markers and zones
     readiness/             what each objective needs; "!" and fading; the Bring list
-    scan/  ai-categorize/  drawing/  sub-tasks/  settings/  picker/
+    scan/  drawing/  sub-tasks/  settings/  picker/
     find-me/               player marker, radar, auto-center               (tickets 01–02)
     extracts/              extract marks, closest extract, AI marks        (tickets 03, 06)
     squad/  icons/  loot/  keys/  routes/                                   (tickets 05, 07–10)

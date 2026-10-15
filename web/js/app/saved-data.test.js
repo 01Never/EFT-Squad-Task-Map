@@ -175,3 +175,11 @@ test("saved loot choices load as they are, and a damaged one keeps only the chip
   assert.deepEqual(saved.prefs.woods.loot, { drawer: true });
   assert.deepEqual(saved.prefs.shoreline.loot, {});
 });
+
+test("an older file has no catsResetAt (so the one-time reset runs) and loses aiOpen; a new file has catsResetAt", () => {
+  const older = migrateSavedData({ version: 3, cats: [], modes: {}, aiOpen: false });
+  assert.equal(older.catsResetAt, undefined);
+  assert.equal("aiOpen" in older, false);
+  assert.equal(typeof migrateSavedData(null).catsResetAt, "number");
+  assert.equal(migrateSavedData({ version: 3, cats: [], modes: {}, catsResetAt: 5 }).catsResetAt, 5);
+});

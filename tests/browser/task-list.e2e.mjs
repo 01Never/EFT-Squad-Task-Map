@@ -205,9 +205,12 @@ test("selecting a row highlights it and flashes its markers; a marker click sele
       });
     });
     for (const ring of rings) assert.deepEqual(ring, { onMap: true, animations: "halo infinite / wave infinite" }, "each selected marker flashes, on the map");
+    // Clicking a row selects it where it is (the list scrolls only for a marker click), and the row
+    // opens downwards, so check that its top line is in view (its opened details may reach just
+    // past the panel's edge, depending on how tall the section above is).
     const rowBox = await page.locator("#panel .task.sel .trow-wrap").boundingBox();
     const panelBox = await page.locator("#panel").boundingBox();
-    assert.ok(rowBox.y >= panelBox.y && rowBox.y + rowBox.height <= panelBox.y + panelBox.height, "the selected row is in view");
+    assert.ok(rowBox.y >= panelBox.y && rowBox.y < panelBox.y + panelBox.height, "the selected row is in view");
 
     await page.keyboard.press("Escape");
     assert.deepEqual(await selection(), { rows: [], rings: 0, popup: null }, "Esc deselects");

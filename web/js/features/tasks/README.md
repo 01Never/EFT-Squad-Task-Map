@@ -29,6 +29,9 @@ game log (event `task`), or by name.
   whole task (`"*"`), else the built-in category for its kind, else Unsorted. Only parts you moved
   are stored, so "Auto-sort" only re-creates deleted built-ins; "Re-sort everything" forgets every
   choice. Both have Undo (`snapshotCategories()` / `restoreCategories()`).
+- The one-time reset (`resetPartCategoriesOnce()`, issue #25): a file with no `catsResetAt` has every
+  part move cleared in every mode (categories stay) and gets `catsResetAt`; `main.js` runs it at
+  start-up and saves. `freshState()` sets it, so a new file never resets.
 - Ticks (`tickCount()`, `isObjectiveDone()`): a saved `true` or a count; objectives with a count
   over 1 get − n/N +. A part is done (and leaves the map) when its required (non-optional)
   objectives are done; progress is the average of ticks / target.
