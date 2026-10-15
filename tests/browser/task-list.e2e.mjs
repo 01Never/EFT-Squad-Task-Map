@@ -394,7 +394,15 @@ test("switching game mode in Settings shows that mode's list on the map; switchi
       await page.click("#settings");
       await page.waitForSelector(".modal #sSave");
       await page.selectOption("#sMode", mode);
+      // The new mode's game data arrives a moment later (a "data" event: GET /api/data, then
+      // /api/status, then the page redraws). Wait for that redraw, or it can wipe what the test
+      // types next into the add-a-task box.
+      const isGet = (pathname) => (response) => response.request().method() === "GET" && new URL(response.url()).pathname === pathname;
+      const dataReloaded = page.waitForResponse(isGet("/api/data"), { timeout: 15_000 })
+        .then(() => page.waitForResponse(isGet("/api/status"), { timeout: 15_000 }));
       await s.answered("PUT", "/api/settings", () => page.click("#sSave"));
+      await dataReloaded;
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       await page.waitForFunction((hash) => location.hash === hash, `#/${mode}/map/streets-of-tarkov`);
       await s.waitForMap("streets-of-tarkov");
     };
