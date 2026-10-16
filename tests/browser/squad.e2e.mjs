@@ -1,19 +1,19 @@
 // Squad (ticket 05): three real copies of the app on the dev transport (no Tailscale): Alice, Bob
 // and Cara, each with its own data folder, app port and peer port, each in its own browser page.
 // Checks the acceptance list: drawings travel and undo, the per-friend toggle, task sharing on in
-// one copy and off in another, who has a task (colour boxes), badges, the filter, the popup's
-// progress, squadmates' tasks as crosshatched rows of your own list (ticket 26: selectable,
-// pinnable, never tickable; ☰ Tasks on by default) and as see-through task markers with the
-// friend's colour square under each part's main spot (ticket 27), a friend going offline and
-// coming back, and Leave.
+// one copy and off in another ("Share my tasks" is on by default since ticket 17), who has a task
+// (colour boxes), badges, the filter, the popup's progress, squadmates' tasks as crosshatched rows
+// of your own list (ticket 26: selectable, pinnable, never tickable; ☰ Tasks on by default) and as
+// see-through task markers with the friend's colour square under each part's main spot (ticket 27),
+// a friend going offline and coming back, and Leave. Friends' positions (ticket 17) are in
+// squad-positions.e2e.mjs.
 // STM_E2E_SHOTS=<dir> also saves screenshots there.
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import http from "node:http";
-import net from "node:net";
 import path from "node:path";
 import { test } from "node:test";
-import { browserSuite, Scenario, startApp, stateWithTasks, taskNamed, waitUntil } from "./harness.js";
+import { browserSuite, startApp, stateWithTasks, taskNamed } from "./harness.js";
+import { Player, FakeFriend, freePort, eventually, STREETS, SHOTS_DIR } from "./squad-players.js";
 import { partsOfTask } from "../../web/js/features/tasks/rules.js";
 import { DEFAULT_CATEGORIES } from "../../web/js/features/tasks/categories.js";
 import { requirementsOf } from "../../web/js/features/readiness/rules.js";
@@ -21,99 +21,11 @@ import { markerShapePath } from "../../web/js/map/marker-shapes.js";
 
 browserSuite();
 
-const MAP = "streets-of-tarkov";
+const MAP = STREETS;
 const revision = taskNamed("Revision - Streets of Tarkov"); // three "mark" objectives
 const glory = taskNamed("Glory to CPSU");
 const ballet = taskNamed("Ballet Lover");
 const dandies = taskNamed("Dandies");
-const SHOTS_DIR = process.env.STM_E2E_SHOTS || "";
-
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const probe = net.createServer();
-    probe.once("error", reject);
-    probe.listen(0, "127.0.0.1", () => {
-      const { port } = /** @type {net.AddressInfo} */ (probe.address());
-      probe.close(() => resolve(port));
-    });
-  });
-}
-
-/** One friend: a scenario (app + browser page) joined to the squad over the dev transport. */
-class Player {
-  constructor(name, color, peerPort, otherPeerPorts, state) {
-    this.name = name;
-    this.color = color;
-    this.env = {
-      STM_SQUAD_DEV_LISTEN: `127.0.0.1:${peerPort}`,
-      STM_SQUAD_DEV_PEERS: otherPeerPorts.map((port) => `127.0.0.1:${port}`).join(","),
-    };
-    this.scenario = new Scenario(`squad--${name.toLowerCase()}`, { state, env: this.env });
-  }
-
-  get page() {
-    return this.scenario.page;
-  }
-
-  async start() {
-    await this.scenario.start();
-    await this.scenario.openMap(MAP);
-  }
-
-  async openSettings() {
-    await this.page.click("#settings");
-    await this.page.waitForSelector("#sSquad");
-  }
-
-  async closeSettings() {
-    await this.page.click("#sClose");
-  }
-
-  /** Settings → Squad: paste an invite code and Join, then set the name and colour. */
-  async join() {
-    await this.openSettings();
-    await this.page.fill("#sSquadKey", "tskey-auth-dev-test");
-    await this.page.click("#sSquadJoin");
-    await this.page.waitForSelector("#sSquadName", { timeout: 30_000 });
-    await this.setProfile();
-    await this.closeSettings();
-  }
-
-  async setProfile() {
-    await this.page.fill("#sSquadName", this.name);
-    await this.answeredProfile(() => this.page.press("#sSquadName", "Tab"));
-    await this.answeredProfile(() => this.page.fill("#sSquadColor", this.color));
-  }
-
-  answeredProfile(action) {
-    return this.scenario.answered("PUT", "/api/squad/profile", action);
-  }
-
-  /** The player's id (from the server), to find its chip and toggles in the others' pages. */
-  async playerId() {
-    return (await this.scenario.api("/api/squad")).me.playerId;
-  }
-
-  chip(friendId) {
-    return this.page.locator(`.squad-chip[data-friend="${friendId}"]`);
-  }
-
-  /** The number of lines of a friend on the map. */
-  friendLines(friendId) {
-    return this.page.locator(`svg.map g[data-friend="${friendId}"] polyline`).count();
-  }
-
-  async shot(name) {
-    if (!SHOTS_DIR) return;
-    fs.mkdirSync(SHOTS_DIR, { recursive: true });
-    await this.page.evaluate(() => document.fonts.ready.then(() => true));
-    await this.page.screenshot({ path: path.join(SHOTS_DIR, name + ".png"), animations: "disabled" });
-  }
-}
-
-async function eventually(check, what, timeout = 8000) {
-  await waitUntil(check, { timeout, interval: 100, what });
-}
 
 /**
  * The category a part of a squadmate's task lands in by default: the built-in for its kind of
@@ -235,16 +147,29 @@ test("three copies: drawings, task sharing, offline and back, and leaving", { ti
     assert.equal(await bob.friendLines(aliceId), 1, "switched on, Alice's line is back");
     await alice.page.click("#bdraw"); // leave draw mode
 
-    // ---- tasks (ticket 26): ☰ Tasks is on by default; nothing shows until Alice shares
+    // ---- tasks: ☰ Tasks is on by default (ticket 26); "Share my tasks" and "Share my position" are
+    // on by default too (ticket 17), and the settings file says so
     assert.equal(await bob.page.getAttribute(`[data-squad-tasks="${aliceId}"]`, "aria-pressed"), "true", "☰ Tasks on by default");
     assert.equal(await bob.page.locator(".squad-tasks").count(), 0, "the old Friends' tasks block is gone");
-    assert.equal(await bob.page.locator("#panel .squad-boxes").count(), 0, "Alice isn't sharing tasks yet");
-    assert.equal(await bob.page.locator("#panel .task.notmine").count(), 0);
-    assert.equal(await bob.page.locator("svg.map .squad-square, svg.map g.mk.notmine").count(), 0, "no squares, no squad markers");
+    // Cara keeps her tasks to herself here, so only Alice's show on Bob's list and map
+    await cara.openSettings();
+    await cara.answeredProfile(() => cara.page.uncheck("#sSquadShareTasks"));
+    await cara.closeSettings();
+    const caraShareOf = async (player) => (await player.scenario.api("/api/squad")).friends.find((friend) => friend.playerId === caraId)?.share;
+    await eventually(async () => (await caraShareOf(bob))?.tasks === null, "Bob has Cara's share without tasks");
 
     await alice.openSettings();
-    await alice.page.check("#sSquadShareTasks");
+    assert.equal(await alice.page.isChecked("#sSquadShareTasks"), true, "Share my tasks is on by default");
+    assert.equal(await alice.page.isChecked("#sSquadSharePosition"), true, "Share my position is on by default");
     await alice.closeSettings();
+    const aliceSquadSettings = alice.scenario.savedSettings().squad;
+    assert.equal(aliceSquadSettings.shareTasks, true, "both switches are written to the settings file");
+    assert.equal(aliceSquadSettings.sharePosition, true);
+    // Bob switches it off: the "off in another copy" case (Alice sees none of his tasks below)
+    await bob.openSettings();
+    await bob.answeredProfile(() => bob.page.uncheck("#sSquadShareTasks"));
+    await bob.closeSettings();
+    await eventually(() => bob.scenario.savedSettings().squad?.shareTasks === false, "an 'off' is written as false");
     const bobRow = `#panel .task[data-task="${revision.id}"]`;
     await eventually(async () => (await bob.page.locator(bobRow + " .squad-box").count()) === 1, "Bob's Revision row has Alice's box", 8000);
     assert.equal((await bob.page.textContent(bobRow + " .squad-box")).trim(), "Alice");
@@ -409,31 +334,6 @@ test("three copies: drawings, task sharing, offline and back, and leaving", { ti
 
 // ---------------------------------------------------------------- hostile friends (QA round 2)
 
-/** A friend that is only a peer API serving the share we give it, so its name and task ids are ours. */
-class FakeFriend {
-  constructor(id, name, tasks) {
-    this.share = { v: 1, player: { id, name, color: "#ff922b" }, rev: 1, updatedAt: 1000, draw: {}, tasks };
-  }
-
-  async start() {
-    this.port = await freePort();
-    this.server = http.createServer((req, res) => {
-      if (req.url === "/squad/v1/share") {
-        res.setHeader("Content-Type", "application/json");
-        return res.end(JSON.stringify(this.share));
-      }
-      res.writeHead(200, { "Content-Type": "text/event-stream" });
-      res.write(": hi\n\nevent: share\ndata: " + JSON.stringify(this.share) + "\n\n");
-    });
-    await new Promise((resolve) => this.server.listen(this.port, "127.0.0.1", resolve));
-  }
-
-  stop() {
-    this.server.close();
-    this.server.closeAllConnections();
-  }
-}
-
 test("a 32-wide name keeps the toggles and rows in the panel; friends with 'toString' task ids or a direction override are refused", { timeout: 180_000 }, async () => {
   // Real game ids are 24 hex characters; the server refuses a share with anything else (QA round 3).
   const wide = new FakeFriend("a1a1a1a1a1a1a1a1", "W".repeat(32), { [glory.id]: { ticks: {}, pct: 0 } });
@@ -473,7 +373,8 @@ test("a 32-wide name keeps the toggles and rows in the panel; friends with 'toSt
           return box.width > 0 && box.left >= panel.left && box.right <= panel.right;
         });
       });
-      assert.deepEqual(fits, [true, true], `${what}: both toggles are inside the panel`);
+      // ✎ Draw, ☰ Tasks and (ticket 17) ◎ Pos
+      assert.deepEqual(fits, [true, true, true], `${what}: all three toggles are inside the panel`);
     };
     const panelDoesNotOverflow = async (what) => {
       const [scroll, client] = await victim.page.evaluate(() => [document.querySelector("#panel").scrollWidth, document.querySelector("#panel").clientWidth]);

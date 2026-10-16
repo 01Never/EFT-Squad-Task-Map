@@ -119,11 +119,13 @@ func (app *App) onLogEvent(event gamelog.Event) {
 	case gamelog.KindMapLoading:
 		mapKey := app.gameData.MapFromScene(event.Scene)
 		app.raid.MapLoading(mapKey)
+		app.clearSharedPositionIfFromAnotherMap(mapKey)
 		app.hub.Broadcast(events.New(events.RaidMap, map[string]any{"map": mapKey}))
 	case gamelog.KindMapLoaded:
 		app.raid.MapLoaded(app.gameData.MapFromNameID(event.NameID))
 	case gamelog.KindRaidStart:
 		mapKey := app.raid.Start()
+		app.clearSharedPositionIfFromAnotherMap(mapKey)
 		app.position.ClearTrail()
 		app.extracts.RaidStarted()
 		app.hub.Broadcast(events.New(events.RaidStart, map[string]any{"map": mapKey}))
@@ -159,9 +161,10 @@ func (app *App) currentEventMode() string {
 	return raid.TaskEventMode(app.raid.SessionMode(), app.currentSettings().GameModeOrDefault())
 }
 
-// endRaid: back in the menus after a raid. Delete that raid's GPS screenshots, forget the position,
-// and tell the page (queued, so it resets bag counts and extract marks even if it was closed). The
-// event carries the game mode, so only that mode's bag counts are reset.
+// endRaid: back in the menus after a raid. Delete that raid's GPS screenshots, forget the position
+// (also the one in my squad share), and tell the page (queued, so it resets bag counts and extract
+// marks even if it was closed). The event carries the game mode, so only that mode's bag counts
+// are reset.
 func (app *App) endRaid() {
 	app.raidAndPosition.Lock()
 	defer app.raidAndPosition.Unlock()
@@ -170,6 +173,7 @@ func (app *App) endRaid() {
 	payload := map[string]any{"map": mapKey, "deleted": deleted, "mode": app.currentEventMode()}
 	app.hub.Deliver(events.New(events.RaidEnd, payload))
 	app.position.Clear()
+	app.squad.ClearMyPosition() // ticket 17
 }
 
 func (app *App) onScreenshotKeyChecked(event gamelog.Event) {
@@ -187,8 +191,8 @@ func (app *App) onScreenshotKeyChecked(event gamelog.Event) {
 // ---------------------------------------------------------------- screenshots
 
 // onScreenshot: a picture appeared (or disappeared) in the screenshots folder. routeScreenshot
-// decides who gets it: in-raid shots carry a position in their name, but while "Scan tasks" is
-// capturing every new picture belongs to the scan.
+// decides who gets it: in-raid shots carry a position in their name (shown on the page, and put in
+// my squad share), but while "Scan tasks" is capturing every new picture belongs to the scan.
 func (app *App) onScreenshot(file screenshots.File) {
 	fix, hasPosition := gps.ParseFileName(file.Name)
 	switch routeScreenshot(file.Exists, hasPosition, app.scan.IsActive()) {
@@ -223,6 +227,7 @@ func (app *App) moveMarkerTo(fix gps.Fix) {
 func (app *App) updatePositionLocked(fix gps.Fix) {
 	position, trail := app.position.Update(fix, app.raid.CurrentMap())
 	app.hub.Broadcast(events.New(events.GPS, map[string]any{"gps": position, "trail": trail}))
+	app.shareMyPosition(position) // ticket 17
 }
 
 func (app *App) onCaptureListChanged(files []taskscan.CapturedFile) {

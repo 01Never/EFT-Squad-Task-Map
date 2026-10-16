@@ -1,13 +1,18 @@
 // @ts-check
 // A new squad view arrived (the `squad` live event, or the answer of join / leave / profile, or
 // GET /api/squad at start-up): keep it in app.squad and redraw only what it changed. A friend's
-// new drawing redraws that friend's lines alone; a friend's changed tasks redraw the page once; a
-// friend going online or away redraws the chips alone and leaves the rest of the panel (and
+// new drawing redraws that friend's lines alone; a friend's new position on this map redraws the
+// friends' positions alone; a friend's changed tasks redraw the page once; a friend going online
+// or away (or to another map) redraws the chips alone and leaves the rest of the panel (and
 // anything you are typing in it) as it is. What changed is worked out in rules.js.
 import { app } from "../../app/state.js";
 import { renderMapPage } from "../../map/map-page.js";
 import { renderSquadChipsInPlace } from "./panel.js";
-import { renderFriendDrawingsOf } from "./map-layer.js";
+import {
+  renderFriendDrawingsOf,
+  renderFriendPlayersAndApplyView,
+  scheduleFriendPositionRefresh,
+} from "./map-layer.js";
 import { refreshSquadSettings } from "./settings-section.js";
 import { describeSquadChange, friendPrefsOf } from "./rules.js";
 
@@ -29,7 +34,7 @@ export function applySquadView(view) {
   const before = app.squad;
   app.squad = view;
   const mapKey = app.mapView ? app.mapView.key : null;
-  const change = describeSquadChange(before, view, mapKey);
+  const change = describeSquadChange(before, view, mapKey, Date.now());
   if (change.settingsChanged) refreshSquadSettings();
   if (!app.mapView) return;
   const joinedChanged = !before || before.settings.joined !== view.settings.joined;
@@ -40,6 +45,12 @@ export function applySquadView(view) {
   }
   if (change.chipsChanged) renderSquadChipsInPlace();
   for (const playerId of change.drawingsChanged) renderFriendDrawingsOf(playerId);
+  if (change.positionsChanged.length) {
+    renderFriendPlayersAndApplyView();
+  } else {
+    // a friend on another map may have a new position: its "on Customs" goes at a new moment
+    scheduleFriendPositionRefresh();
+  }
 }
 
 /**

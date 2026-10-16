@@ -112,6 +112,7 @@ func TestNeverJoinedStartsNothing(t *testing.T) {
 
 func TestTheServerDropsTasksWhenSharingIsOffEvenIfThePageSendsThem(t *testing.T) {
 	rig, listen := newSquadRigWithDevListener(t)
+	rig.send("PUT", "/api/squad/profile", `{"shareTasks":false}`) // on by default (ticket 17)
 
 	status, answer := rig.send("PUT", "/api/squad/share", shareWithTasks)
 	if status != http.StatusOK || answer["tasksShared"] != false || answer["rev"] != 1.0 {

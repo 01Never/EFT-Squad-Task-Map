@@ -28,8 +28,9 @@ type Settings struct {
 	ReadExtracts       *bool `json:"readExtracts,omitempty"`
 	ExtractsNoticeSeen bool  `json:"extractsNoticeSeen,omitempty"` // the one-time "what's sent" notice was shown
 
-	// Squad (ticket 05): your player id, name, colour, "Share my tasks", and whether you joined.
-	// Never the invite code. nil until the squad feature first saves it.
+	// Squad (ticket 05): your player id, name, colour, "Share my tasks", "Share my position"
+	// (ticket 17), and whether you joined. Never the invite code. nil until the squad feature first
+	// saves it.
 	Squad *SquadSettings `json:"squad,omitempty"`
 
 	// Fields this version doesn't know about, kept so an older or newer version's settings survive a save.
@@ -38,19 +39,32 @@ type Settings struct {
 
 // SquadSettings is the "squad" block of the settings file (ticket 05).
 type SquadSettings struct {
-	PlayerID   string `json:"playerId,omitempty"`   // random, made once (16 hex characters)
-	Name       string `json:"name,omitempty"`       // shown to friends, 1 to 32 characters
-	Color      string `json:"color,omitempty"`      // "#rrggbb"
-	ShareTasks bool   `json:"shareTasks,omitempty"` // default off
-	Joined     bool   `json:"joined,omitempty"`     // in a squad: start the squad network at launch
+	PlayerID string `json:"playerId,omitempty"` // random, made once (16 hex characters)
+	Name     string `json:"name,omitempty"`     // shown to friends, 1 to 32 characters
+	Color    string `json:"color,omitempty"`    // "#rrggbb"
+
+	// "Share my tasks" and "Share my position" (ticket 17). nil (missing) = on, the default.
+	// The squad feature always writes both (true or false), so a player's "off" sticks.
+	ShareTasks    *bool `json:"shareTasks,omitempty"`
+	SharePosition *bool `json:"sharePosition,omitempty"`
+
+	Joined bool `json:"joined,omitempty"` // in a squad: start the squad network at launch
 
 	// Fields this version doesn't know about inside "squad", kept like the top-level ones.
 	extra map[string]json.RawMessage
 }
 
 var knownSquadSettingsFields = map[string]bool{
-	"playerId": true, "name": true, "color": true, "shareTasks": true, "joined": true,
+	"playerId": true, "name": true, "color": true, "shareTasks": true, "sharePosition": true,
+	"joined": true,
 }
+
+// IsShareTasksOn is true unless the player switched "Share my tasks" off (owner's decision,
+// ticket 17: on by default).
+func (s SquadSettings) IsShareTasksOn() bool { return s.ShareTasks == nil || *s.ShareTasks }
+
+// IsSharePositionOn is true unless the player switched "Share my position" off (ticket 17).
+func (s SquadSettings) IsSharePositionOn() bool { return s.SharePosition == nil || *s.SharePosition }
 
 // UnmarshalJSON reads the known squad fields and keeps the rest untouched.
 func (s *SquadSettings) UnmarshalJSON(data []byte) error {

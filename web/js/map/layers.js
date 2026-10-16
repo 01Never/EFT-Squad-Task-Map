@@ -17,6 +17,7 @@ const MAP_LAYERS_BOTTOM_TO_TOP = [
   "closestExtract", // the closest-extract ring and line (features/extracts/map-layer.js)
   "loot", // loot spots: small, under everything about tasks (features/loot/map-layer.js)
   "taskMarkers", // task and sub-task markers, squadmates' tasks under yours (features/tasks/map-layer.js)
+  "friendPlayers", // friends' positions: smaller than yours, under it (features/squad/map-layer.js)
   "player", // you: marker, trail, "You" (features/find-me/map-layer.js)
 ];
 

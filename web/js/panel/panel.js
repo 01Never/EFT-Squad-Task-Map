@@ -49,6 +49,7 @@ import {
   renderSquadSection,
   onFriendDrawingsToggled,
   onFriendTasksToggled,
+  onFriendPositionToggled,
 } from "../features/squad/panel.js";
 import { friendOnlyPartsOnMap } from "../features/squad/friends.js";
 import { countMyOpenTasks, countSquadOnlyTasks } from "../features/tasks/rules.js";
@@ -162,6 +163,7 @@ const PANEL_BUTTONS_BY_ATTRIBUTE = [
   ["data-have", onBagStepClicked],
   ["data-squad-drawings", onFriendDrawingsToggled],
   ["data-squad-tasks", onFriendTasksToggled],
+  ["data-squad-position", onFriendPositionToggled],
 ];
 
 const ANY_PANEL_BUTTON = "[data-act]," + PANEL_BUTTONS_BY_ATTRIBUTE.map(([attribute]) => `[${attribute}]`).join(",");

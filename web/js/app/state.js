@@ -26,6 +26,7 @@
  * @property {SVGGElement} closestExtract
  * @property {SVGGElement} loot
  * @property {SVGGElement} taskMarkers
+ * @property {SVGGElement} friendPlayers
  * @property {SVGGElement} player
  */
 

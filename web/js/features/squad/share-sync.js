@@ -1,8 +1,9 @@
 // @ts-check
 // Sending my share to the program (PUT /api/squad/share), which hands it to my friends. The page
 // builds the share from its saved data (rules.js: buildMyShare) and sends it about a second after
-// a save, only while in a squad, and only when its content changed since the last one sent. This
-// is the squad's only timer. A failed send is dropped quietly: the next save sends it again.
+// a save, only while in a squad, and only when its content changed since the last one sent. (The
+// squad's only other timer is the one-shot redraw when a friend's position fades or goes, in
+// map-layer.js.) A failed send is dropped quietly: the next save sends it again.
 import { app } from "../../app/state.js";
 import { shownGameMode } from "../../app/current-list.js";
 import { callApi } from "../../app/api.js";

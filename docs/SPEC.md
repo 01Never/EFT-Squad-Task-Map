@@ -222,7 +222,7 @@ For the boss list, use the boss names in json.tarkov.dev's map `bosses` data, or
 - `S.have[itemId]` is shared across maps. It resets to 0 at raid end (§10). Also add a "Reset all" button.
 
 ### 7.3 Map styling rules
-- **Fully opaque by default.** Only three things are ever semi-transparent: **not-ready** markers and zones, **unmarked extracts** (§11), and **squadmates' tasks you don't have** (friend-only markers and their zones, ticket 27). Use about 50% opacity, tuned by eye.
+- **Fully opaque by default.** Only four things are ever semi-transparent: **not-ready** markers and zones, **unmarked extracts** (§11), **squadmates' tasks you don't have** (friend-only markers and their zones, ticket 27), and **a friend's position older than 5 minutes** (ticket 17; it is gone after 30). Use about 50% opacity, tuned by eye.
 - **Not-ready marker:** semi-transparent, plus a **"!" badge at the top-left**.
 - **Friend-only marker:** a task a shown squadmate has and you don't is drawn exactly like your own (category shape and colour or item icon, same size, badges, zone), at the same ~50% opacity, with a solid zone outline (no dashes, no "!"). It sits under your own markers and can be clicked like its row.
 - **Badge positions:**

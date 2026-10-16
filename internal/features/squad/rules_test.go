@@ -14,6 +14,8 @@ var (
 	noon     = time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
 	oneLine  = Stroke{Color: "#ff4d4d", Width: 2.5, Points: [][]float64{{10, 20}, {30, 40}}}
 	twoTicks = TaskProgress{Ticks: map[string]Tick{"65732ac3c67dcd96adffa3c7": {IsDone: true}, "65732ac3c67dcd96adffa3c8": {Count: 3}}, Percent: 40}
+
+	shareEverything = Sharing{Tasks: true, Position: true}
 )
 
 func someParts() ShareParts {
@@ -24,14 +26,14 @@ func someParts() ShareParts {
 }
 
 func TestRevStamping(t *testing.T) {
-	first, _ := StampShare(nil, mike, someParts(), true, noon)
+	first, _ := StampShare(nil, mike, someParts(), nil, shareEverything, noon)
 	movedLine := someParts()
 	movedLine.Draw["customs"][0].Points = [][]float64{{11, 20}, {30, 40}}
 	renamed := mike
 	renamed.Name = "Mikey"
 	inPvE := someParts()
 	inPvE.Mode = "pve"
-	firstInPvE, _ := StampShare(nil, mike, inPvE, true, noon)
+	firstInPvE, _ := StampShare(nil, mike, inPvE, nil, Sharing{Tasks: true}, noon)
 	inPvPSeason := someParts()
 	inPvPSeason.Mode = "pvp-season"
 
@@ -55,7 +57,7 @@ func TestRevStamping(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			later := noon.Add(time.Minute)
-			got, changed := StampShare(tc.previous, tc.player, tc.parts, true, later)
+			got, changed := StampShare(tc.previous, tc.player, tc.parts, nil, shareEverything, later)
 			if got.Rev != tc.wantRev || changed != tc.wantChanged {
 				t.Errorf("rev %d changed %v, want rev %d changed %v", got.Rev, changed, tc.wantRev, tc.wantChanged)
 			}
@@ -85,7 +87,7 @@ func TestTasksAreStrippedWhenSharingIsOff(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			share, _ := StampShare(nil, mike, someParts(), tc.shareTasks, noon)
+			share, _ := StampShare(nil, mike, someParts(), nil, Sharing{Tasks: tc.shareTasks}, noon)
 			if len(share.Tasks) != tc.wantTaskCount {
 				t.Errorf("%d tasks, want %d", len(share.Tasks), tc.wantTaskCount)
 			}
@@ -98,8 +100,8 @@ func TestTasksAreStrippedWhenSharingIsOff(t *testing.T) {
 	}
 
 	t.Run("turning sharing off raises the rev, so friends drop the tasks at once", func(t *testing.T) {
-		shared, _ := StampShare(nil, mike, someParts(), true, noon)
-		hidden, changed := StampShare(&shared, mike, someParts(), false, noon.Add(time.Second))
+		shared, _ := StampShare(nil, mike, someParts(), nil, shareEverything, noon)
+		hidden, changed := StampShare(&shared, mike, someParts(), nil, Sharing{Tasks: false}, noon.Add(time.Second))
 		if !changed || hidden.Rev != 2 || hidden.Tasks != nil {
 			t.Errorf("changed %v rev %d tasks %v", changed, hidden.Rev, hidden.Tasks)
 		}
@@ -110,7 +112,7 @@ func TestTheShareCarriesItsGameModeThereAndBack(t *testing.T) {
 	t.Run("the page's mode is stamped into my share and survives the trip to a friend", func(t *testing.T) {
 		parts := someParts()
 		parts.Mode = "pvp-season"
-		share, _ := StampShare(nil, mike, parts, true, noon)
+		share, _ := StampShare(nil, mike, parts, nil, Sharing{Tasks: true}, noon)
 		encoded, _ := json.Marshal(share)
 		received, err := DecodeShare(encoded)
 		if err != nil {
@@ -123,13 +125,13 @@ func TestTheShareCarriesItsGameModeThereAndBack(t *testing.T) {
 	t.Run("the mode is kept when \"Share my tasks\" is off", func(t *testing.T) {
 		parts := someParts()
 		parts.Mode = "pve"
-		share, _ := StampShare(nil, mike, parts, false, noon)
+		share, _ := StampShare(nil, mike, parts, nil, Sharing{Tasks: false}, noon)
 		if share.Mode != "pve" || share.Tasks != nil {
 			t.Errorf("mode %q tasks %v, want pve and no tasks", share.Mode, share.Tasks)
 		}
 	})
 	t.Run("a share without a mode is written without the field, as older copies wrote it", func(t *testing.T) {
-		share, _ := StampShare(nil, mike, someParts(), true, noon)
+		share, _ := StampShare(nil, mike, someParts(), nil, Sharing{Tasks: true}, noon)
 		encoded, _ := json.Marshal(share)
 		if strings.Contains(string(encoded), `"mode"`) {
 			t.Errorf("JSON %s has a mode field", encoded)

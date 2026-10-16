@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"squadtaskmap/internal/events"
+	"squadtaskmap/internal/features/gps"
 	"squadtaskmap/internal/features/squad"
 	"squadtaskmap/internal/httpapi"
 	"squadtaskmap/internal/storage"
@@ -48,11 +49,12 @@ func newSquad(app *App) *squad.Squad {
 		StateDir:      app.files.SquadNetwork,
 		TransportName: squadTransportName(),
 		Settings: squad.Settings{
-			PlayerID:   saved.PlayerID,
-			Name:       saved.Name,
-			Color:      saved.Color,
-			ShareTasks: saved.ShareTasks,
-			Joined:     saved.Joined,
+			PlayerID:      saved.PlayerID,
+			Name:          saved.Name,
+			Color:         saved.Color,
+			ShareTasks:    saved.IsShareTasksOn(),
+			SharePosition: saved.IsSharePositionOn(),
+			Joined:        saved.Joined,
 		},
 		SaveSettings: app.saveSquadSettings,
 		OnChange:     app.onSquadChanged,
@@ -121,14 +123,17 @@ func (app *App) newSquadTransport(authKey string) squad.Transport {
 }
 
 // saveSquadSettings writes the squad block of the settings file (other fields, and unknown fields
-// inside the block, are kept).
+// inside the block, are kept). Both sharing switches are always written, true or false, so a
+// player's "off" sticks (a missing one means on).
 func (app *App) saveSquadSettings(settings squad.Settings) {
+	shareTasks, sharePosition := settings.ShareTasks, settings.SharePosition
 	app.settingsMutex.Lock()
 	block := app.settings.SquadOrEmpty()
 	block.PlayerID = settings.PlayerID
 	block.Name = settings.Name
 	block.Color = settings.Color
-	block.ShareTasks = settings.ShareTasks
+	block.ShareTasks = &shareTasks
+	block.SharePosition = &sharePosition
 	block.Joined = settings.Joined
 	app.settings.Squad = &block
 	saved := app.settings
@@ -178,21 +183,75 @@ func (app *App) LeaveSquad(ctx context.Context) any {
 	return app.squad.View()
 }
 
-// SetSquadProfile changes the fields that were sent (name, colour, "Share my tasks").
+// SetSquadProfile changes the fields that were sent (name, colour, "Share my tasks",
+// "Share my position").
 func (app *App) SetSquadProfile(change httpapi.SquadProfileChange) (any, error) {
 	current := app.squad.Settings()
-	name, color, shareTasks := current.Name, current.Color, current.ShareTasks
+	profile := squad.Profile{
+		Name:          current.Name,
+		Color:         current.Color,
+		ShareTasks:    current.ShareTasks,
+		SharePosition: current.SharePosition,
+	}
 	if change.Name != nil {
-		name = *change.Name
+		profile.Name = *change.Name
 	}
 	if change.Color != nil {
-		color = *change.Color
+		profile.Color = *change.Color
 	}
 	if change.ShareTasks != nil {
-		shareTasks = *change.ShareTasks
+		profile.ShareTasks = *change.ShareTasks
 	}
-	if err := app.squad.SetProfile(name, color, shareTasks); err != nil {
+	if change.SharePosition != nil {
+		profile.SharePosition = *change.SharePosition
+	}
+	if err := app.squad.SetProfile(profile); err != nil {
 		return nil, err
 	}
 	return app.squad.View(), nil
+}
+
+// ---------------------------------------------------------------- my position in my share (ticket 17)
+
+// sharedPositionFrom turns a GPS position into the one my squad share carries. A position on a
+// map the log didn't name isn't shared (ok = false): a friend couldn't place it.
+func sharedPositionFrom(position gps.Position) (shared squad.Position, ok bool) {
+	if position.Map == nil {
+		return squad.Position{}, false
+	}
+	shared = squad.Position{
+		Map: *position.Map,
+		X:   position.X,
+		Y:   position.Y,
+		Z:   position.Z,
+		Yaw: position.Yaw,
+		T:   int64(position.T),
+	}
+	return shared, true
+}
+
+// shareMyPosition puts a new GPS position into my squad share. The squad keeps it only while in a
+// squad, and sends it only while "Share my position" is on.
+func (app *App) shareMyPosition(position gps.Position) {
+	shared, isOnKnownMap := sharedPositionFrom(position)
+	if !isOnKnownMap {
+		return
+	}
+	if err := app.squad.SetMyPosition(shared); err != nil {
+		log.Printf("squad: my position isn't shared: %v", err)
+	}
+}
+
+// clearSharedPositionIfFromAnotherMap: the log reported a raid loading or starting on mapKey (nil
+// = a map it couldn't name), already recorded in app.raid. A shared position on another map
+// belongs to an earlier raid. Taken in turn with onScreenshot (raidAndPosition): a screenshot
+// handled at the same moment either came first (and is cleared here) or reads the new map.
+func (app *App) clearSharedPositionIfFromAnotherMap(mapKey *string) {
+	raidMap := ""
+	if mapKey != nil {
+		raidMap = *mapKey
+	}
+	app.raidAndPosition.Lock()
+	defer app.raidAndPosition.Unlock()
+	app.squad.ClearMyPositionIfFromAnotherMap(raidMap)
 }

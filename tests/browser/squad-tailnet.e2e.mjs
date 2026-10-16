@@ -335,10 +335,13 @@ test("three copies on a simulated Tailscale network", { skip: skip || false, tim
     });
 
     await t.test("tasks are shared from Alice only: colour boxes, badges and the filter", async () => {
-      // ☰ Tasks is on by default (ticket 26)
-      assert.equal(await bob.page.locator("#panel .squad-boxes").count(), 0, "Alice isn't sharing tasks yet");
+      // "Share my tasks" is on by default (ticket 17): Bob switches it off, Alice keeps it on.
+      // Each friend's ☰ Tasks is on by default (ticket 26), so Bob sees hers without a click.
+      await bob.openSettings();
+      await bob.scenario.answered("PUT", "/api/squad/profile", () => bob.page.uncheck("#sSquadShareTasks"));
+      await bob.closeSettings();
       await alice.openSettings();
-      await alice.page.check("#sSquadShareTasks");
+      assert.equal(await alice.page.isChecked("#sSquadShareTasks"), true, "Share my tasks is on by default");
       await alice.closeSettings();
       const bobRow = `#panel .task[data-task="${revision.id}"]`;
       await eventually(async () => (await bob.page.locator(bobRow + " .squad-box").count()) === 1, "Bob's Revision row has Alice's box");
@@ -350,7 +353,8 @@ test("three copies on a simulated Tailscale network", { skip: skip || false, tim
       assert.equal(await bob.page.locator("#panel .cat .task:not(.notmine)").count(), 1, "the filter keeps only Revision of Bob's own");
       await bob.page.click('[data-act="squadonly"]');
       await sleep(1500);
-      assert.equal(await alice.page.locator("#panel .squad-boxes").count(), 0, "Bob shares no tasks");
+      // Cara shares her tasks by default too (ticket 17), so Alice sees Cara's boxes; none of Bob's
+      assert.equal(await alice.page.locator(`#panel .squad-box[data-friend="${bob.id}"]`).count(), 0, "Bob shares no tasks");
       assert.equal((await alice.view()).friends.find((friend) => friend.playerId === bob.id).share.tasks, null);
       await bob.shot("tasks-shared");
     });
