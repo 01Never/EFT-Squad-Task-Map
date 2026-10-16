@@ -93,7 +93,7 @@ pixel by pixel (prints the % of differing pixels and writes a diff image to `<af
 | `mode-select.e2e.mjs` | ticket 23: the start page is the mode select page (cards PvE, PvP, PvP Season with kind, active-task count, "Last used"); PvE → `#/pve/maps` → Customs with crumbs `PvE / Maps / Customs`, the `Maps` and `PvE` crumb links lead back; picking PvP Season saves the mode and shows its (empty) list, and the browser Back button walks the steps and switches back; the old `#/map/customs` opens the map in the Settings mode; an unknown mode goes to `#/`, an unknown map to the picker; Switch data stays on the same page; at phone width `#crumbback` ("‹ PvP", "‹ Maps") replaces the trail. Uses `.modes .mode[data-mode]` (`.mname`, `.mkind`, `.mcount`, `.note`), `#crumbs`, `#crumbback`. |
 | `picker-and-map.e2e.mjs` | picker counts per map (every task active; recorded); one Streets task counts on Streets only; Streets markers, zones, extracts and category counts (recorded); the Scav extract chip. |
 | `task-list.e2e.mjs` | add a task by name; tick a marker objective → "have" goes down, untick gives it back (and only what that tick took); pins and Pinned only (list, markers, Bring list); mark / unmark / clear extracts; Move to, Re-sort everything + Undo, Don't split; selection highlight, flash, marker click, Esc, empty-map click; Hide / ◂ Tasks keeping the view; Settings save; phone width layout and Find me; (2.9.0, issue #22) Settings → Game mode on Streets shows the other mode's list (markers and panel), a task added there lands in that mode only, and switching back finds the first list unchanged. |
-| `ai-and-scan.e2e.mjs` | AI key (wrong, then right), categorize, apply, undo (mock); Scan without a key asks for one; Scan capture → review → confirm replaces the list and deletes the screenshot; cancel at review and while capturing keep the screenshots. |
+| `ai-and-scan.e2e.mjs` | AI key (wrong, then right) in Settings → OpenAI; the AI Categorize box and the reasoning choice are gone and nothing calls `/api/ai/categorize` or `/api/ai/job` (ticket 25); the scan sends the default model `gpt-6-luna` with `low` reasoning (ticket 18); Scan without a key asks for one; Scan capture → review → confirm replaces the list and deletes the screenshot; cancel at review and while capturing keep the screenshots. |
 | `game-log.e2e.mjs` | log: "Pve" then "PvpSeason" leaves no prompt; accepted task added, finished task removed; a PvE session's task ignored, the prompt switches data; GPS screenshot → arrow turned by the heading; raid end resets bag counts and extract marks and deletes that raid's GPS screenshots. |
 | `find-me.e2e.mjs` | ticket 01: marker, 6 s pulse, off-screen chip, Find me and Show keep the zoom; ticket 02: Follow off/on, mid-drag, toolbar ↔ Settings; ticket 03: closest extract (shown, marked, transits, raid end). |
 | `paint.e2e.mjs` | a Chrome trace sees paints while zooming (control); 0 main-thread Paint/Layout during the selection flash and during the find-me pulse. |
@@ -119,7 +119,7 @@ turns, and the saved-data round trips.
 **HTTP:** `GET /api/loot/<map>` (the loot scenario), `GET /api/status` (`statePath`, `data.origin`, `data.mode`, `settings`, `raid.sessionMode`,
 `gps`, `ai`), `GET /api/data`, `GET /api/config`; requests matched by path: `PUT /api/state`,
 `PUT /api/settings`, `PUT /api/ai/key`, `POST /api/scan/start`, `POST /api/scan/cancel`.
-Files in the data folder: `squad-task-map-data.json`, `squad-task-map-settings.json`.
+The mock's `GET /log` (the OpenAI request lines, in `ai-and-scan` and `extracts`). Files in the data folder: `squad-task-map-data.json`, `squad-task-map-settings.json`.
 
 **Shell:** `#settings`, `#navinfo .raid`, `#navinfo .modewarn`, `#navinfo .dd`, `#modeSwitch`,
 `#toast` (shown = computed `display` isn't `none`), `#toastAct`, `.modal`, `.modal h3`,
@@ -169,7 +169,7 @@ deleted", "Following you"; the picker's "N active tasks. Pick a map." and "1 tas
 review note and "Update list & delete 1 screenshot"; "● In raid: Streets of Tarkov",
 "PvE data", "PvE · Switch data Not now"; "📍 You … · just now Show", "Closest shown";
 Find me's two tooltips; Settings' "PvP · 515 tasks · downloaded just now" and "No key yet";
-"not set up", "gpt-5.4-mini", "Moved 3 parts that need keys."; the Re-sort confirm
+"not set up", "gpt-6-luna", "Moved 3 parts that need keys."; the Re-sort confirm
 "Put every part back into its default category?".
 
 ## Writing a new scenario

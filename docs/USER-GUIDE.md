@@ -118,7 +118,7 @@ You need a **screenshot key** bound in Tarkov's control settings. The app warns 
 - **Center the map on me when I take a screenshot:** off by default. When on, every new position pans the map so you're in the middle, keeping your zoom, like a minimap. Same as **◎ Follow** on the map toolbar. If you're dragging the map when a screenshot comes in, it waits until you let go.
 - **Task markers:** **Item icons** (default) or **Category shapes only**. With icons, a spot where you place something shows that item (an MS2000 marker, a camera, a quest item, the item to stash) in a tile with the category colour as its border. If an icon can't be loaded, the marker shows its shape instead.
 - **Game data:** where it came from and **Update game data now**.
-- **OpenAI:** key and model.
+- **OpenAI:** key and model. Paste a key from platform.openai.com/api-keys (the account needs API credit). The default model is `gpt-6-luna`, used by Scan tasks and the extract reader (both at Low reasoning). If your OpenAI account can't use it, type another model; **Save & test** checks it. If you never chose a model, the app switches you from the old default (`gpt-5.4-mini`) to `gpt-6-luna` once, the first time you start 2.10.0; a model you picked yourself is kept.
 - **Read my extracts from my first raid screenshot:** only shown once you have an OpenAI key. On by default (after a one-time notice that explains what is sent). Untick it to stop sending that screenshot. See "Your extracts, read from a screenshot" below.
 - **Updates:** the version you're on and **Check for updates** (see "Updating" below).
 

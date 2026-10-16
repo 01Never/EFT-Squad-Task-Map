@@ -12,7 +12,7 @@ the server keeps them in `squad-task-map-settings.json` (`internal/storage`, wir
 **The rules** (`rules.js`):
 - The game data line: "PvP · 515 tasks · downloaded 2 min ago" / "saved copy from …" / "built-in
   copy (date)" (`gameDataDescription()`, `timeAgo()`).
-- The model field suggests `DEFAULT_AI_MODEL` = gpt-5.4-mini.
+- The model field suggests `DEFAULT_AI_MODEL` = gpt-6-luna.
 - The server tests a key with OpenAI before saving it; the page only ever sees it masked.
 
 **Flow:** Save → `PUT /api/settings` → the answer's status replaces `app.status` → toast "Settings

@@ -2,10 +2,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  browserSuite, withScenario, readFixture, stateWithTasks, taskNamed, taskNameOf, taskEntry, assertMatchesRecorded, OPENAI_TEST_KEY,
+  browserSuite, withScenario, readFixture, stateWithTasks, taskNamed, taskNameOf, taskEntry, assertMatchesRecorded, OPENAI_TEST_KEY, MOCK_PORT,
 } from "./harness.js";
 
 browserSuite();
+
+/** The mock's log line for the last OpenAI request of one kind ("responses model=… reasoning=…"). */
+async function lastOpenAIRequest(isWanted) {
+  const log = await (await fetch(`http://127.0.0.1:${MOCK_PORT}/log`)).json();
+  return log.filter((line) => line.startsWith("responses ") && isWanted(line)).at(-1);
+}
 
 const ballet = taskNamed("Ballet Lover");
 const audiophile = taskNamed("Audiophile");
@@ -95,6 +101,11 @@ test("Scan: captured screenshots are read, confirming replaces the list and dele
     assert.equal(review.button, "Update list & delete 1 screenshot");
     assert.equal(review.note, "Read 8 rows from 1 screenshot. New tasks are added. Tasks on your list that aren't in these screenshots are removed.");
     assert.equal(review.spellingFixed, 1, "“Seizing the Initative” is matched with its spelling fixed");
+    assert.match(
+      await lastOpenAIRequest((line) => line.includes("vision=true") && !line.includes("extracts=true")),
+      /^responses model=gpt-6-luna vision=true reasoning=\{"effort":"low"\} /,
+      "the scan uses the default model and still asks for low reasoning",
+    );
     assertMatchesRecorded("scan-review", review);
 
     await s.saving(() => page.click("#rvok"));

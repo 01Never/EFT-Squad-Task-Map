@@ -125,7 +125,7 @@ function renderGameDataStatus(status) {
   return `<p class="mnote">${escapeHtml(gameDataDescription(data, Date.now()))}${error}</p>`;
 }
 
-/** "Key sk-…abcd · gpt-5.4-mini", or that there's no key yet. */
+/** "Key sk-…abcd · gpt-6-luna", or that there's no key yet. */
 function renderAiStatus(status) {
   const ai = status.ai;
   if (!ai.hasKey) return "No key yet — needed for Scan tasks (and reading your extracts).";

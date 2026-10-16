@@ -12,7 +12,7 @@ for each call; the client doesn't store or log it, and the page never sees it wh
 prompts and schemas (those live in `taskscan` and `extracts`).
 
 **The rules / limits:**
-- `DefaultModel` = `gpt-5.4-mini`, used when Settings has none.
+- `DefaultModel` = `gpt-6-luna`, used when Settings has none.
 - Checking a key in Settings: `CheckKeyShape` (`sk-` and at least 20 letters, digits, `_` or `-`),
   `CheckModelName` (2–80 letters, digits, `.`, `_`, `:` or `-`), then `CheckKey` asks OpenAI for
   the model, which fails for a bad key or a model the key can't use.

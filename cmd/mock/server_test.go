@@ -101,13 +101,13 @@ func TestOpenAIAcceptsOnlyTheTestKey(t *testing.T) {
 		wantStatus int
 		wantBody   string
 	}{
-		{"the test key can read a model", goodKey, 200, `{"id":"gpt-5.4-mini"}`},
+		{"the test key can read a model", goodKey, 200, `{"id":"gpt-6-luna"}`},
 		{"another key is refused", map[string]string{"Authorization": "Bearer sk-other"}, 401, refusal},
 		{"no key is refused", nil, 401, refusal},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			recorder := send(newTestMock(t), "GET", "/v1/models/gpt-5.4-mini", "", test.headers)
+			recorder := send(newTestMock(t), "GET", "/v1/models/gpt-6-luna", "", test.headers)
 			if recorder.Code != test.wantStatus || recorder.Body.String() != test.wantBody {
 				t.Errorf("got %d %s, want %d %s",
 					recorder.Code, recorder.Body.String(), test.wantStatus, test.wantBody)
@@ -118,7 +118,7 @@ func TestOpenAIAcceptsOnlyTheTestKey(t *testing.T) {
 
 func TestVisionReturnsThePresetRowsUntilSetRowsReplacesThem(t *testing.T) {
 	mock := newTestMock(t)
-	visionRequest := `{"model":"gpt-5.4-mini","input":[{"role":"user",` +
+	visionRequest := `{"model":"gpt-6-luna","input":[{"role":"user",` +
 		`"content":[{"type":"input_image","image_url":"data:,"}]}]}`
 
 	defaultText := outputText(t, send(mock, "POST", "/v1/responses", visionRequest, goodKey))
@@ -157,7 +157,7 @@ func TestCategorizeMovesOnlyPartsThatNeedKeys(t *testing.T) {
 func TestRequestLogListsRequestsInOrder(t *testing.T) {
 	mock := newTestMock(t)
 	send(mock, "GET", "/regular/tasks", "", nil)
-	visionRequest := `{"model":"gpt-5.4-mini","reasoning":{"effort":"low"},"input":"input_image <&>"}`
+	visionRequest := `{"model":"gpt-6-luna","reasoning":{"effort":"low"},"input":"input_image <&>"}`
 	send(mock, "POST", "/v1/responses", visionRequest, goodKey)
 	send(mock, "POST", "/v1/responses", `{"input":[]}`, goodKey)
 	send(mock, "GET", "/v1/models/x", "", nil) // refused requests aren't logged
@@ -165,7 +165,7 @@ func TestRequestLogListsRequestsInOrder(t *testing.T) {
 	recorder := send(mock, "GET", "/log", "", nil)
 	// imgBytes is the input's length as JSON: "input_image <&>" with its quotes is 17.
 	want := `["json /regular/tasks",` +
-		`"responses model=gpt-5.4-mini vision=true reasoning={\"effort\":\"low\"} imgBytes=17",` +
+		`"responses model=gpt-6-luna vision=true reasoning={\"effort\":\"low\"} imgBytes=17",` +
 		`"responses model=undefined vision=false reasoning=null imgBytes=0"]`
 	if got := recorder.Body.String(); got != want {
 		t.Errorf("log:\n got %s\nwant %s", got, want)

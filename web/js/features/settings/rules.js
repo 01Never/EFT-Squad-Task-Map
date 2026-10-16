@@ -3,10 +3,10 @@
 // Plain functions only: no DOM, no network. panel.js draws the dialogs.
 import { GAME_MODE_NAMES } from "../../app/game-modes.js";
 
-/** @import { GameDataStatus } from "../../app/types.js" */
+/** @import { GameDataStatus, AiStatus } from "../../app/types.js" */
 
 // The model the OpenAI dialog suggests when none is saved (the server uses the same default).
-export const DEFAULT_AI_MODEL = "gpt-5.4-mini";
+export const DEFAULT_AI_MODEL = "gpt-6-luna";
 
 const SECOND_MS = 1000;
 const MINUTE_SECONDS = 60;
