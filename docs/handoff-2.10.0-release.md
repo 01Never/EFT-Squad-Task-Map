@@ -124,3 +124,10 @@ If something fails, stop and ask the owner. The fix goes on `release-next` and t
   - The mock still has its fake categorize answer (`cmd/mock/openai.go`). The app no longer calls it, so it's harmless; remove it when convenient.
   - `tests/browser/harness.js` still normalises `/api/ai/job/` in its request log, also harmless.
   - The stored `openaiEffort` setting is still accepted by `PUT /api/ai/key` but unused.
+
+## 8. Added by the local session: tickets 18 and 17
+The cloud session built 2.10.0 from `main` without tickets 18 and 17, which were open as PRs #19 and #20. The owner asked for them to ship in this release, so the local session merged both into `release-next` (two merge commits) before publishing:
+- **#18, default model `gpt-6-luna`:** kept for Scan tasks and the extract reader, both at Low reasoning, with the settings step 1→2 that moves a never-chosen `gpt-5.4-mini` to it. Its High reasoning for AI Categorize went away with #25.
+- **#17, friends' positions:** a friend's last GPS position on the map you're on, faded after 5 minutes and gone after 30, a ◎ Pos switch per friend, and "Share my tasks" and "Share my position" on by default (settings step 2→3). The squad share carries both `mode` (#22) and `pos` (#17). Friend positions are their own layer, under your marker; #27's friend-only task markers are unchanged. SPEC §7.3 now lists four see-through cases.
+- **In-game checks for these two:** `docs/HANDOFF.md` §10 items 15 (`gpt-6-luna` with a real key) and 16 (friends' positions on two PCs).
+- **Open question on #17 (default used):** friends' positions show whatever game mode the friend is on, like drawings; only tasks follow the mode.
