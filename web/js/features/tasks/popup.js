@@ -7,8 +7,8 @@ import { currentList } from "../../app/current-list.js";
 import { escapeHtml, findElement } from "../../app/dom.js";
 import { save } from "../../app/saving.js";
 import { renderMapPage } from "../../map/map-page.js";
-import { partLabel, partProgressPercent, isObjectiveOnMap } from "./rules.js";
-import { partsOnMap } from "./task-list.js";
+import { partLabel, partProgressPercent, isObjectiveOnMap, togglePinnedTask } from "./rules.js";
+import { listedPartsOnMap } from "./task-list.js";
 import { deselectPart } from "./selection.js";
 import { renderObjectiveLine, onTickBoxChanged, onTickCounterClicked } from "./objective-line.js";
 import { renderSquadLinesForPopup } from "../squad/panel.js";
@@ -20,7 +20,7 @@ export function renderPopup() {
   const mapView = app.mapView;
   const popup = findElement("#pop");
   if (!popup) return;
-  const row = mapView.popup && mapView.selectedPartKey && partsOnMap(mapView.key).find((candidate) => candidate.part.key === mapView.selectedPartKey);
+  const row = mapView.popup && mapView.selectedPartKey && listedPartsOnMap(mapView.key).find((candidate) => candidate.part.key === mapView.selectedPartKey);
   if (!row) {
     popup.style.display = "none";
     return;
@@ -40,11 +40,15 @@ function renderPopupContent(row) {
   const clickedSubTask = "sub" in mapView.popup && mapView.popup.sub;
   const subTaskLine = clickedSubTask ? `<div style="margin-bottom:6px;color:#fff">Sub-task: ${escapeHtml(clickedSubTask.text)}</div>` : "";
   const objectivesHere = part.objs.filter((objective) => isObjectiveOnMap(objective, mapView.key, task));
-  return `<button class="x" title="Close">×</button><h3>${escapeHtml(task.name)}</h3><div class="m">${escapeHtml(task.trader)} · ${escapeHtml(cat.name)}${partText} · ${partProgressPercent(part, currentList().ticks)}%</div>
+  // A squadmate's task you don't have (ticket 26): their progress is in the squad lines, not yours.
+  const myProgress = row.notMine ? " · not on your list" : ` · ${partProgressPercent(part, currentList().ticks)}%`;
+  const canTick = !row.notMine;
+  const objectiveLines = objectivesHere.map((objective) => renderObjectiveLine(objective, true, canTick)).join("");
+  return `<button class="x" title="Close">×</button><h3>${escapeHtml(task.name)}</h3><div class="m">${escapeHtml(task.trader)} · ${escapeHtml(cat.name)}${partText}${myProgress}</div>
     ${renderSquadLinesForPopup(task, part)}
     <div class="popacts">${wiki}<button class="btn sm line" data-pin="${escapeHtml(task.id)}">${entry.pinned ? "📌 Unpin" : "📌 Pin"}</button></div>
     ${subTaskLine}
-    <ul class="objs">${objectivesHere.map((objective) => renderObjectiveLine(objective)).join("")}</ul>`;
+    <ul class="objs">${objectiveLines}</ul>`;
 }
 
 /**
@@ -59,12 +63,10 @@ function onPopupClicked(event) {
   }
   const pinButton = target.closest("[data-pin]");
   if (pinButton) {
-    const entry = currentList().tasks[pinButton.getAttribute("data-pin")];
-    if (entry) {
-      entry.pinned = !entry.pinned;
-      save();
-      renderMapPage();
-    }
+    // also a squadmate's task you don't have: kept as a pin only (ticket 26)
+    togglePinnedTask(currentList(), pinButton.getAttribute("data-pin"));
+    save();
+    renderMapPage();
     return;
   }
   const counterButton = /** @type {HTMLElement | null} */ (target.closest("[data-tick]"));

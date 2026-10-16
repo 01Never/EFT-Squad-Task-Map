@@ -279,7 +279,7 @@
   "panelHidden": false,
   "dcolor": "#2fbf3a",
   "dwidth": 6,
-  "aiOpen": false,
   "migratedFrom": 1,
-  "showScanBanner": false
+  "showScanBanner": false,
+  "catsResetAt": 1790000000000
 }

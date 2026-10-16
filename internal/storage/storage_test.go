@@ -234,7 +234,7 @@ func TestTheV2BackupIsMadeOnlyOnceAndSurvivesTheMigration(t *testing.T) {
 
 func TestSettingsKeepUnknownFieldsThroughASave(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "squad-task-map-settings.json")
-	writeText(t, path, `{"gameMode":"pve","futureSetting":{"a":[1,2]},"zoom":3}`)
+	writeText(t, path, `{"settingsVersion":3,"gameMode":"pve","futureSetting":{"a":[1,2]},"zoom":3}`)
 	settings := ReadSettings(path)
 	if settings.GameMode != "pve" {
 		t.Fatalf("gameMode = %q, want pve", settings.GameMode)
@@ -247,7 +247,7 @@ func TestSettingsKeepUnknownFieldsThroughASave(t *testing.T) {
 	if err := json.Unmarshal([]byte(readText(t, path)), &saved); err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]any{"gameMode": "pve", "logsPath": `D:\Games\EFT\Logs`, "futureSetting": map[string]any{"a": []any{1.0, 2.0}}, "zoom": 3.0}
+	want := map[string]any{"gameMode": "pve", "logsPath": `D:\Games\EFT\Logs`, "futureSetting": map[string]any{"a": []any{1.0, 2.0}}, "zoom": 3.0, "settingsVersion": 3.0}
 	if gotJSON, wantJSON := mustJSON(saved), mustJSON(want); gotJSON != wantJSON {
 		t.Errorf("saved %s, want %s", gotJSON, wantJSON)
 	}
@@ -255,10 +255,10 @@ func TestSettingsKeepUnknownFieldsThroughASave(t *testing.T) {
 
 func TestTheSquadBlockKeepsUnknownFieldsThroughASave(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "squad-task-map-settings.json")
-	writeText(t, path, `{"gameMode":"pve","squad":{"playerId":"0123456789abcdef","name":"Mike","futureSquadSetting":7}}`)
+	writeText(t, path, `{"settingsVersion":3,"gameMode":"pve","squad":{"playerId":"0123456789abcdef","name":"Mike","futureSquadSetting":7}}`)
 	settings := ReadSettings(path)
 	squad := settings.SquadOrEmpty()
-	if squad.PlayerID != "0123456789abcdef" || squad.Name != "Mike" || squad.ShareTasks || squad.Joined {
+	if squad.PlayerID != "0123456789abcdef" || squad.Name != "Mike" || squad.Joined {
 		t.Fatalf("read %+v", squad)
 	}
 	squad.Joined = true
@@ -270,7 +270,7 @@ func TestTheSquadBlockKeepsUnknownFieldsThroughASave(t *testing.T) {
 	if err := json.Unmarshal([]byte(readText(t, path)), &saved); err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]any{"gameMode": "pve", "squad": map[string]any{
+	want := map[string]any{"settingsVersion": 3.0, "gameMode": "pve", "squad": map[string]any{
 		"playerId": "0123456789abcdef", "name": "Mike", "joined": true, "futureSquadSetting": 7.0,
 	}}
 	if gotJSON, wantJSON := mustJSON(saved), mustJSON(want); gotJSON != wantJSON {
@@ -278,12 +278,59 @@ func TestTheSquadBlockKeepsUnknownFieldsThroughASave(t *testing.T) {
 	}
 }
 
-func TestSettingsWithoutASquadBlockReadAsNotInASquad(t *testing.T) {
+func TestSettingsWithoutASquadBlockReadAsNotInASquadSharingEverything(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "squad-task-map-settings.json")
 	writeText(t, path, `{"gameMode":"pve"}`)
 	squad := ReadSettings(path).SquadOrEmpty()
-	if squad.Joined || squad.ShareTasks || squad.PlayerID != "" {
+	if squad.Joined || squad.PlayerID != "" {
 		t.Errorf("read %+v, want the empty defaults", squad)
+	}
+	if !squad.IsShareTasksOn() || !squad.IsSharePositionOn() {
+		t.Errorf("tasks shared %v, position shared %v; both are on by default (ticket 17)",
+			squad.IsShareTasksOn(), squad.IsSharePositionOn())
+	}
+}
+
+func TestTheSharingSwitchesAreOnUnlessSwitchedOff(t *testing.T) {
+	cases := []struct {
+		name               string
+		block              string
+		wantTasksShared    bool
+		wantPositionShared bool
+	}{
+		{"missing fields mean on", `{"playerId":"0123456789abcdef"}`, true, true},
+		{"an explicit true is on", `{"shareTasks":true,"sharePosition":true}`, true, true},
+		{"an explicit false is kept", `{"shareTasks":false,"sharePosition":false}`, false, false},
+		{"each switch is read on its own", `{"shareTasks":false}`, false, true},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "squad-task-map-settings.json")
+			writeText(t, path, `{"settingsVersion":3,"squad":`+testCase.block+`}`)
+			squad := ReadSettings(path).SquadOrEmpty()
+			if squad.IsShareTasksOn() != testCase.wantTasksShared || squad.IsSharePositionOn() != testCase.wantPositionShared {
+				t.Errorf("tasks %v position %v, want %v %v", squad.IsShareTasksOn(), squad.IsSharePositionOn(),
+					testCase.wantTasksShared, testCase.wantPositionShared)
+			}
+		})
+	}
+}
+
+func TestAnExplicitOffIsWrittenBackAsFalse(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "squad-task-map-settings.json")
+	off := false
+	settings := Settings{Squad: &SquadSettings{PlayerID: "0123456789abcdef", ShareTasks: &off, SharePosition: &off}}
+	if err := WriteSettings(path, settings); err != nil {
+		t.Fatal(err)
+	}
+	text := readText(t, path)
+	for _, want := range []string{`"shareTasks": false`, `"sharePosition": false`} {
+		if !strings.Contains(text, want) {
+			t.Errorf("the file lacks %s:\n%s", want, text)
+		}
+	}
+	if again := ReadSettings(path).SquadOrEmpty(); again.IsShareTasksOn() || again.IsSharePositionOn() {
+		t.Errorf("read back as on: %+v", again)
 	}
 }
 
@@ -294,8 +341,8 @@ func TestTarkovTrackerFieldsAreDroppedAndTheFileRewritten(t *testing.T) {
 		wantFields  []string
 		wantRewrite bool
 	}{
-		{"tt… fields are dropped, the rest stays", `{"ttToken":"abc","ttTeam":"x","gameMode":"pve","other":1}`, []string{"gameMode", "other"}, true},
-		{"without tt… fields the file isn't touched", `{"gameMode":"pve","other":1}`, []string{"gameMode", "other"}, false},
+		{"tt… fields are dropped, the rest stays", `{"ttToken":"abc","ttTeam":"x","settingsVersion":3,"gameMode":"pve","other":1}`, []string{"gameMode", "other", "settingsVersion"}, true},
+		{"without tt… fields the file isn't touched", `{"gameMode":"pve","other":1,"settingsVersion":3}`, []string{"gameMode", "other", "settingsVersion"}, false},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -325,8 +372,8 @@ func TestAMissingOrBrokenSettingsFileGivesEmptySettings(t *testing.T) {
 	for name, path := range map[string]string{"missing": filepath.Join(dir, "none.json"), "broken": broken} {
 		t.Run(name, func(t *testing.T) {
 			settings := ReadSettings(path)
-			if got := mustJSON(settings); got != "{}" {
-				t.Errorf("got %s, want {}", got)
+			if got := mustJSON(settings); got != `{"settingsVersion":3}` {
+				t.Errorf("got %s, want only the current version", got)
 			}
 			if settings.GameModeOrDefault() != "regular" {
 				t.Errorf("game mode = %q, want regular", settings.GameModeOrDefault())

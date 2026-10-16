@@ -172,12 +172,14 @@ export {};
  * @property {Category} cat
  * @property {boolean} done
  * @property {boolean} pinned
+ * @property {boolean} [notMine] a squadmate's task that isn't on your list (ticket 26): shown and
+ *   pinnable, never worked
  */
 
 // ---------------------------------------------------------------- saved data (PUT /api/state)
 
 /**
- * @typedef {object} PartCategoryChoice Where the owner (or AI Categorize) put a part.
+ * @typedef {object} PartCategoryChoice Where the owner put a part.
  * @property {string} cat category id
  * @property {boolean} manual
  */
@@ -246,7 +248,7 @@ export {};
  * @property {boolean} panelHidden
  * @property {string} dcolor drawing colour
  * @property {number} dwidth drawing width in screen pixels
- * @property {boolean} aiOpen
+ * @property {number} [catsResetAt] ms since 1970 when every part went back to its default category (the one-time reset of issue #25); absent = not yet run
  * @property {boolean} [taskIcons] false = task markers keep their category shapes; absent = item icons (Settings → Task markers; features/icons)
  * @property {boolean} [showScanBanner]
  * @property {number} [migratedFrom]
@@ -255,7 +257,8 @@ export {};
 
 /**
  * @typedef {object} SquadChoices What you chose about the squad (features/squad). Absent in files
- * from before 2.7.0: friends then get the defaults (drawings on, tasks off, filter off).
+ * from before 2.7.0: friends then get the defaults (drawings on, tasks off, position on, filter
+ * off).
  * @property {Record<string, FriendPrefs>} friends by friend's player id
  * @property {boolean} [sharedOnly] the "Shared with squad" filter
  */
@@ -264,6 +267,8 @@ export {};
  * @typedef {object} FriendPrefs
  * @property {boolean} drawings show this friend's drawings
  * @property {boolean} tasks show this friend's tasks (when they share them)
+ * @property {boolean} position show this friend's position (ticket 17; absent in files from before
+ *   it, which reads as on)
  */
 
 // ---------------------------------------------------------------- server status (/api/status)
@@ -298,7 +303,6 @@ export {};
  * @property {boolean} hasKey
  * @property {string | null} key masked
  * @property {string} model
- * @property {string} [effort]
  */
 
 /**
@@ -415,6 +419,19 @@ export {};
  * @property {Record<string, { ticks?: Record<string, true | number>, pct?: number }> | null} [tasks]
  * @property {string} [mode] the game mode their tasks belong to (ticket 22); absent or "" from
  *   older copies
+ * @property {FriendPosition | null} [pos] their last GPS position (ticket 17); absent or null when
+ *   they have none, don't share it, or their raid ended or they changed maps
+ */
+
+/**
+ * @typedef {object} FriendPosition A friend's last position from a GPS screenshot (ticket 17), with
+ * the same meaning as the `gps` event's position. Read it through rules.js friendPositionOf().
+ * @property {string} map map key
+ * @property {number} x game coordinates
+ * @property {number} y height
+ * @property {number} z
+ * @property {number} yaw heading in degrees
+ * @property {number} t when their copy saw the screenshot, ms since 1970 (by their clock)
  */
 
 /**
@@ -430,7 +447,7 @@ export {};
 /**
  * @typedef {object} SquadView The answer of GET /api/squad and the body of the `squad` event.
  * @property {{ playerId: string, name: string, color: string, rev: number, updatedAt: number }} me
- * @property {{ shareTasks: boolean, joined: boolean }} settings
+ * @property {{ shareTasks: boolean, sharePosition: boolean, joined: boolean }} settings
  * @property {string} transport "tsnet" or "dev"
  * @property {{ state: string, text: string, friendsOnline: number, friendsKnown: number, problem: string }} status
  * @property {SquadFriend[]} friends

@@ -1,9 +1,9 @@
-// Tests for the squad's page rules (rules.js): what is shared, who shows, the texts, and what a
-// new `squad` event changed.
+// Tests for the squad's page rules (rules.js): what is shared, who shows, the texts, friends'
+// positions (ticket 17), and what a new `squad` event changed.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { freshState, migrateSavedData } from "../../app/saved-data.js";
-import { partsOfTask } from "../tasks/rules.js";
+import { freshState, migrateSavedData, blankTaskEntry } from "../../app/saved-data.js";
+import { partsOfTask, togglePinnedTask, isRowListed, isRowShownOnMap, countMyOpenTasks, countSquadOnlyTasks, isObjectiveDone } from "../tasks/rules.js";
 import {
   NEUTRAL_FRIEND_COLOR,
   safeFriendColor,
@@ -31,6 +31,21 @@ import {
   progressPieces,
   friendTasksOf,
   friendTasksButtonTitle,
+  friendBoxes,
+  friendOnlyRowsOnMap,
+  MAX_SQUAD_SQUARES_ON_MARKER,
+  squadSquaresOf,
+  mainSpotIndex,
+  squadMarkerLook,
+  squadTicksOfTask,
+  FRIEND_POSITION_FADES_AFTER_MS,
+  FRIEND_POSITION_GOES_AFTER_MS,
+  friendPositionOf,
+  friendPositionLook,
+  friendPositionsOnMap,
+  friendElsewhereText,
+  friendPositionTooltip,
+  msUntilNextFriendPositionChange,
 } from "./rules.js";
 
 // ---------------------------------------------------------------- fixtures
@@ -93,20 +108,33 @@ test("a friend shows 'online', or 'last seen' with how long ago", () => {
   assert.equal(lastSeenAgo(NOW + 5000, NOW), "just now", "a clock a little behind is still 'just now'");
 });
 
-test("drawings are shown by default and tasks are not; the choices are remembered per friend", () => {
+test("drawings and tasks are shown by default (ticket 26); the choices are remembered per friend", () => {
   const saved = freshState();
-  assert.deepEqual(friendPrefsOf(saved, "mike"), { drawings: true, tasks: false });
-  setFriendPref(saved, "mike", "tasks", true);
+  assert.deepEqual(friendPrefsOf(saved, "mike"), { drawings: true, tasks: true, position: true });
+  setFriendPref(saved, "mike", "tasks", false);
   setFriendPref(saved, "sam", "drawings", false);
-  assert.deepEqual(friendPrefsOf(saved, "mike"), { drawings: true, tasks: true });
-  assert.deepEqual(friendPrefsOf(saved, "sam"), { drawings: false, tasks: false });
-  assert.deepEqual(friendPrefsOf(saved, "someone-new"), { drawings: true, tasks: false });
+  assert.deepEqual(friendPrefsOf(saved, "mike"), { drawings: true, tasks: false, position: true });
+  assert.deepEqual(friendPrefsOf(saved, "sam"), { drawings: false, tasks: true, position: true });
+  assert.deepEqual(friendPrefsOf(saved, "someone-new"), { drawings: true, tasks: true, position: true });
+});
+
+test("a ☰ Tasks switched off and saved before ticket 26 stays off; one never touched is now on", () => {
+  const saved = migrateSavedData({
+    version: 2,
+    cats: [],
+    tasks: {},
+    prefs: {},
+    squad: { friends: { mike: { drawings: true, tasks: false, position: true }, sam: { drawings: true } } },
+  });
+  assert.equal(friendPrefsOf(saved, "mike").tasks, false, "explicit off kept");
+  assert.equal(friendPrefsOf(saved, "sam").tasks, true, "no saved choice: the new default");
+  assert.equal(friendPrefsOf(saved, "kim").tasks, true, "a friend you never set");
 });
 
 test("a saved file from before the squad is read with the defaults and is not changed by reading it", () => {
   const older = migrateSavedData({ version: 2, cats: [], tasks: {}, prefs: {} });
   assert.equal("squad" in older, false, "no squad block is invented");
-  assert.deepEqual(friendPrefsOf(older, "mike"), { drawings: true, tasks: false });
+  assert.deepEqual(friendPrefsOf(older, "mike"), { drawings: true, tasks: true, position: true });
   assert.equal(isSharedOnlyFilterOn(older), false);
   assert.equal("squad" in older, false, "reading choices writes nothing");
   setSharedOnlyFilter(older, true);
@@ -114,10 +142,10 @@ test("a saved file from before the squad is read with the defaults and is not ch
 });
 
 test("a squad block that lost a field is read with the defaults", () => {
-  const saved = migrateSavedData({ version: 2, cats: [], tasks: {}, prefs: {}, squad: { friends: { mike: { tasks: true } } } });
-  assert.deepEqual(friendPrefsOf(saved, "mike"), { drawings: true, tasks: true });
+  const saved = migrateSavedData({ version: 2, cats: [], tasks: {}, prefs: {}, squad: { friends: { mike: { tasks: false } } } });
+  assert.deepEqual(friendPrefsOf(saved, "mike"), { drawings: true, tasks: false, position: true });
   const hollow = migrateSavedData({ version: 2, cats: [], tasks: {}, prefs: {}, squad: {} });
-  assert.deepEqual(friendPrefsOf(hollow, "mike"), { drawings: true, tasks: false });
+  assert.deepEqual(friendPrefsOf(hollow, "mike"), { drawings: true, tasks: true, position: true });
 });
 
 test("which friends show: drawings by their toggle; tasks by their toggle and only when they share", () => {
@@ -125,9 +153,9 @@ test("which friends show: drawings by their toggle; tasks by their toggle and on
   const mike = friend("mike", "Mike");
   const sam = friendSharing("sam", "Sam", {});
   const kim = friendSharing("kim", "Kim", {});
-  setFriendPref(saved, "sam", "tasks", true);
   setFriendPref(saved, "kim", "drawings", false);
-  setFriendPref(saved, "mike", "tasks", true); // Mike shares no tasks (null)
+  setFriendPref(saved, "kim", "tasks", false);
+  // Mike's and Sam's ☰ Tasks are on (the default); Mike shares no tasks (null)
   const friends = [mike, sam, kim];
   assert.deepEqual(friendsWithDrawingsOn(friends, saved).map((one) => one.name), ["Mike", "Sam"]);
   assert.deepEqual(friendsWithTasksOn(friends, saved, "regular").map((one) => one.name), ["Sam"]);
@@ -148,8 +176,8 @@ test("'Shared with squad' hides none of your tasks while no friend whose tasks y
   setSharedOnlyFilter(saved, true);
   const player = friend("0123456789abcdef", "Player", { online: false, lastSeen: NOW - 60 * 60_000 });
   const sam = friendSharing("fedcba9876543210", "Sam", { [killScavs.id]: { ticks: {}, pct: 0 } });
-  setFriendPref(saved, player.playerId, "tasks", true); // switched on, but Player shares nothing
-  // Sam shares, but his ☰ Tasks is off (the default)
+  // Player's ☰ Tasks is on (the default), but Player shares nothing
+  setFriendPref(saved, sam.playerId, "tasks", false); // Sam shares, but you switched his ☰ Tasks off
   const shown = friendsWithTasksOn([player, sam], saved, "regular");
   assert.equal(shown.length, 0);
   assert.equal(isSharedOnlyFilterInEffect(saved, shown), false);
@@ -323,11 +351,12 @@ function withDrawing(playerId, strokes, rev) {
 test("a friend's new drawing on the open map redraws only that friend's lines", () => {
   const before = viewOf([withDrawing("mike", [stroke()], 1), withDrawing("sam", [stroke()], 1)]);
   const after = viewOf([withDrawing("mike", [stroke(), stroke({ pts: [[5, 5]] })], 2), withDrawing("sam", [stroke()], 1)]);
-  assert.deepEqual(describeSquadChange(before, after, "customs"), {
+  assert.deepEqual(describeSquadChange(before, after, "customs", NOW), {
     chipsChanged: false,
     settingsChanged: false,
     drawingsChanged: ["mike"],
     tasksChanged: [],
+    positionsChanged: [],
   });
 });
 
@@ -450,9 +479,9 @@ test("objective ids named like Object.prototype members count as no progress", (
 test("a friend's choices are read and saved safely for ids like '__proto__' and 'constructor'", () => {
   for (const key of PROTOTYPE_KEYS) {
     const saved = freshState();
-    assert.deepEqual(friendPrefsOf(saved, key), { drawings: true, tasks: false }, `${key}: defaults`);
-    setFriendPref(saved, key, "tasks", true);
-    assert.equal(friendPrefsOf(saved, key).tasks, true, `${key}: remembered`);
+    assert.deepEqual(friendPrefsOf(saved, key), { drawings: true, tasks: true, position: true }, `${key}: defaults`);
+    setFriendPref(saved, key, "tasks", false);
+    assert.equal(friendPrefsOf(saved, key).tasks, false, `${key}: remembered`);
     assert.equal(Object.getPrototypeOf(saved.squad.friends), Object.prototype, `${key}: prototype untouched`);
   }
 });
@@ -563,4 +592,475 @@ test("the ☰ Tasks title says why a friend's tasks don't show", () => {
   assert.equal(friendTasksButtonTitle(friendOnMode("mike", "Mike", "<odd>"), "regular"), "Mike's tasks are for <odd>");
   assert.equal(friendTasksButtonTitle(friend("sam", "Sam"), "regular"), "Sam isn't sharing tasks");
   assert.equal(friendTasksButtonTitle(friendOnMode("kim", "Kim", undefined), "pve"), "Show Kim's tasks");
+});
+
+// ---------------------------------------------------------------- ticket 26: squadmates' tasks in your list
+
+// Marks one place and visits another: two parts (Mark, Scout & extract) when split.
+const markThenVisit = {
+  id: "aaaaaaaaaaaaaaaaaaaa0026",
+  name: "Mark then visit",
+  trader: "Mechanic",
+  map: "customs",
+  objs: [
+    objective("bbbbbbbbbbbbbbbbbbbb0261", { type: "mark", d: "Mark the truck" }),
+    objective("bbbbbbbbbbbbbbbbbbbb0262", { d: "Visit the dorms" }),
+  ],
+};
+const taskByIdWithSplit = { ...taskById, [markThenVisit.id]: markThenVisit };
+const noTicks = { ticks: {}, pct: 0 };
+
+/** Rows the list shows for squadmates' tasks, as the page asks for them. */
+function squadRows(friends, saved, mode = "regular", mapKey = "customs") {
+  const shown = friendsWithTasksOn(friends, saved, mode);
+  return friendOnlyRowsOnMap(shown, saved, mode, taskByIdWithSplit, mapKey);
+}
+
+test("a task only a squadmate has lands in the category its kind of work gets by default", () => {
+  const saved = savedWithActive(killScavs);
+  const mike = friendSharing("mike", "Mike", { [killScavs.id]: noTicks, [visitTwoPlaces.id]: noTicks, [markThenVisit.id]: noTicks });
+  const rows = squadRows([mike], saved);
+  const shape = rows.map((row) => [row.task.id, row.part.action, row.cat.id, row.notMine, row.done]);
+  assert.deepEqual(shape, [
+    [markThenVisit.id, "mark", "b-mark", true, false],
+    [markThenVisit.id, "go", "b-go", true, false],
+    [visitTwoPlaces.id, "go", "b-go", true, false],
+  ]);
+  assert.ok(!rows.some((row) => row.task.id === killScavs.id), "a task you have is your own row, not a squad row");
+});
+
+test("your own category choices and Don't split never apply to a squadmate's task", () => {
+  const saved = freshState();
+  // an old entry of yours, off your list: you once moved its mark part to Boss hunts and kept it whole
+  saved.modes.regular.tasks[markThenVisit.id] = {
+    ...blankTaskEntry(NOW),
+    noSplit: true,
+    partCats: { [`${markThenVisit.id}:mark`]: { cat: "b-boss", manual: true }, "*": { cat: "b-boss", manual: true } },
+  };
+  const mike = friendSharing("mike", "Mike", { [markThenVisit.id]: noTicks });
+  const rows = squadRows([mike], saved);
+  assert.deepEqual(rows.map((row) => row.cat.id), ["b-mark", "b-go"]);
+});
+
+test("a part a squadmate finished isn't listed, unless another shown friend still has it open", () => {
+  const saved = freshState();
+  const markDone = { ticks: { bbbbbbbbbbbbbbbbbbbb0261: true }, pct: 50 };
+  const mike = friendSharing("mike", "Mike", { [markThenVisit.id]: markDone });
+  assert.deepEqual(squadRows([mike], saved).map((row) => row.part.action), ["go"]);
+  const sam = friendSharing("sam", "Sam", { [markThenVisit.id]: noTicks });
+  assert.deepEqual(squadRows([mike, sam], saved).map((row) => row.part.action), ["mark", "go"]);
+});
+
+test("squad rows are per map: a task on Woods isn't listed on Customs", () => {
+  const mike = friendSharing("mike", "Mike", { [onlyOnWoods.id]: noTicks });
+  assert.deepEqual(squadRows([mike], freshState(), "regular", "customs"), []);
+  assert.deepEqual(squadRows([mike], freshState(), "regular", "woods").map((row) => row.task.id), [onlyOnWoods.id]);
+});
+
+test("a squadmate whose ☰ Tasks you switched off, or who is on another game mode, adds no rows", () => {
+  const saved = freshState();
+  const mike = friendSharing("mike", "Mike", { [visitTwoPlaces.id]: noTicks });
+  assert.equal(squadRows([mike], saved).length, 1, "☰ Tasks is on by default");
+  setFriendPref(saved, "mike", "tasks", false);
+  assert.deepEqual(squadRows([mike], saved), [], "switched off");
+  const onPve = friendSharing("kim", "Kim", { [visitTwoPlaces.id]: noTicks });
+  onPve.share.mode = "pve";
+  assert.deepEqual(squadRows([onPve], freshState(), "regular"), [], "Kim's tasks are for PvE");
+  assert.equal(squadRows([onPve], freshState(), "pve").length, 1, "shown when you're on PvE too");
+});
+
+test("each row shows a colour box and name for every shown friend who has it, yours too", () => {
+  const saved = savedWithActive(killScavs);
+  const mike = friendSharing("mike", "Mike", { [killScavs.id]: noTicks, [visitTwoPlaces.id]: noTicks }, { color: "#E03131" });
+  const sam = friendSharing("sam", "Sam‮", { [killScavs.id]: noTicks }, { color: "red;background:url(x)" });
+  const kim = friendSharing("kim", "Kim", { [killScavs.id]: noTicks });
+  setFriendPref(saved, "kim", "tasks", false);
+  const shown = friendsWithTasksOn([mike, sam, kim], saved, "regular");
+  assert.deepEqual(
+    friendBoxes(killScavs.id, shown),
+    [
+      { playerId: "mike", name: "Mike", color: "#e03131" },
+      { playerId: "sam", name: "Sam", color: NEUTRAL_FRIEND_COLOR },
+    ],
+    "your own task: Mike and Sam (Kim is switched off); colours and names made safe",
+  );
+  assert.deepEqual(friendBoxes(visitTwoPlaces.id, shown).map((box) => box.name), ["Mike"], "a squad-only task");
+  assert.deepEqual(friendBoxes(onlyOnWoods.id, shown), [], "nobody has it");
+});
+
+test("a pinned squadmate's task is a pin only: off your list, listed under Pinned only", () => {
+  const saved = freshState();
+  const list = saved.modes.regular;
+  assert.equal(togglePinnedTask(list, visitTwoPlaces.id, NOW), true);
+  assert.deepEqual(list.tasks[visitTwoPlaces.id], { ...blankTaskEntry(NOW), pinned: true }, "a blank entry, not on your list");
+  assert.equal(buildMyShare(saved, "regular", taskById, true).tasks[visitTwoPlaces.id], undefined, "not shared as yours");
+  const mike = friendSharing("mike", "Mike", { [visitTwoPlaces.id]: noTicks, [markThenVisit.id]: noTicks });
+  const rows = squadRows([mike], saved);
+  const listedUnderPinnedOnly = rows.filter((row) => isRowListed(row, true)).map((row) => row.task.id);
+  assert.deepEqual(listedUnderPinnedOnly, [visitTwoPlaces.id]);
+  assert.equal(rows.filter((row) => isRowListed(row, false)).length, 3, "all of them without the filter");
+  assert.equal(togglePinnedTask(list, visitTwoPlaces.id, NOW), false, "and unpinned again");
+});
+
+test("a pinned squadmate's task that no shown friend has any more keeps its pin but has no row", () => {
+  const saved = freshState();
+  togglePinnedTask(saved.modes.regular, visitTwoPlaces.id, NOW);
+  const mikeWithout = friendSharing("mike", "Mike", { [killScavs.id]: noTicks });
+  assert.deepEqual(squadRows([mikeWithout], saved).map((row) => row.task.id), [killScavs.id]);
+  assert.equal(saved.modes.regular.tasks[visitTwoPlaces.id].pinned, true, "the pin is kept");
+});
+
+test("the header counts your tasks only; squadmates' tasks are a separate '+N from squad'", () => {
+  const saved = savedWithActive(killScavs);
+  const mike = friendSharing("mike", "Mike", { [visitTwoPlaces.id]: noTicks, [markThenVisit.id]: noTicks });
+  const [killsPart] = partsOfTask(killScavs);
+  const myRows = [{ task: killScavs, part: killsPart, cat: saved.cats[2], done: false, pinned: false }];
+  const rows = [...myRows, ...squadRows([mike], saved)];
+  assert.equal(countMyOpenTasks(rows), 1);
+  assert.equal(countSquadOnlyTasks(rows), 2, "two tasks (three rows)");
+});
+
+test("'Shared with squad' never hides a squadmate's task (a friend has it by definition)", () => {
+  const saved = savedWithActive(killScavs);
+  setSharedOnlyFilter(saved, true);
+  const mike = friendSharing("mike", "Mike", { [visitTwoPlaces.id]: noTicks });
+  const shown = friendsWithTasksOn([mike], saved, "regular");
+  for (const row of squadRows([mike], saved)) {
+    assert.equal(isHiddenBySharedOnlyFilter(row.task.id, saved, shown), false);
+  }
+  assert.equal(isHiddenBySharedOnlyFilter(killScavs.id, saved, shown), true, "your own task nobody else has");
+});
+
+// ---------------------------------------------------------------- ticket 27: squadmates on the markers
+
+function coloured(playerId, color) {
+  return friend(playerId, playerId, { color });
+}
+
+test("a marker's squares are the colours of the friends who have the task, in the chips' order", () => {
+  const friends = [coloured("ann", "#e03131"), coloured("bob", "#1c7ed6"), coloured("cat", "#2f9e44")];
+  assert.deepEqual(squadSquaresOf(friends), { colors: ["#e03131", "#1c7ed6", "#2f9e44"], moreCount: 0 });
+});
+
+test("a friend's colour that isn't #rrggbb is a grey square", () => {
+  assert.deepEqual(squadSquaresOf([coloured("eve", "red;x")]).colors, [NEUTRAL_FRIEND_COLOR]);
+});
+
+test("after four squares, the other friends are a '+N'", () => {
+  assert.equal(MAX_SQUAD_SQUARES_ON_MARKER, 4);
+  const colors = ["#000001", "#000002", "#000003", "#000004", "#000005", "#000006"];
+  const six = colors.map((color, index) => coloured("f" + index, color));
+  assert.deepEqual(squadSquaresOf(six), { colors: colors.slice(0, 4), moreCount: 2 });
+  assert.equal(squadSquaresOf(six.slice(0, 4)).moreCount, 0, "exactly four: no +N");
+});
+
+test("a part's main spot is its first exact spot", () => {
+  const spots = [
+    { x: 0, y: 0, kind: "possible" },
+    { x: 50, y: 50, kind: "exact" },
+    { x: 90, y: 90, kind: "exact" },
+  ];
+  assert.equal(mainSpotIndex(spots), 1);
+});
+
+test("with only possible spots, the main spot is the one nearest the middle of them", () => {
+  // the middle of the four is (25, 10); the spot at (30, 10) is nearest
+  const spots = [
+    { x: 0, y: 0, kind: "possible" },
+    { x: 30, y: 10, kind: "possible" },
+    { x: 70, y: 40, kind: "possible" },
+    { x: 0, y: -10, kind: "possible" },
+  ];
+  assert.equal(mainSpotIndex(spots), 1);
+  assert.equal(mainSpotIndex([]), -1, "no spots, no main spot");
+});
+
+test("only the main spot gets squares; a squadmate's task you don't have is see-through", () => {
+  const ann = coloured("ann", "#e03131");
+  const mine = /** @type {any} */ ({});
+  const theirs = /** @type {any} */ ({ notMine: true });
+  const annsSquare = { colors: ["#e03131"], moreCount: 0 };
+  assert.deepEqual(squadMarkerLook(mine, [ann], true), { isSeeThrough: false, squares: annsSquare });
+  assert.deepEqual(squadMarkerLook(mine, [ann], false), { isSeeThrough: false, squares: null });
+  assert.deepEqual(squadMarkerLook(mine, [], true), { isSeeThrough: false, squares: null }, "nobody else has it");
+  assert.deepEqual(squadMarkerLook(theirs, [ann], true), { isSeeThrough: true, squares: annsSquare });
+  assert.deepEqual(squadMarkerLook(theirs, [ann], false), { isSeeThrough: true, squares: null });
+});
+
+test("a squadmate's task shows a spot while any friend who has it still needs it", () => {
+  const [mark, visit] = markThenVisit.objs;
+  const mikeMarked = friendSharing("mike", "Mike", { [markThenVisit.id]: { ticks: { [mark.id]: true }, pct: 50 } });
+  const samNothing = friendSharing("sam", "Sam", { [markThenVisit.id]: noTicks });
+  const mikeAlone = squadTicksOfTask(markThenVisit.id, [mikeMarked]);
+  assert.equal(isObjectiveDone(mark, mikeAlone), true, "Mike alone: the mark is done");
+  const together = squadTicksOfTask(markThenVisit.id, [mikeMarked, samNothing]);
+  assert.equal(isObjectiveDone(mark, together), false, "Sam still has to mark it");
+  assert.equal(isObjectiveDone(visit, together), false);
+});
+
+test("on a counter, the squad's progress is the lowest of theirs", () => {
+  const [kills] = killScavs.objs;
+  const mike = friendSharing("mike", "Mike", { [killScavs.id]: { ticks: { [kills.id]: 4 }, pct: 80 } });
+  const sam = friendSharing("sam", "Sam", { [killScavs.id]: { ticks: { [kills.id]: 2 }, pct: 40 } });
+  assert.deepEqual(squadTicksOfTask(killScavs.id, [mike, sam]), { [kills.id]: 2 });
+});
+
+test("squad ticks ignore keys that aren't game ids", () => {
+  const odd = JSON.parse('{"__proto__": true, "toString": 3}');
+  const mike = friendSharing("mike", "Mike", { [killScavs.id]: { ticks: odd, pct: 0 } });
+  const together = squadTicksOfTask(killScavs.id, [mike]);
+  assert.deepEqual(Object.keys(together), []);
+  assert.equal(Object.getPrototypeOf(together), Object.prototype);
+});
+
+test("Pinned only and hidden categories hide a squadmate's markers like its rows", () => {
+  const saved = freshState();
+  const mike = friendSharing("mike", "Mike", { [markThenVisit.id]: noTicks });
+  const rows = squadRows([mike], saved);
+  assert.ok(rows.every((row) => isRowShownOnMap(row, false)), "shown by default");
+  assert.ok(rows.every((row) => !isRowShownOnMap(row, true)), "not pinned: hidden under Pinned only");
+  togglePinnedTask(saved.modes.regular, markThenVisit.id, NOW);
+  const pinnedRows = squadRows([mike], saved);
+  assert.ok(pinnedRows.every((row) => isRowShownOnMap(row, true)), "pinned: shown under Pinned only");
+  const [markRow] = pinnedRows;
+  const inHiddenCategory = { ...markRow, cat: { ...markRow.cat, visible: false } };
+  assert.equal(isRowShownOnMap(inHiddenCategory, false), false, "its category is hidden");
+});
+
+// ---------------------------------------------------------------- friends' positions (ticket 17)
+
+const MINUTE = 60_000;
+const MAP_NAMES = { customs: "Customs", woods: "Woods", "streets-of-tarkov": "Streets of Tarkov" };
+
+function positionOn(map, minutesAgo, extra = {}) {
+  return { map, x: 120.5, y: 2.1, z: -210.75, yaw: 90, t: NOW - minutesAgo * MINUTE, ...extra };
+}
+
+function friendAt(playerId, name, pos, extra = {}) {
+  return friend(playerId, name, { share: { rev: 1, updatedAt: 1, draw: {}, tasks: null, pos }, ...extra });
+}
+
+const namesOf = (shown) => shown.map((one) => one.friend.name);
+
+test("a friend's position shows only on the map they are on", () => {
+  const saved = freshState();
+  const mike = friendAt("mike", "Mike", positionOn("customs", 1));
+  const sam = friendAt("sam", "Sam", positionOn("woods", 1));
+  const kim = friend("kim", "Kim"); // no position: out of raid, or not sharing it
+  const friends = [mike, sam, kim];
+  assert.deepEqual(namesOf(friendPositionsOnMap(friends, saved, "customs", NOW)), ["Mike"]);
+  assert.deepEqual(namesOf(friendPositionsOnMap(friends, saved, "woods", NOW)), ["Sam"]);
+  assert.deepEqual(namesOf(friendPositionsOnMap(friends, saved, "reserve", NOW)), []);
+  const [shown] = friendPositionsOnMap(friends, saved, "customs", NOW);
+  assert.deepEqual(shown.position, positionOn("customs", 1), "the position as sent, for the projection");
+});
+
+test("friends' positions are shown by default, and each friend's ◎ Pos switch hides theirs", () => {
+  const saved = freshState();
+  const mike = friendAt("mike", "Mike", positionOn("customs", 1));
+  const sam = friendAt("sam", "Sam", positionOn("customs", 1));
+  assert.equal(friendPrefsOf(saved, "mike").position, true, "on by default");
+  setFriendPref(saved, "sam", "position", false);
+  assert.equal(friendPrefsOf(saved, "sam").position, false, "remembered");
+  assert.deepEqual(saved.squad.friends.sam, { drawings: true, tasks: true, position: false });
+  assert.deepEqual(namesOf(friendPositionsOnMap([mike, sam], saved, "customs", NOW)), ["Mike"]);
+  setFriendPref(saved, "sam", "position", true);
+  assert.deepEqual(namesOf(friendPositionsOnMap([mike, sam], saved, "customs", NOW)), ["Mike", "Sam"]);
+});
+
+test("a friend's choices saved before ticket 17 (no position) read the position switch as on", () => {
+  const older = migrateSavedData({
+    version: 2, cats: [], tasks: {}, prefs: {},
+    squad: { friends: { mike: { drawings: false, tasks: true } }, sharedOnly: true },
+  });
+  assert.deepEqual(friendPrefsOf(older, "mike"), { drawings: false, tasks: true, position: true });
+  assert.deepEqual(older.squad.friends.mike, { drawings: false, tasks: true }, "reading changes nothing");
+  const oddValue = migrateSavedData({ version: 2, cats: [], tasks: {}, prefs: {}, squad: { friends: { mike: { position: "no" } } } });
+  assert.equal(friendPrefsOf(oddValue, "mike").position, true, "anything but true/false reads as the default");
+});
+
+test("a position is fully opaque up to 5 minutes, faded after 5, and not drawn after 30", () => {
+  assert.equal(FRIEND_POSITION_FADES_AFTER_MS, 5 * MINUTE);
+  assert.equal(FRIEND_POSITION_GOES_AFTER_MS, 30 * MINUTE);
+  const lookAt = (ageMs) => friendPositionLook({ ...positionOn("customs", 0), t: NOW - ageMs }, NOW);
+  assert.equal(lookAt(0), "fresh");
+  assert.equal(lookAt(5 * MINUTE), "fresh", "exactly 5 minutes is still fresh");
+  assert.equal(lookAt(5 * MINUTE + 1), "faded");
+  assert.equal(lookAt(30 * MINUTE), "faded", "exactly 30 minutes is still drawn");
+  assert.equal(lookAt(30 * MINUTE + 1), "gone");
+
+  const saved = freshState();
+  const friends = [
+    friendAt("a", "Fresh", positionOn("customs", 2)),
+    friendAt("b", "Faded", positionOn("customs", 12)),
+    friendAt("c", "Gone", positionOn("customs", 31)),
+  ];
+  const shown = friendPositionsOnMap(friends, saved, "customs", NOW);
+  assert.deepEqual(shown.map((one) => [one.friend.name, one.isFaded]), [["Fresh", false], ["Faded", true]]);
+});
+
+test("a position from a friend whose clock is ahead of yours counts as just taken", () => {
+  const fromTheFuture = { ...positionOn("customs", 0), t: NOW + 3 * MINUTE };
+  assert.equal(friendPositionLook(fromTheFuture, NOW), "fresh");
+  assert.equal(friendPositionLook(fromTheFuture, NOW + 8 * MINUTE), "fresh", "age 5 min by their clock");
+  assert.equal(friendPositionLook(fromTheFuture, NOW + 9 * MINUTE), "faded");
+  const mike = friendAt("mike", "Mike", fromTheFuture);
+  assert.equal(friendPositionTooltip(mike, fromTheFuture, NOW), "Mike · just now", "never 'in 3 min'");
+});
+
+test("the tooltip says 'Mike · 2 min ago', worked out at the moment it is shown", () => {
+  const position = positionOn("customs", 0);
+  const mike = friendAt("mike", "  Mike\u0007 ", position);
+  assert.equal(friendPositionTooltip(mike, position, NOW), "Mike · just now");
+  assert.equal(friendPositionTooltip(mike, position, NOW + 2 * MINUTE), "Mike · 2 min ago", "the same marker, later");
+  assert.equal(friendPositionTooltip(mike, position, NOW + 25 * MINUTE), "Mike · 25 min ago");
+  const markup = friendAt("x", "<b>Sam</b>", position);
+  assert.equal(friendPositionTooltip(markup, position, NOW), "<b>Sam</b> · just now", "text (set with textContent)");
+});
+
+test("a friend on another map shows 'on Customs' on their chip", () => {
+  const saved = freshState();
+  const mike = friendAt("mike", "Mike", positionOn("customs", 3));
+  assert.equal(friendElsewhereText(mike, saved, "woods", MAP_NAMES, NOW), "on Customs");
+  assert.equal(friendElsewhereText(mike, saved, "customs", MAP_NAMES, NOW), "", "on this map: drawn instead");
+  const streets = friendAt("sam", "Sam", positionOn("streets-of-tarkov", 3));
+  assert.equal(friendElsewhereText(streets, saved, "woods", MAP_NAMES, NOW), "on Streets of Tarkov");
+});
+
+test("'on Customs' needs a recent position, the friend's ◎ Pos switch on and a map the config names", () => {
+  const saved = freshState();
+  const old = friendAt("old", "Old", positionOn("customs", 31));
+  assert.equal(friendElsewhereText(old, saved, "woods", MAP_NAMES, NOW), "", "over 30 minutes old");
+  const faded = friendAt("faded", "Faded", positionOn("customs", 20));
+  assert.equal(friendElsewhereText(faded, saved, "woods", MAP_NAMES, NOW), "on Customs", "faded still counts");
+  assert.equal(friendElsewhereText(friend("none", "None"), saved, "woods", MAP_NAMES, NOW), "", "no position");
+  const hidden = friendAt("hidden", "Hidden", positionOn("customs", 1));
+  setFriendPref(saved, "hidden", "position", false);
+  assert.equal(friendElsewhereText(hidden, saved, "woods", MAP_NAMES, NOW), "", "switch off");
+  const unknownMap = friendAt("lab", "Lab", positionOn("the-lab", 1));
+  assert.equal(friendElsewhereText(unknownMap, saved, "woods", MAP_NAMES, NOW), "", "a map the config doesn't name");
+});
+
+test("the one timer waits until the next fade or hide moment among friends with a position", () => {
+  const fresh = friendAt("a", "Fresh", positionOn("customs", 2)); // fades in 3 min
+  const faded = friendAt("b", "Faded", positionOn("woods", 20)); // goes in 10 min
+  const gone = friendAt("c", "Gone", positionOn("customs", 45)); // nothing more to change
+  assert.equal(msUntilNextFriendPositionChange([fresh, faded, gone], NOW), 3 * MINUTE + 1);
+  assert.equal(msUntilNextFriendPositionChange([faded, gone], NOW), 10 * MINUTE + 1);
+  assert.equal(msUntilNextFriendPositionChange([gone, friend("d", "None")], NOW), null, "no timer at all");
+  assert.equal(msUntilNextFriendPositionChange([], NOW), null);
+});
+
+test("the timer never waits less than a second, nor longer than a browser timer can", () => {
+  const almostFaded = friendAt("a", "A", { ...positionOn("customs", 0), t: NOW - 5 * MINUTE });
+  assert.equal(msUntilNextFriendPositionChange([almostFaded], NOW), 1000);
+  const farFuture = friendAt("b", "B", { ...positionOn("customs", 0), t: NOW + 365 * 24 * 60 * MINUTE });
+  assert.equal(msUntilNextFriendPositionChange([farFuture], NOW), 2 ** 31 - 1);
+});
+
+test("a position that isn't shaped right is ignored without throwing", () => {
+  const saved = freshState();
+  const good = positionOn("customs", 1);
+  const without = (field) => {
+    const copy = { ...good };
+    delete copy[field];
+    return copy;
+  };
+  const badPositions = [
+    null, undefined, "customs", 42, [], [1, 2, 3],
+    without("map"), without("x"), without("y"), without("z"), without("yaw"), without("t"),
+    { ...good, x: "120" }, { ...good, z: NaN }, { ...good, y: Infinity }, { ...good, yaw: null },
+    { ...good, t: "now" }, { ...good, t: NaN }, { ...good, x: 1e9 },
+    { ...good, map: "" }, { ...good, map: "bad map key!" }, { ...good, map: 5 }, { ...good, map: "x".repeat(65) },
+    Object.create(good), // fields only on its prototype, not its own
+  ];
+  for (const pos of badPositions) {
+    const mike = friendAt("mike", "Mike", pos);
+    const what = JSON.stringify(pos) ?? String(pos);
+    assert.equal(friendPositionOf(mike), null, what);
+    assert.deepEqual(friendPositionsOnMap([mike], saved, "customs", NOW), [], what);
+    assert.equal(friendElsewhereText(mike, saved, "woods", MAP_NAMES, NOW), "", what);
+    assert.equal(msUntilNextFriendPositionChange([mike], NOW), null, what);
+  }
+  for (const share of [null, "share", { rev: 1 }, { pos: undefined }]) {
+    assert.equal(friendPositionOf(friend("sam", "Sam", { share })), null, JSON.stringify(share));
+  }
+});
+
+test("a friend's position under a map key like '__proto__' or 'toString' shows nowhere", () => {
+  const saved = freshState();
+  for (const key of PROTOTYPE_KEYS) {
+    const pos = JSON.parse(`{"map":"${key}","x":1,"y":2,"z":3,"yaw":4,"t":${NOW}}`);
+    const mike = friendAt("mike", "Mike", pos);
+    assert.deepEqual(friendPositionsOnMap([mike], saved, "customs", NOW), [], `${key}: not on Customs`);
+    assert.equal(friendElsewhereText(mike, saved, "customs", MAP_NAMES, NOW), "", `${key}: no "on …"`);
+  }
+  // a share whose own "__proto__" key carries a position is not a position
+  const sneaky = friend("sam", "Sam", { share: JSON.parse(`{"rev":1,"updatedAt":1,"__proto__":{"pos":${JSON.stringify(positionOn("customs", 1))}}}`) });
+  assert.equal(friendPositionOf(sneaky), null);
+});
+
+// ---------------------------------------------------------------- what a squad event changed: positions
+
+test("a friend's new position on the open map redraws only the positions", () => {
+  const before = viewOf([friendAt("mike", "Mike", positionOn("customs", 3))]);
+  const after = viewOf([friendAt("mike", "Mike", positionOn("customs", 0, { x: 140 }))]);
+  assert.deepEqual(describeSquadChange(before, after, "customs", NOW), {
+    chipsChanged: false,
+    settingsChanged: false,
+    drawingsChanged: [],
+    tasksChanged: [],
+    positionsChanged: ["mike"],
+  });
+});
+
+test("a friend's new position on another map redraws nothing on this one, and their chip only if the map changed", () => {
+  const onWoods = viewOf([friendAt("mike", "Mike", positionOn("woods", 3))]);
+  const movedOnWoods = viewOf([friendAt("mike", "Mike", positionOn("woods", 0, { x: 140 }))]);
+  const sameMap = describeSquadChange(onWoods, movedOnWoods, "customs", NOW);
+  assert.deepEqual([sameMap.chipsChanged, sameMap.positionsChanged], [false, []]);
+  const onStreets = viewOf([friendAt("mike", "Mike", positionOn("streets-of-tarkov", 0))]);
+  const newMap = describeSquadChange(onWoods, onStreets, "customs", NOW);
+  assert.deepEqual([newMap.chipsChanged, newMap.positionsChanged], [true, []], "'on Woods' becomes 'on Streets of Tarkov'");
+});
+
+test("a friend arriving on this map or leaving it (or their raid ending) redraws the positions and the chips", () => {
+  const onWoods = viewOf([friendAt("mike", "Mike", positionOn("woods", 1))]);
+  const onCustoms = viewOf([friendAt("mike", "Mike", positionOn("customs", 0))]);
+  const outOfRaid = viewOf([friendAt("mike", "Mike", null)]);
+  for (const [before, after, what] of [[onWoods, onCustoms, "arrives"], [onCustoms, onWoods, "leaves"], [onCustoms, outOfRaid, "raid ends"]]) {
+    const change = describeSquadChange(before, after, "customs", NOW);
+    assert.deepEqual([change.chipsChanged, change.positionsChanged], [true, ["mike"]], what);
+  }
+});
+
+test("a new position replacing one over 30 minutes old updates the chip, even on the same map", () => {
+  const old = viewOf([friendAt("mike", "Mike", positionOn("woods", 40))]);
+  const renewed = viewOf([friendAt("mike", "Mike", positionOn("woods", 0))]);
+  assert.equal(describeSquadChange(old, renewed, "customs", NOW).chipsChanged, true);
+});
+
+test("a friend's new colour or name redraws their position on this map", () => {
+  const before = viewOf([friendAt("mike", "Mike", positionOn("customs", 1))]);
+  const recoloured = viewOf([friendAt("mike", "Mike", positionOn("customs", 1), { color: "#00ff00" })]);
+  assert.deepEqual(describeSquadChange(before, recoloured, "customs", NOW).positionsChanged, ["mike"]);
+  assert.deepEqual(describeSquadChange(before, recoloured, "woods", NOW).positionsChanged, [], "not on this map");
+});
+
+test("the first view, or a friend joining or leaving, draws the positions on the open map", () => {
+  const withMike = viewOf([friendAt("mike", "Mike", positionOn("customs", 1))]);
+  assert.deepEqual(describeSquadChange(null, withMike, "customs", NOW).positionsChanged, ["mike"]);
+  assert.deepEqual(describeSquadChange(null, withMike, null, NOW).positionsChanged, [], "no map open");
+  assert.deepEqual(describeSquadChange(viewOf([]), withMike, "customs", NOW).positionsChanged, ["mike"]);
+  assert.deepEqual(describeSquadChange(withMike, viewOf([]), "customs", NOW).positionsChanged, ["mike"]);
+});
+
+test("a friend's other news (drawings, going offline) does not redraw positions", () => {
+  const before = viewOf([friendAt("mike", "Mike", positionOn("customs", 1))]);
+  const offline = viewOf([friendAt("mike", "Mike", positionOn("customs", 1), { online: false, lastSeen: NOW })]);
+  assert.deepEqual(describeSquadChange(before, offline, "customs", NOW).positionsChanged, []);
+  const drew = viewOf([friendAt("mike", "Mike", positionOn("customs", 1))]);
+  drew.friends[0].share = { ...drew.friends[0].share, rev: 2, updatedAt: 2, draw: { customs: [stroke()] } };
+  const change = describeSquadChange(before, drew, "customs", NOW);
+  assert.deepEqual([change.drawingsChanged, change.positionsChanged], [["mike"], []]);
 });

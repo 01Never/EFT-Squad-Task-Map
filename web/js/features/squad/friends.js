@@ -11,13 +11,13 @@ import {
   isSharedOnlyFilterOn,
   isSharedOnlyFilterInEffect,
   isHiddenBySharedOnlyFilter,
-  safeFriendColor,
+  friendBoxes,
+  squadTicksOfTask,
+  friendOnlyRowsOnMap,
 } from "./rules.js";
+import { warnOnce } from "./safe.js";
 
-/** @import { SquadFriend } from "../../app/types.js" */
-
-// At most this many friend dots fit in a marker's bottom-left badge slot.
-const MAX_SQUAD_DOTS_ON_MARKER = 3;
+/** @import { SquadFriend, PartOnMap } from "../../app/types.js" */
 
 /** Whether this copy is in a squad. */
 export function isInSquad() {
@@ -51,14 +51,46 @@ export function friendsAlsoDoingTask(taskId) {
 }
 
 /**
- * The colours of the friends who also have this task, for the marker's dots (at most three).
+ * The ticks a squadmate's task you don't have is drawn with: done only when every shown friend
+ * who has it has done it (rules.js: squadTicksOfTask). A friend's data that breaks it counts as
+ * nothing ticked (noted once).
  * @param {string} taskId
- * @returns {string[]}
+ * @returns {Record<string, true | number>}
  */
-export function squadColorsForTask(taskId) {
-  return friendsAlsoDoingTask(taskId)
-    .slice(0, MAX_SQUAD_DOTS_ON_MARKER)
-    .map((friend) => safeFriendColor(friend.color));
+export function squadTicksForTask(taskId) {
+  try {
+    return squadTicksOfTask(taskId, friendsAlsoDoingTask(taskId));
+  } catch (error) {
+    warnOnce("squad ticks", error);
+    return {};
+  }
+}
+
+/**
+ * Who has this task: a colour box and name per shown friend (rules.js: friendBoxes).
+ * @param {string} taskId
+ */
+export function friendBoxesForTask(taskId) {
+  if (!isInSquad()) return [];
+  return friendBoxes(taskId, friendsShowingTasks());
+}
+
+/**
+ * The rows of squadmates' tasks you don't have on this map (ticket 26, rules.js:
+ * friendOnlyRowsOnMap). A friend's data that breaks it shows none of them (noted once).
+ * @param {string} mapKey
+ * @returns {PartOnMap[]}
+ */
+export function friendOnlyPartsOnMap(mapKey) {
+  if (!isInSquad()) return [];
+  const friends = friendsShowingTasks();
+  if (!friends.length) return [];
+  try {
+    return friendOnlyRowsOnMap(friends, app.saved, shownGameMode(), app.taskById, mapKey);
+  } catch (error) {
+    warnOnce("friend-only rows", error);
+    return [];
+  }
 }
 
 /**

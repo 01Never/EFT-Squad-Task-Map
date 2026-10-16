@@ -7,7 +7,7 @@ import { escapeHtml } from "../../app/dom.js";
 import { save } from "../../app/saving.js";
 import { objectiveById } from "../../app/game-data.js";
 import { renderMapPage } from "../../map/map-page.js";
-import { isObjectiveDone, usesCounter, tickCount, tickTarget } from "./rules.js";
+import { isObjectiveDone, usesCounter, tickCount, tickTarget, NOT_ON_YOUR_LIST_TITLE } from "./rules.js";
 import { setTick } from "./task-list.js";
 import { isObjectivePossible } from "../readiness/rules.js";
 import { renderRequirementTags } from "../readiness/panel.js";
@@ -16,14 +16,17 @@ import { renderRequirementTags } from "../readiness/panel.js";
 
 /**
  * The objective's line. Done objectives are struck through; with `isOnThisMap` false (objectives
- * on another map) the line is greyed out.
+ * on another map) the line is greyed out. With `canTick` false (a squadmate's task you don't
+ * have, ticket 26) the tick control is there but disabled, and readiness says nothing.
  * @param {Objective} objective
  * @param {boolean} [isOnThisMap]
+ * @param {boolean} [canTick]
  */
-export function renderObjectiveLine(objective, isOnThisMap = true) {
+export function renderObjectiveLine(objective, isOnThisMap = true, canTick = true) {
   const isDone = isObjectiveDone(objective, currentList().ticks);
   const classes = `ob${isDone ? " done" : ""}${isOnThisMap ? "" : " away"}`;
-  return `<li class="${classes}">${renderTickControl(objective, isDone)}<span class="od">${escapeHtml(objective.d)}</span>${renderObjectiveTags(objective, isDone)}</li>`;
+  const control = canTick ? renderTickControl(objective, isDone) : renderDisabledTickControl(objective, isDone);
+  return `<li class="${classes}">${control}<span class="od">${escapeHtml(objective.d)}</span>${renderObjectiveTags(objective, isDone, canTick)}</li>`;
 }
 
 /** A checkbox, or − n/N + for objectives with a count. */
@@ -36,11 +39,21 @@ function renderTickControl(objective, isDone) {
   return `<input type="checkbox" data-tickbox="${id}" ${isDone ? "checked" : ""} title="Done">`;
 }
 
+/** The same controls, disabled and without their data hooks: "Not on your task list". */
+function renderDisabledTickControl(objective, isDone) {
+  if (usesCounter(objective)) {
+    const count = `${tickCount(objective, currentList().ticks)}/${tickTarget(objective)}`;
+    return `<span class="ctr" title="${NOT_ON_YOUR_LIST_TITLE}"><button class="ib sm" disabled title="${NOT_ON_YOUR_LIST_TITLE}">−</button><b>${count}</b><button class="ib sm" disabled title="${NOT_ON_YOUR_LIST_TITLE}">+</button></span>`;
+  }
+  return `<input type="checkbox" class="notmine-tick" disabled ${isDone ? "checked" : ""} title="${NOT_ON_YOUR_LIST_TITLE}">`;
+}
+
 /**
  * The tags after the text, in order: optional, FIR, what it needs (readiness), quest item, time
- * window, possible spots on this map, "no armor" restriction, and "! missing items".
+ * window, possible spots on this map, "no armor" restriction, and "! missing items" (only for
+ * your own tasks).
  */
-function renderObjectiveTags(objective, isDone) {
+function renderObjectiveTags(objective, isDone, canTick) {
   const tags = [
     objective.opt ? ' <span class="tag">optional</span>' : "",
     objective.fir ? ' <span class="tag fir">FIR</span>' : "",
@@ -49,7 +62,7 @@ function renderObjectiveTags(objective, isDone) {
     objective.time ? ` <span class="tag">🕑 ${objective.time[0]}:00–${objective.time[1]}:00</span>` : "",
     renderPossibleSpotsTag(objective),
     objective.gear && objective.gear.notWearing ? ' <span class="tag">no armor/gear restriction</span>' : "",
-    !isDone && !isObjectivePossible(objective, currentList().have) ? ' <span class="tag miss">! missing items</span>' : "",
+    canTick && !isDone && !isObjectivePossible(objective, currentList().have) ? ' <span class="tag miss">! missing items</span>' : "",
   ];
   return tags.join("");
 }
@@ -74,8 +87,7 @@ function renderPossibleSpotsTag(objective) {
 export function onTickBoxChanged(objectiveId, isChecked) {
   const objective = objectiveById(objectiveId);
   if (!objective) return;
-  setTick(objective, !!isChecked);
-  save();
+  if (setTick(objective, !!isChecked)) save();
   renderMapPage();
 }
 
@@ -87,7 +99,6 @@ export function onTickBoxChanged(objectiveId, isChecked) {
 export function onTickCounterClicked(objectiveId, step) {
   const objective = objectiveById(objectiveId);
   if (!objective) return;
-  setTick(objective, tickCount(objective, currentList().ticks) + step);
-  save();
+  if (setTick(objective, tickCount(objective, currentList().ticks) + step)) save();
   renderMapPage();
 }

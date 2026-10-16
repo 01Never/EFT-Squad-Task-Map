@@ -21,7 +21,7 @@ import { renderExtracts } from "../features/extracts/map-layer.js";
 import { renderLoot } from "../features/loot/map-layer.js";
 import { renderDrawings, renderDrawingBar, bindDrawing } from "../features/drawing/map-layer.js";
 import { renderPlayer, bindFindMe } from "../features/find-me/map-layer.js";
-import { renderFriendDrawings, renderFriendTaskMarkers } from "../features/squad/map-layer.js";
+import { renderFriendDrawings, renderFriendPlayers } from "../features/squad/map-layer.js";
 
 /** @import { MapConfig, MapInfo } from "../app/types.js" */
 
@@ -167,8 +167,8 @@ export function renderMapPage() {
   renderLoot();
   renderFriendDrawings();
   renderDrawings();
-  renderFriendTaskMarkers();
-  renderTaskMarkers(); // also puts every marker at screen size, friends' included
+  renderFriendPlayers(); // friends' positions (ticket 17)
+  renderTaskMarkers(); // squadmates' tasks too; also puts every marker at screen size, friends' positions included
   renderPlayer();
   renderPopup();
   findElement("#bpin").setAttribute("aria-pressed", String(!!app.saved.pinnedOnly));

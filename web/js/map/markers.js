@@ -1,7 +1,7 @@
 // @ts-check
 // Drawing one marker on the map: the category's shape and colour, and its badges (floor, "!" when
-// you're missing something, split-task corner, sub-task dot, done tick). Which markers to draw and
-// why is up to the features (features/tasks/map-layer.js).
+// you're missing something, split-task corner, sub-task dot, done tick, squadmates' squares).
+// Which markers to draw and why is up to the features (features/tasks/map-layer.js).
 import { createSvgElement } from "../app/dom.js";
 import { markerShapePath } from "./marker-shapes.js";
 
@@ -9,21 +9,23 @@ import { markerShapePath } from "./marker-shapes.js";
 
 const SVG_FONT = "bender, Arial, sans-serif";
 
-// A marker of a part you're not ready for is drawn at half opacity (SPEC §7.3, one of the two
-// see-through cases).
-const NOT_READY_MARKER_OPACITY = 0.5;
+// A marker of a part you're not ready for, or of a squadmate's task you don't have, is drawn at
+// half opacity (SPEC §7.3, see-through cases). The squad squares under it stay opaque.
+const SEE_THROUGH_MARKER_OPACITY = 0.5;
 
 // Marker sizes (SVG units at zoom 1, kept at screen size by the "sc" class): task spots and the
 // smaller sub-task pins.
 const TASK_MARKER_RADIUS = 8.5;
 const SUB_TASK_MARKER_RADIUS = 6.5;
 
-// Friends who also have the task: small dots in their colours, bottom left (the slot SPEC §7.3
-// reserved), each a little to the right of the one before so they overlap like a hand of cards.
-const SQUAD_DOT_RADIUS = 3.6;
-const SQUAD_DOT_FIRST_X = -9.5;
-const SQUAD_DOT_Y = 9;
-const SQUAD_DOT_STEP_X = 4.6;
+// Friends who have the task: small squares in their colours, centred under the marker's main spot
+// (SPEC §7.3, bottom centre; owner's mock, ticket 27). After four, "+N" says how many more.
+const SQUAD_SQUARE_SIZE = 4.4;
+const SQUAD_SQUARE_GAP = 1.3;
+const SQUAD_SQUARE_OUTLINE = 1;
+const SQUAD_SQUARES_BELOW_RADIUS = 2.6; // the squares' centre line is this far below the shape's radius
+const SQUAD_MORE_FONT_SIZE = 6.5;
+const SQUAD_MORE_CHARACTER_WIDTH = 0.6; // of the font size, to centre "+N" with the squares
 
 // An item icon tile (ticket 07) is a little bigger than the shape it replaces, so a 64 px icon
 // stays readable; borders and padding in SVG units, like the sizes above.
@@ -53,20 +55,24 @@ const NOT_READY_BADGE_COLOR = "#ffd43b"; // the same yellow as the "!" in the ta
  * @returns {SVGGElement}
  */
 export function drawMarker(layer, marker, markerKey) {
-  const opacity = marker.ready === false ? NOT_READY_MARKER_OPACITY : 1;
+  // "notmine": a squadmate's task you don't have (ticket 27), like its row in the list
+  const classes = marker.seeThrough ? "sc mk notmine" : "sc mk";
   const group = createSvgElement(
     "g",
-    { class: "sc mk", "data-x": marker.x, "data-y": marker.y, "data-k": markerKey, style: "cursor:pointer", opacity },
+    { class: classes, "data-x": marker.x, "data-y": marker.y, "data-k": markerKey, "data-part": marker.part.key, style: "cursor:pointer" },
     layer,
   );
+  const isSeeThrough = marker.ready === false || !!marker.seeThrough;
+  // the shape and badges fade; the squad squares (on the outer group) don't
+  const body = createSvgElement("g", { opacity: isSeeThrough ? SEE_THROUGH_MARKER_OPACITY : 1 }, group);
   const radius = marker.kind === "sub" ? SUB_TASK_MARKER_RADIUS : TASK_MARKER_RADIUS;
-  if (marker.kind === "possible") drawPossibleSpot(group, marker, radius);
-  else if (marker.iconItem && !failedIconUrls.has(marker.iconItem.url)) drawItemIconSpot(group, marker, radius);
-  else drawExactSpot(group, marker, radius);
-  if (marker.f) drawFloorBadge(group, marker.f);
-  if (marker.ready === false) drawNotReadyBadge(group);
-  if (marker.split) drawSplitBadge(group);
-  if (marker.squadColors && marker.squadColors.length) drawSquadDots(group, marker.squadColors);
+  if (marker.kind === "possible") drawPossibleSpot(body, marker, radius);
+  else if (marker.iconItem && !failedIconUrls.has(marker.iconItem.url)) drawItemIconSpot(body, marker, radius);
+  else drawExactSpot(body, marker, radius);
+  if (marker.f) drawFloorBadge(body, marker.f);
+  if (marker.ready === false) drawNotReadyBadge(body);
+  if (marker.split) drawSplitBadge(body);
+  if (marker.squadSquares) drawSquadSquares(group, marker.squadSquares, radius);
   createSvgElement("circle", { r: MARKER_TAP_RADIUS, fill: "transparent" }, group);
   return group;
 }
@@ -161,15 +167,41 @@ function drawSplitBadge(group) {
 }
 
 /**
- * Friend-colour dots, bottom left: one per friend who also has this task. The colours were
- * checked (#rrggbb) before they got here.
+ * Friend-colour squares, bottom centre: one per friend who has this task (up to four), then
+ * "+N" for the others; the whole row is centred under the marker. The colours were checked
+ * (#rrggbb) before they got here.
  * @param {SVGGElement} group
- * @param {string[]} colors
+ * @param {{ colors: string[], moreCount: number }} squares
+ * @param {number} radius
  */
-function drawSquadDots(group, colors) {
-  // Drawn from the last to the first, so the first friend's dot is on top.
-  for (let index = colors.length - 1; index >= 0; index--) {
-    const dot = { cx: SQUAD_DOT_FIRST_X + index * SQUAD_DOT_STEP_X, cy: SQUAD_DOT_Y, r: SQUAD_DOT_RADIUS, fill: colors[index], stroke: BLACK, "stroke-width": 1.2 };
-    createSvgElement("circle", { ...dot, class: "squad-dot" }, group);
+function drawSquadSquares(group, squares, radius) {
+  const { colors, moreCount } = squares;
+  const moreText = moreCount > 0 ? "+" + moreCount : "";
+  const squaresWidth = colors.length * SQUAD_SQUARE_SIZE + Math.max(0, colors.length - 1) * SQUAD_SQUARE_GAP;
+  const moreWidth = moreText ? SQUAD_SQUARE_GAP + moreText.length * SQUAD_MORE_FONT_SIZE * SQUAD_MORE_CHARACTER_WIDTH : 0;
+  const centreY = radius + SQUAD_SQUARES_BELOW_RADIUS;
+  let x = -(squaresWidth + moreWidth) / 2;
+  for (const color of colors) {
+    const square = { x, y: centreY - SQUAD_SQUARE_SIZE / 2, width: SQUAD_SQUARE_SIZE, height: SQUAD_SQUARE_SIZE };
+    createSvgElement("rect", { ...square, fill: color, stroke: BLACK, "stroke-width": SQUAD_SQUARE_OUTLINE, class: "squad-square" }, group);
+    x += SQUAD_SQUARE_SIZE + SQUAD_SQUARE_GAP;
   }
+  if (!moreText) return;
+  const more = createSvgElement(
+    "text",
+    {
+      x,
+      y: centreY + SQUAD_MORE_FONT_SIZE * 0.36,
+      "font-size": SQUAD_MORE_FONT_SIZE,
+      "font-weight": 700,
+      "font-family": SVG_FONT,
+      fill: WHITE,
+      stroke: BLACK,
+      "stroke-width": 1.4,
+      "paint-order": "stroke",
+      class: "squad-more",
+    },
+    group,
+  );
+  more.textContent = moreText;
 }

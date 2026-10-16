@@ -43,20 +43,16 @@ import {
   onLootChipClicked,
   onLootSectionToggled,
 } from "../features/loot/panel.js";
-import {
-  renderAiCategorizeBox,
-  onAiCategorizeClicked,
-  onAiCategorizeKeyDown,
-  onAiScopeChanged,
-} from "../features/ai-categorize/panel.js";
 import { startScan } from "../features/scan/panel.js";
 import {
   SQUAD_SECTION_ACTIONS,
   renderSquadSection,
-  renderFriendsTasksSection,
   onFriendDrawingsToggled,
   onFriendTasksToggled,
+  onFriendPositionToggled,
 } from "../features/squad/panel.js";
+import { friendOnlyPartsOnMap } from "../features/squad/friends.js";
+import { countMyOpenTasks, countSquadOnlyTasks } from "../features/tasks/rules.js";
 
 /** @import { PartOnMap } from "../app/types.js" */
 
@@ -68,12 +64,10 @@ import {
 const TASKS_TAB_SECTIONS = [
   renderListTools, // 📌 Pinned only, Clear pins, ⇅ Auto-sort (features/tasks)
   renderSquadSection, // a chip per friend, "Shared with squad" (features/squad)
-  renderAiCategorizeBox, // 🤖 AI Categorize (features/ai-categorize)
   renderExtractsSection, // Extracts & labels (features/extracts)
   renderLootSection, // Loot, closed until opened (features/loot)
-  renderCategoryLists, // the categories and their task rows (features/tasks)
+  renderCategoryLists, // the categories and their task rows, squadmates' tasks too (features/tasks)
   renderNewCategoryBox, // + Category (features/tasks)
-  renderFriendsTasksSection, // friends' tasks you don't have, read-only (features/squad)
 ];
 
 // ---------------------------------------------------------------- drawing
@@ -103,12 +97,14 @@ export function renderPanel() {
  * @param {"tasks" | "bring"} tab
  */
 function renderPanelHeader(rows, tab) {
-  const taskCount = new Set(rows.filter((row) => !row.done).map((row) => row.task.id)).size;
+  const taskCount = countMyOpenTasks(rows);
+  const squadCount = countSquadOnlyTasks(friendOnlyPartsOnMap(app.mapView.key));
+  const squadText = squadCount ? ` <span class="squad-extra" title="Squadmates' tasks you don't have, on this map">+${squadCount} from squad</span>` : "";
   const missingCount = countMissingForShownParts();
   const banner = app.saved.showScanBanner
     ? `<div class="banner sm">Your saved tasks were carried over from the old version. <b>Scan your task list</b> to load exactly what you have now. <button class="lnk" data-act="hidebanner">Dismiss</button></div>`
     : "";
-  return `<div class="phead"><h2>${escapeHtml(app.mapView.config.name)} <span class="hr"><small>${taskCount} task${taskCount === 1 ? "" : "s"}</small><button class="btn sm line hidep" data-act="hidepanel" title="Hide the task list to give the map the whole window">Hide ▸</button></span></h2>
+  return `<div class="phead"><h2>${escapeHtml(app.mapView.config.name)} <span class="hr"><small>${taskCount} task${taskCount === 1 ? "" : "s"}${squadText}</small><button class="btn sm line hidep" data-act="hidepanel" title="Hide the task list to give the map the whole window">Hide ▸</button></span></h2>
     <div class="row"><button class="btn" data-act="scan" title="Read your task list from in-game screenshots">📷 Scan tasks</button>${renderAddTaskBox()}</div>
     ${banner}
     <div class="tabs"><button data-tab="tasks" aria-pressed="${tab === "tasks"}">Tasks</button><button data-tab="bring" aria-pressed="${tab === "bring"}">Bring list${missingCount ? ` <span class="bang">${missingCount}</span>` : ""}</button></div></div>`;
@@ -167,6 +163,7 @@ const PANEL_BUTTONS_BY_ATTRIBUTE = [
   ["data-have", onBagStepClicked],
   ["data-squad-drawings", onFriendDrawingsToggled],
   ["data-squad-tasks", onFriendTasksToggled],
+  ["data-squad-position", onFriendPositionToggled],
 ];
 
 const ANY_PANEL_BUTTON = "[data-act]," + PANEL_BUTTONS_BY_ATTRIBUTE.map(([attribute]) => `[${attribute}]`).join(",");
@@ -186,12 +183,11 @@ function onTabClicked(button) {
 }
 
 /**
- * A click anywhere in the panel: AI Categorize first, then the nearest button with one of the
+ * A click anywhere in the panel: the nearest button with one of the
  * attributes above.
  * @param {MouseEvent} event
  */
 function onPanelClicked(event) {
-  if (onAiCategorizeClicked(event)) return;
   const button = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest(ANY_PANEL_BUTTON));
   if (!button) return;
   for (const [attribute, handler] of PANEL_BUTTONS_BY_ATTRIBUTE) {
@@ -218,7 +214,6 @@ function onPanelChanged(event) {
   if (field.hasAttribute("data-subfloor")) return onFloorChanged(/** @type {any} */ (field));
   if (field.hasAttribute("data-catcolor")) return onCategoryColorChanged(field);
   if (field.id === "addtask") addTaskByName(field.value);
-  if (field.id === "aiscope") onAiScopeChanged(/** @type {any} */ (field));
 }
 
 /**
@@ -236,7 +231,6 @@ function onPanelInput(event) {
  * @param {KeyboardEvent} event
  */
 function onPanelKeyDown(event) {
-  if (onAiCategorizeKeyDown(event)) return;
   if (event.key !== "Enter") return;
   const field = /** @type {HTMLInputElement} */ (event.target);
   if (field.dataset.addsub !== undefined) onAddBoxEnter(field);

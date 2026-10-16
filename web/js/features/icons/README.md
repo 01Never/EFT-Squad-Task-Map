@@ -26,7 +26,7 @@ icon (not "the item may be here" spots, not sub-task pins, not friends' markers)
 - `showsItemIcons(saved)`: `saved.taskIcons !== false`.
 - Drawing (`web/js/map/markers.js`, `drawItemIconSpot`): the tile is the shape's size plus 3 SVG
   units (a 64 px icon stays readable), drawn where the shape would be, so the badges keep their
-  corners (! top left, floor top right, split bottom right, squad dots bottom left). Not-ready
+  corners (! top left, floor top right, split bottom right, squad squares bottom centre). Not-ready
   fading, selection scale and flash, popup and tap area are the marker's, unchanged. Nothing is
   animated.
 - **Failure:** when the picture can't load (`error` event), the tile is replaced by the category

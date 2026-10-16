@@ -21,12 +21,12 @@ Project: **Squad Task Map, local edition.** It's a Windows desktop helper for Es
 - Test: `go test ./...` (server) and `npm test` (page logic, `node --test`).
 - Build: `go build -trimpath -ldflags "-s -w" -o dist/SquadTaskMap.exe .` (icon and version info from `rsrc_windows_amd64.syso`, made from `winres/`).
 - Use a scratch `STM_DATA_DIR` while developing, so the owner's real `squad-task-map-data.json` isn't touched.
-- Offline stand-ins: `go run ./cmd/mock` (port 7820) fakes json.tarkov.dev, OpenAI and the wiki. Point the app at it with `STM_JSON_BASE`, `STM_OPENAI_API`, `STM_WIKI_API`; `STM_LOGS_DIR` and `STM_SCREENSHOTS_DIR` override the game folders.
+- Offline stand-ins: `go run ./cmd/mock` (port 7820) fakes json.tarkov.dev and OpenAI. Point the app at it with `STM_JSON_BASE` and `STM_OPENAI_API`; `STM_LOGS_DIR` and `STM_SCREENSHOTS_DIR` override the game folders.
 
 ## Layout
 - Root: only `README.md` (GitHub landing page), `CLAUDE.md`, the Go entry files and build files. Docs live in `docs/` (`USER-GUIDE.md` is the player manual).
 - `main.go`, `embed.go` (files built into the exe), `internal/app` (creates and connects every feature: read first).
-- `internal/features/<name>/` (gamelog, raid, gps, taskscan, aicategorize, updates, …): one folder per feature, `rules.go` for the logic, a README each.
+- `internal/features/<name>/` (gamelog, raid, gps, taskscan, extracts, squad, updates, …): one folder per feature, `rules.go` for the logic, a README each.
 - `internal/` infrastructure: `httpapi` (routes), `events` (SSE + pending queue), `storage` (files next to the exe), `gamedata` (download/cache/convert), `gamefolders`, `screenshots`, `openai`.
 - `web/js/`: `main.js` (start-up), `app/` (saved data, API, live-event router, types), `map/` (view, projection, layer order), `panel/` (panel shell), `features/<name>/` (`rules.js` + `*.test.js`, `panel.js`, `map-layer.js`, CSS, README). `web/css/base.css` holds the shared colour variables.
 - `assets/`: map SVGs, `maps-config.json`, bundled game-data snapshot, fonts. `testdata/`: fixtures and v2 golden outputs. `cmd/mock`: offline stand-ins.
@@ -40,7 +40,7 @@ Project: **Squad Task Map, local edition.** It's a Windows desktop helper for Es
 ## Conventions
 - Follow `docs/CODE-STYLE.md`: readable over concise, rules separate from I/O, a README per feature, tests that read like the rules.
 - Pure logic in DOM-free modules with tests (`node --test` for JS, `go test` for Go). UI in `web/js/`.
-- Styling follows tarkov.dev (see existing CSS variables in `web/index.html`). Markers are fully opaque except the two cases in SPEC §7.3.
+- Styling follows tarkov.dev (see existing CSS variables in `web/index.html`). Markers are fully opaque except the four cases in SPEC §7.3.
 - Saved-state changes need a migration (SPEC §5.3, §12).
 
 ## Working with agents

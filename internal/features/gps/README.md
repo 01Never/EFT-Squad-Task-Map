@@ -50,12 +50,19 @@ screenshot file → screenshots.Watcher (OS file notification, settled ~0.8 s)
                     → hub.Broadcast "gps" {gps: {map, x, y, z, yaw, t}, trail: [{x, z, t}, …]}
                     → live.js → find-me: onNewPosition() → renderPlayer() → renderClosestExtract()
                       → moveViewForNewPosition()
+                    → app.shareMyPosition (ticket 17): on a known map, while in a squad
+                      → squad.SetMyPosition → my squad share's "pos" {map, x, y, z, yaw, t}
+                      → friends' copies (only while "Share my position" is on)
+raid end (log)    → app.endRaid → gps.Tracker.Clear() and squad.ClearMyPosition()
+raid on another map (log: map loading, raid start) → squad.ClearMyPositionIfFromAnotherMap
 ```
 `/api/status` also returns `gps` and `trail`, so a page opened later shows the last position.
+The squad's rules for the shared position are in `internal/features/squad/README.md`.
 
-**Saved data / settings:** nothing saved; the last position and the trail live in memory. The
-page's `followPosition` and `autoCenter` settings decide what the page does with a position (see
-the find-me README).
+**Saved data / settings:** nothing saved; the last position and the trail live in memory (and so
+does the copy in your squad share: it is dropped at a restart). The page's `followPosition` and
+`autoCenter` settings decide what the page does with a position (see the find-me README); the
+squad's `sharePosition` decides whether friends get it.
 
 **Files:**
 - `rules.go`: `ParseFileName`, `IsGPSFileName`, `IsImageFile`, `YawFromQuaternion`.

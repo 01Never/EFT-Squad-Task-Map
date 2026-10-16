@@ -10,6 +10,10 @@ import (
 // Settings are the user's choices, saved in squad-task-map-settings.json.
 // The OpenAI key is kept here in plain text and is only ever sent to api.openai.com.
 type Settings struct {
+	// Format number of this file (see settings_migrations.go). 0 = not set: a file without it is
+	// version 1; settings written for the first time get the current number.
+	SettingsVersion int `json:"settingsVersion,omitempty"`
+
 	OpenAIKey       string `json:"openaiKey,omitempty"`
 	OpenAIModel     string `json:"openaiModel,omitempty"`
 	OpenAIEffort    string `json:"openaiEffort,omitempty"`
@@ -24,8 +28,9 @@ type Settings struct {
 	ReadExtracts       *bool `json:"readExtracts,omitempty"`
 	ExtractsNoticeSeen bool  `json:"extractsNoticeSeen,omitempty"` // the one-time "what's sent" notice was shown
 
-	// Squad (ticket 05): your player id, name, colour, "Share my tasks", and whether you joined.
-	// Never the invite code. nil until the squad feature first saves it.
+	// Squad (ticket 05): your player id, name, colour, "Share my tasks", "Share my position"
+	// (ticket 17), and whether you joined. Never the invite code. nil until the squad feature first
+	// saves it.
 	Squad *SquadSettings `json:"squad,omitempty"`
 
 	// Fields this version doesn't know about, kept so an older or newer version's settings survive a save.
@@ -34,19 +39,32 @@ type Settings struct {
 
 // SquadSettings is the "squad" block of the settings file (ticket 05).
 type SquadSettings struct {
-	PlayerID   string `json:"playerId,omitempty"`   // random, made once (16 hex characters)
-	Name       string `json:"name,omitempty"`       // shown to friends, 1 to 32 characters
-	Color      string `json:"color,omitempty"`      // "#rrggbb"
-	ShareTasks bool   `json:"shareTasks,omitempty"` // default off
-	Joined     bool   `json:"joined,omitempty"`     // in a squad: start the squad network at launch
+	PlayerID string `json:"playerId,omitempty"` // random, made once (16 hex characters)
+	Name     string `json:"name,omitempty"`     // shown to friends, 1 to 32 characters
+	Color    string `json:"color,omitempty"`    // "#rrggbb"
+
+	// "Share my tasks" and "Share my position" (ticket 17). nil (missing) = on, the default.
+	// The squad feature always writes both (true or false), so a player's "off" sticks.
+	ShareTasks    *bool `json:"shareTasks,omitempty"`
+	SharePosition *bool `json:"sharePosition,omitempty"`
+
+	Joined bool `json:"joined,omitempty"` // in a squad: start the squad network at launch
 
 	// Fields this version doesn't know about inside "squad", kept like the top-level ones.
 	extra map[string]json.RawMessage
 }
 
 var knownSquadSettingsFields = map[string]bool{
-	"playerId": true, "name": true, "color": true, "shareTasks": true, "joined": true,
+	"playerId": true, "name": true, "color": true, "shareTasks": true, "sharePosition": true,
+	"joined": true,
 }
+
+// IsShareTasksOn is true unless the player switched "Share my tasks" off (owner's decision,
+// ticket 17: on by default).
+func (s SquadSettings) IsShareTasksOn() bool { return s.ShareTasks == nil || *s.ShareTasks }
+
+// IsSharePositionOn is true unless the player switched "Share my position" off (ticket 17).
+func (s SquadSettings) IsSharePositionOn() bool { return s.SharePosition == nil || *s.SharePosition }
 
 // UnmarshalJSON reads the known squad fields and keeps the rest untouched.
 func (s *SquadSettings) UnmarshalJSON(data []byte) error {
@@ -132,7 +150,7 @@ func (s Settings) NeedsExtractsNotice() bool {
 var knownSettingsFields = map[string]bool{
 	"openaiKey": true, "openaiModel": true, "openaiEffort": true, "gameMode": true, "logsPath": true,
 	"screenshotsPath": true, "followPosition": true, "autoCenter": true, "squad": true,
-	"readExtracts": true, "extractsNoticeSeen": true,
+	"readExtracts": true, "extractsNoticeSeen": true, "settingsVersion": true,
 }
 
 // UnmarshalJSON reads the known fields and keeps the rest untouched.
@@ -171,22 +189,33 @@ func (s Settings) MarshalJSON() ([]byte, error) {
 	return json.Marshal(merged)
 }
 
-// ReadSettings loads the settings file; a missing or broken file gives empty settings.
+// ReadSettings loads the settings file and brings it up to the current format (MigrateSettings).
+// A missing or broken file gives empty settings at the current version, so a fresh install never
+// runs old migrations. When a migration changed something, the file is written back once and one
+// console line per change says what happened.
 // v1's TarkovTracker fields (tt…) are dropped on first start, since v2 doesn't use TarkovTracker.
 func ReadSettings(path string) Settings {
 	var settings Settings
 	data, err := os.ReadFile(path)
 	if err != nil || json.Unmarshal(data, &settings) != nil {
-		return Settings{extra: map[string]json.RawMessage{}}
+		return Settings{SettingsVersion: CurrentSettingsVersion, extra: map[string]json.RawMessage{}}
 	}
-	droppedAny := false
+	needsWrite := false
 	for key := range settings.extra {
 		if strings.HasPrefix(key, "tt") {
 			delete(settings.extra, key)
-			droppedAny = true
+			needsWrite = true
 		}
 	}
-	if droppedAny {
+	migrated, changes := MigrateSettings(settings)
+	if migrated.SettingsVersion != settings.SettingsVersion {
+		needsWrite = true
+	}
+	settings = migrated
+	for _, change := range changes {
+		fmt.Println("Settings: " + change)
+	}
+	if needsWrite {
 		_ = WriteSettings(path, settings)
 	}
 	return settings
@@ -194,6 +223,9 @@ func ReadSettings(path string) Settings {
 
 // WriteSettings saves the settings file (indented, like v2 did).
 func WriteSettings(path string, settings Settings) error {
+	if settings.SettingsVersion == 0 {
+		settings.SettingsVersion = CurrentSettingsVersion
+	}
 	compact, err := json.Marshal(settings)
 	if err != nil {
 		return fmt.Errorf("encoding settings: %w", err)

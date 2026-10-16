@@ -61,13 +61,12 @@ Safes, weapon boxes, PC blocks, jackets, filing cabinets and notable loose loot 
 ![Customs with the High value loot spots on](docs/images/loot.png)
 
 ### Squad
-Join friends with an invite code: a private Tailscale network is built into the exe, nothing else to install. See each other's drawings live, and, if you both choose, each other's tasks with "Also: Alice" and progress on the tasks you share.
+Join friends with an invite code: a private Tailscale network is built into the exe, nothing else to install. See each other's drawings live, each other's last position in a raid, and each other's tasks right in your task list: a colour box with the name of every friend who has a task, their progress, and their tasks you don't have yourself in the usual categories with a crosshatched background (you can open and pin those, not tick them).
 
-![A friend's drawing in their colour, and "Also: Alice" on a shared task](docs/images/squad.png)
+![A friend's drawing in their colour, their colour square under a task you share, and a task only they have, drawn see-through](docs/images/squad.png)
 
 ### And more
 - **Scan your task list:** screenshot the in-game Tasks screen, in the menus or in a raid, and an OpenAI vision model reads it, so your list matches the game exactly (optional, your own API key).
-- **AI Categorize:** sort tasks by plain-English instructions, checked against each task's wiki page (optional).
 - **Draw** on the map, **pin** tasks, add **sub-tasks**, and switch between game modes (PvP, PvE, PvP Season), each with its own task list.
 - **Check for updates** in Settings: signed releases from this repo, installed with one click.
 
@@ -75,7 +74,7 @@ The full manual is the **[user guide](docs/USER-GUIDE.md)**: setup, every featur
 
 ## Privacy
 
-The app contacts GitHub only when you click Check for updates. If you join a squad, your drawings (and your tasks, only if you turn that on) go directly to your friends' copies over a private Tailscale network; Tailscale relays traffic when two PCs can't connect directly but can't read it. Never joined, nothing of this runs. Everything else stays on your PC except downloads of game data (json.tarkov.dev), item icons (assets.tarkov.dev), wiki pages for AI Categorize, and, only if you add a key, requests to api.openai.com (the task scan's screenshots, AI Categorize, and **the first in-raid screenshot of each raid** so your extracts can be marked for you; that one can be turned off in Settings). Your OpenAI key stays in the settings file on your PC and is sent nowhere else. The app deletes only screenshots you confirmed in a scan, and the GPS screenshots of the raid that just ended.
+The app contacts GitHub only when you click Check for updates. If you join a squad, your drawings, your last in-raid position and your active tasks (the last two are on by default and can be switched off in Settings → Squad) go directly to your friends' copies over a private Tailscale network; Tailscale relays traffic when two PCs can't connect directly but can't read it. Never joined, nothing of this runs. Everything else stays on your PC except downloads of game data (json.tarkov.dev), item icons (assets.tarkov.dev), and, only if you add a key, requests to api.openai.com (the task scan's screenshots and **the first in-raid screenshot of each raid** so your extracts can be marked for you; that one can be turned off in Settings). Your OpenAI key stays in the settings file on your PC and is sent nowhere else. The app deletes only screenshots you confirmed in a scan, and the GPS screenshots of the raid that just ended.
 
 ## Building from source
 
@@ -91,7 +90,7 @@ go build -trimpath -ldflags "-s -w" -o dist/SquadTaskMap.exe .
 
 The icon and version info come from `rsrc_windows_amd64.syso`, made from `winres/` with `go-winres make --arch amd64 --out rsrc`.
 
-**Offline development:** `go run ./cmd/mock` serves stand-ins for json.tarkov.dev, OpenAI and the wiki on port 7820. Point the app at it with `STM_JSON_BASE=http://127.0.0.1:7820`, `STM_OPENAI_API=http://127.0.0.1:7820/v1` and `STM_WIKI_API=http://127.0.0.1:7820/wiki`. Use a scratch `STM_DATA_DIR` so your real data isn't touched. Other variables: `STM_LOGS_DIR`, `STM_SCREENSHOTS_DIR`, `STM_NO_BROWSER=1`, `PORT`, `STM_ASSETS_DIR`.
+**Offline development:** `go run ./cmd/mock` serves stand-ins for json.tarkov.dev and OpenAI on port 7820. Point the app at it with `STM_JSON_BASE=http://127.0.0.1:7820` and `STM_OPENAI_API=http://127.0.0.1:7820/v1`. Use a scratch `STM_DATA_DIR` so your real data isn't touched. Other variables: `STM_LOGS_DIR`, `STM_SCREENSHOTS_DIR`, `STM_NO_BROWSER=1`, `PORT`, `STM_ASSETS_DIR`.
 
 ### Where to start reading
 

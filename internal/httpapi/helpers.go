@@ -86,18 +86,3 @@ func optional(value string) *string {
 	}
 	return &value
 }
-
-func limitRunes(text string, limit int) string {
-	runes := []rune(text)
-	if len(runes) > limit {
-		return string(runes[:limit])
-	}
-	return text
-}
-
-func firstN[T any](list []T, n int) []T {
-	if len(list) > n {
-		return list[:n]
-	}
-	return list
-}

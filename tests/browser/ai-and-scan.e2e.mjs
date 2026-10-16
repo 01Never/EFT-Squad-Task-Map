@@ -1,11 +1,17 @@
-// The two OpenAI features, against the offline mock: AI Categorize and Scan tasks.
+// The two OpenAI features, against the offline mock: Scan tasks and the key dialog.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  browserSuite, withScenario, readFixture, stateWithTasks, taskNamed, taskNameOf, taskEntry, assertMatchesRecorded, OPENAI_TEST_KEY,
+  browserSuite, withScenario, readFixture, stateWithTasks, taskNamed, taskNameOf, taskEntry, assertMatchesRecorded, OPENAI_TEST_KEY, MOCK_PORT,
 } from "./harness.js";
 
 browserSuite();
+
+/** The mock's log line for the last OpenAI request of one kind ("responses model=… reasoning=…"). */
+async function lastOpenAIRequest(isWanted) {
+  const log = await (await fetch(`http://127.0.0.1:${MOCK_PORT}/log`)).json();
+  return log.filter((line) => line.startsWith("responses ") && isWanted(line)).at(-1);
+}
 
 const ballet = taskNamed("Ballet Lover");
 const audiophile = taskNamed("Audiophile");
@@ -13,18 +19,17 @@ const dandies = taskNamed("Dandies");
 const glory = taskNamed("Glory to CPSU");
 const shortage = taskNamed("Shortage");
 
-test("AI Categorize: add the key, ask, apply the answer and undo it", async (t) => {
-  // The mock moves every part with a key into a new "Key runs" category: here Ballet Lover (one
-  // part) and both parts of Audiophile. Revision and Glory to CPSU need no key.
-  const state = stateWithTasks([ballet.name, audiophile.name, "Revision - Streets of Tarkov", glory.name]);
-  const keyedParts = [ballet.id + ":*", audiophile.id + ":go", audiophile.id + ":retrieve"];
+test("OpenAI key: add it in Settings (a wrong one is refused), and no AI Categorize request is ever made", async (t) => {
+  const state = stateWithTasks([ballet.name, audiophile.name, glory.name]);
   await withScenario(t, { state }, async (s) => {
     const page = s.page;
     await s.openMap("streets-of-tarkov");
-    assert.match(await page.textContent("#panel .aihead"), /not set up/);
+    assert.equal(await page.locator("#panel .aihead, #panel #aitext, #panel [data-ai-act]").count(), 0, "the AI Categorize box is gone");
 
-    await page.click('#panel [data-ai-act="key"]');
+    await page.click("#settings");
+    await page.click("#sAI");
     await page.waitForSelector(".modal #aikey");
+    assert.equal(await page.locator(".modal #aieffort").count(), 0, "no reasoning effort choice");
     await page.fill("#aikey", "sk-wrong_1234567890abcdefghijkl");
     await s.answered("PUT", "/api/ai/key", () => page.click("#aisave"));
     await page.waitForFunction(() => {
@@ -42,41 +47,13 @@ test("AI Categorize: add the key, ask, apply the answer and undo it", async (t) 
     assert.match(await page.textContent(".modal"), /first in-raid screenshot of each raid/);
     await s.answered("PUT", "/api/settings", () => page.click("#exOn"));
     await page.waitForFunction(() => !document.querySelector(".modal"));
-    assert.match(await page.textContent("#panel .aihead .s"), /gpt-5\.4-mini/);
     const ai = (await s.status()).ai;
     assert.equal(ai.hasKey, true);
     assert.notEqual(ai.key, OPENAI_TEST_KEY, "the page never gets the whole key back");
     assertMatchesRecorded("ai-wrong-key-message", { refusal });
 
-    await page.fill("#aitext", "Make a category called Key runs for parts that need a key on this map");
-    await page.click('#panel [data-ai-act="send"]');
-    await page.waitForSelector("#panel .msg.bot[data-mi]", { timeout: 30_000 });
-    assert.match(await page.textContent("#panel .msg.bot[data-mi]"), /^Moved 3 parts that need keys\./);
-    const proposed = await page.$$eval("#panel .msg .ch li", (items) => items.map((item) => item.textContent));
-    assert.equal(proposed.length, keyedParts.length);
-    assert.ok(proposed.every((line) => /^(Ballet Lover|Audiophile)\b.*: .+ → Key runs/.test(line)), proposed.join("\n"));
-    assertMatchesRecorded("ai-proposed-changes", proposed);
-
-    await s.saving(() => page.click('#panel [data-ai-act="apply"]'));
-    await s.waitForToast("Applied 3 changes");
-    assert.equal(await page.textContent("#panel .msg .acts2 .ok"), "Applied 3 changes");
-    const keyRuns = s.savedState().cats.find((category) => category.name === "Key runs");
-    assert.ok(keyRuns, "a Key runs category was made");
-    assert.equal(keyRuns.color, "#4dabf7");
-    assert.equal(keyRuns.icon, "star");
-    const inKeyRuns = await page.$$eval(`#panel .cat[data-cat="${keyRuns.id}"] .task`, (rows) => rows.map((row) => row.dataset.part).sort());
-    assert.deepEqual(inKeyRuns, [...keyedParts].sort());
-    const saved = s.savedList();
-    for (const part of keyedParts) assert.deepEqual(saved.tasks[part.split(":")[0]].partCats[part], { cat: keyRuns.id, manual: true });
-
-    await s.saving(() => page.click('#panel [data-ai-act="undo"]'));
-    await s.waitForToast("Undone");
-    assert.match(await page.textContent("#panel .msg .acts2"), /Undone/);
-    const undone = s.savedState();
-    assert.equal(undone.cats.some((category) => category.name === "Key runs"), false, "the new category is gone");
-    assert.deepEqual(s.savedList().tasks[ballet.id].partCats, {});
-    assert.deepEqual(s.savedList().tasks[audiophile.id].partCats, {});
-    assert.equal(await page.locator(`#panel .cat[data-cat="${keyRuns.id}"]`).count(), 0);
+    const aiCategorizeRequests = s.requests.filter((line) => /\/api\/ai\/(categorize|job)/.test(line));
+    assert.deepEqual(aiCategorizeRequests, [], "the page never calls the removed AI Categorize endpoints");
   });
 });
 
@@ -124,6 +101,11 @@ test("Scan: captured screenshots are read, confirming replaces the list and dele
     assert.equal(review.button, "Update list & delete 1 screenshot");
     assert.equal(review.note, "Read 8 rows from 1 screenshot. New tasks are added. Tasks on your list that aren't in these screenshots are removed.");
     assert.equal(review.spellingFixed, 1, "“Seizing the Initative” is matched with its spelling fixed");
+    assert.match(
+      await lastOpenAIRequest((line) => line.includes("vision=true") && !line.includes("extracts=true")),
+      /^responses model=gpt-6-luna vision=true reasoning=\{"effort":"low"\} /,
+      "the scan uses the default model and still asks for low reasoning",
+    );
     assertMatchesRecorded("scan-review", review);
 
     await s.saving(() => page.click("#rvok"));

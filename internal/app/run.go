@@ -26,7 +26,7 @@ import (
 )
 
 // Version is the app's version, shown in Settings and used by "Check for updates".
-const Version = "2.9.0"
+const Version = "2.10.0"
 
 // The page is served on the first free port from 7777 (PORT overrides the start) up to 7800.
 const (
@@ -53,7 +53,6 @@ func Run(builtIn fs.FS) error {
 		return nil
 	}
 
-	loadMapNames(assets)
 	app := newApp(Version, updatedFrom, files, builtInGameData(builtIn))
 	app.gameData.Start(app.currentSettings().GameModeOrDefault())
 
@@ -129,24 +128,6 @@ func builtInGameData(builtIn fs.FS) func() (gamedata.GameData, error) {
 			}
 		})
 		return converted, err
-	}
-}
-
-// loadMapNames reads each map's display name from assets/maps-config.json (for AI Categorize).
-func loadMapNames(assets fs.FS) {
-	data, err := fs.ReadFile(assets, "assets/maps-config.json")
-	if err != nil {
-		return
-	}
-	var maps []struct {
-		Key  string `json:"key"`
-		Name string `json:"name"`
-	}
-	if json.Unmarshal(data, &maps) != nil {
-		return
-	}
-	for _, info := range maps {
-		mapDisplayNames[info.Key] = info.Name
 	}
 }
 

@@ -205,9 +205,12 @@ test("selecting a row highlights it and flashes its markers; a marker click sele
       });
     });
     for (const ring of rings) assert.deepEqual(ring, { onMap: true, animations: "halo infinite / wave infinite" }, "each selected marker flashes, on the map");
+    // Clicking a row selects it where it is (the list scrolls only for a marker click), and the row
+    // opens downwards, so check that its top line is in view (its opened details may reach just
+    // past the panel's edge, depending on how tall the section above is).
     const rowBox = await page.locator("#panel .task.sel .trow-wrap").boundingBox();
     const panelBox = await page.locator("#panel").boundingBox();
-    assert.ok(rowBox.y >= panelBox.y && rowBox.y + rowBox.height <= panelBox.y + panelBox.height, "the selected row is in view");
+    assert.ok(rowBox.y >= panelBox.y && rowBox.y < panelBox.y + panelBox.height, "the selected row is in view");
 
     await page.keyboard.press("Escape");
     assert.deepEqual(await selection(), { rows: [], rings: 0, popup: null }, "Esc deselects");
@@ -391,7 +394,15 @@ test("switching game mode in Settings shows that mode's list on the map; switchi
       await page.click("#settings");
       await page.waitForSelector(".modal #sSave");
       await page.selectOption("#sMode", mode);
+      // The new mode's game data arrives a moment later (a "data" event: GET /api/data, then
+      // /api/status, then the page redraws). Wait for that redraw, or it can wipe what the test
+      // types next into the add-a-task box.
+      const isGet = (pathname) => (response) => response.request().method() === "GET" && new URL(response.url()).pathname === pathname;
+      const dataReloaded = page.waitForResponse(isGet("/api/data"), { timeout: 15_000 })
+        .then(() => page.waitForResponse(isGet("/api/status"), { timeout: 15_000 }));
       await s.answered("PUT", "/api/settings", () => page.click("#sSave"));
+      await dataReloaded;
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       await page.waitForFunction((hash) => location.hash === hash, `#/${mode}/map/streets-of-tarkov`);
       await s.waitForMap("streets-of-tarkov");
     };

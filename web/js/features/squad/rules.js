@@ -1,7 +1,8 @@
 // @ts-check
-// Squad (page side): what to share, who shows, and every text about friends. Plain functions
-// only: no DOM, no network. Everything a friend sends is untrusted: names are escaped where they
-// are drawn, and colours go through safeFriendColor() before they reach a style or an SVG attribute.
+// Squad (page side): what to share, who shows, friends' positions, and every text about friends.
+// Plain functions only: no DOM, no network. Everything a friend sends is untrusted: names are
+// escaped where they are drawn, colours go through safeFriendColor() and positions through
+// friendPositionOf() before they reach a style or an SVG attribute.
 // The server's contract is internal/features/squad/README.md.
 import {
   partsOfTask,
@@ -14,10 +15,15 @@ import {
   tickTarget,
   isObjectiveDone,
 } from "../tasks/rules.js";
+import { defaultCategoryOfPart } from "../tasks/categories.js";
 import { taskListOf } from "../../app/saved-data.js";
 import { GAME_MODE_NAMES } from "../../app/game-modes.js";
+import { timeAgo } from "../settings/rules.js";
 
-/** @import { SavedState, TaskList, Task, Part, Stroke, SquadView, SquadFriend, MyShare, FriendPrefs } from "../../app/types.js" */
+/**
+ * @import { SavedState, TaskList, Task, Part, PartOnMap, Stroke, SquadView, SquadFriend, MyShare,
+ *   FriendPrefs, FriendPosition } from "../../app/types.js"
+ */
 
 // ---------------------------------------------------------------- numbers the server enforces
 
@@ -141,13 +147,16 @@ export function friendStatusText(friend, nowMs) {
 
 // ---------------------------------------------------------------- what you choose per friend
 
-// Drawings are shown by default (that is why you joined); tasks only after you switch them on.
+// Drawings and tasks are both shown by default (that is why you joined). Tasks were off by
+// default before ticket 26; the owner chose on. A saved "off" stays off. Positions are shown by
+// default too (ticket 17, owner's decision).
 /** @type {FriendPrefs} */
-const DEFAULT_FRIEND_PREFS = Object.freeze({ drawings: true, tasks: false });
+const DEFAULT_FRIEND_PREFS = Object.freeze({ drawings: true, tasks: true, position: true });
 
 /**
- * Your two choices for a friend. A saved file without a `squad` block (every file before 2.7.0)
- * simply gets the defaults; nothing is written until you change a toggle.
+ * Your three choices for a friend. A saved file without a `squad` block (every file before 2.7.0)
+ * simply gets the defaults; nothing is written until you change a toggle. A friend saved before
+ * ticket 17 has no `position` and gets its default (on): that is this field's migration.
  * @param {SavedState} saved
  * @param {string} playerId
  * @returns {FriendPrefs}
@@ -155,16 +164,27 @@ const DEFAULT_FRIEND_PREFS = Object.freeze({ drawings: true, tasks: false });
 export function friendPrefsOf(saved, playerId) {
   const stored = ownValue(saved.squad && saved.squad.friends, playerId);
   return {
-    drawings: stored && typeof stored.drawings === "boolean" ? stored.drawings : DEFAULT_FRIEND_PREFS.drawings,
-    tasks: stored && typeof stored.tasks === "boolean" ? stored.tasks : DEFAULT_FRIEND_PREFS.tasks,
+    drawings: savedChoiceOr(stored, "drawings"),
+    tasks: savedChoiceOr(stored, "tasks"),
+    position: savedChoiceOr(stored, "position"),
   };
+}
+
+/**
+ * One saved choice, or its default when it isn't saved (or isn't true/false).
+ * @param {any} stored the friend's saved choices, if any
+ * @param {keyof FriendPrefs} choice
+ */
+function savedChoiceOr(stored, choice) {
+  const value = ownValue(stored, choice);
+  return typeof value === "boolean" ? value : DEFAULT_FRIEND_PREFS[choice];
 }
 
 /**
  * Remember one choice for a friend, creating the `squad` block the first time.
  * @param {SavedState} saved
  * @param {string} playerId
- * @param {"drawings" | "tasks"} choice
+ * @param {keyof FriendPrefs} choice
  * @param {boolean} isOn
  */
 export function setFriendPref(saved, playerId, choice, isOn) {
@@ -292,12 +312,29 @@ export function friendsAlsoDoing(taskId, friendsWithTasks) {
 }
 
 /**
- * "Also: Mike, Sam", or "" when nobody is.
+ * "Also: Mike, Sam", or "" when nobody is. (Plain-text form; since ticket 26 the page shows
+ * friendBoxes() instead.)
  * @param {SquadFriend[]} friends
  */
 export function alsoText(friends) {
   if (!friends.length) return "";
   return "Also: " + friends.map((friend) => friendDisplayName(friend.name)).join(", ");
+}
+
+/**
+ * Who has this task, as a row and the popup show it (ticket 26): a colour box and a name for
+ * each shown friend who has it active, in the order of the friends. The colour passed
+ * safeFriendColor() and the name friendDisplayName() (escape it where it goes into HTML).
+ * @param {string} taskId
+ * @param {SquadFriend[]} friendsWithTasks friendsWithTasksOn(): shown and sharing, your game mode
+ * @returns {{ playerId: string, name: string, color: string }[]}
+ */
+export function friendBoxes(taskId, friendsWithTasks) {
+  return friendsAlsoDoing(taskId, friendsWithTasks).map((friend) => ({
+    playerId: friend.playerId,
+    name: friendDisplayName(friend.name),
+    color: safeFriendColor(friend.color),
+  }));
 }
 
 /**
@@ -359,7 +396,8 @@ function ticksOfSharedTask(sharedTask) {
 /**
  * What one friend has that you don't: their active tasks that exist in your game data, aren't on
  * your own list (of the game mode you're shown), and have something on this map. Nothing when
- * their tasks are for another game mode. Shown read-only; they never touch your list.
+ * their tasks are for another game mode. Shown read-only (markers, and rows of your list through
+ * friendOnlyRowsOnMap); they are never put on your list.
  * @param {SquadFriend} friend
  * @param {SavedState} saved
  * @param {string} myMode
@@ -397,12 +435,297 @@ export function openPartsOnMap(task, friendTicks, mapKey) {
 }
 
 /**
+ * Squadmates' tasks in your task list (ticket 26): the rows for tasks that only shown friends
+ * have (active in their share, in your game data, not active on your list of the game mode you're
+ * shown), one per part that is on this map and still open for at least one of them. Each part is
+ * in the category the default rules give it (your own moves never apply), split by kind of work
+ * as a new task would be, and pinned when you pinned the task. They are marked `notMine`: you can
+ * look at them and pin them, not work them. A pin is kept even when no friend has the task any
+ * more; then there's no row.
+ * @param {SquadFriend[]} friendsWithTasks friendsWithTasksOn(): shown and sharing, your game mode
+ * @param {SavedState} saved
+ * @param {string} myMode the game mode you're shown
+ * @param {Record<string, Task>} taskById
+ * @param {string} mapKey
+ * @returns {PartOnMap[]} in task-name order, parts in task order
+ */
+export function friendOnlyRowsOnMap(friendsWithTasks, saved, myMode, taskById, mapKey) {
+  /** @type {Map<string, { task: Task, parts: Map<string, Part> }>} */
+  const openPartsByTask = new Map();
+  for (const friend of friendsWithTasks) {
+    for (const { task, ticks } of friendsOwnTasksOnMap(friend, saved, myMode, taskById, mapKey)) {
+      const found = openPartsByTask.get(task.id) || { task, parts: new Map() };
+      for (const part of openPartsOnMap(task, ticks, mapKey)) found.parts.set(part.key, part);
+      openPartsByTask.set(task.id, found);
+    }
+  }
+  const myList = taskListOf(saved, myMode);
+  /** @type {PartOnMap[]} */
+  const rows = [];
+  for (const { task, parts } of openPartsByTask.values()) {
+    const entry = ownValue(myList.tasks, task.id);
+    const isPinned = !!(entry && entry.pinned);
+    const partsInTaskOrder = [...parts.values()].sort((first, second) => first.index - second.index);
+    for (const part of partsInTaskOrder) {
+      const cat = defaultCategoryOfPart(saved, part);
+      rows.push({ task, part, cat, done: false, pinned: isPinned, notMine: true });
+    }
+  }
+  return rows.sort((first, second) => first.task.name.localeCompare(second.task.name));
+}
+
+/**
  * The whole task's progress in whole percent, from a set of ticks.
  * @param {Task} task
  * @param {Record<string, true | number>} ticks
  */
 function wholeTaskPercent(task, ticks) {
   return partProgressPercent(partsOfTask(task, true)[0], ticks);
+}
+
+// ---------------------------------------------------------------- squadmates on the markers
+
+// Under a marker there is room for this many friend squares; more friends show as "+N" after
+// them (owner, ticket 27 mock review).
+export const MAX_SQUAD_SQUARES_ON_MARKER = 4;
+
+/**
+ * The squares under a marker: the colours (safeFriendColor) of the first friends who have the
+ * task, in the friends' (chips') order, and how many more there are for the "+N".
+ * @param {SquadFriend[]} friendsWithTask friendsAlsoDoing() for the marker's task
+ * @returns {{ colors: string[], moreCount: number }}
+ */
+export function squadSquaresOf(friendsWithTask) {
+  const colors = [];
+  for (const friend of friendsWithTask.slice(0, MAX_SQUAD_SQUARES_ON_MARKER)) {
+    colors.push(safeFriendColor(friend.color));
+  }
+  const moreCount = Math.max(0, friendsWithTask.length - MAX_SQUAD_SQUARES_ON_MARKER);
+  return { colors, moreCount };
+}
+
+/**
+ * Which of a part's spots on this map is its main spot, the one that gets the squad squares
+ * (ticket 27: one set of squares per part, not one per spot): the first exact spot; when the
+ * part has only possible spots, the possible spot nearest the middle (average) of all its spots.
+ * -1 when there are no spots.
+ * Example: a quest item with five possible spots → the one closest to the middle of the five.
+ * @param {{ x: number, y: number, kind: string }[]} spots the part's spots on this map, in order
+ * @returns {number} an index into `spots`
+ */
+export function mainSpotIndex(spots) {
+  const firstExact = spots.findIndex((spot) => spot.kind === "exact");
+  if (firstExact >= 0) return firstExact;
+  if (!spots.length) return -1;
+  const middleX = spots.reduce((sum, spot) => sum + spot.x, 0) / spots.length;
+  const middleY = spots.reduce((sum, spot) => sum + spot.y, 0) / spots.length;
+  let nearestIndex = -1;
+  let nearestDistance = Infinity;
+  spots.forEach((spot, index) => {
+    if (spot.kind !== "possible") return;
+    const distance = Math.hypot(spot.x - middleX, spot.y - middleY);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestIndex = index;
+    }
+  });
+  return nearestIndex;
+}
+
+/**
+ * What the squad adds to one task marker (ticket 27). A squadmate's task you don't have
+ * (`notMine`) is drawn like yours but see-through (SPEC §7.3, the third case). The part's main
+ * spot gets a square per friend who has the task (up to four, then "+N"); other spots get none.
+ * @param {PartOnMap} row the marker's row
+ * @param {SquadFriend[]} friendsWithTask friendsAlsoDoing() for the row's task
+ * @param {boolean} isMainSpot mainSpotIndex() picked this marker's spot
+ * @returns {{ isSeeThrough: boolean, squares: { colors: string[], moreCount: number } | null }}
+ */
+export function squadMarkerLook(row, friendsWithTask, isMainSpot) {
+  const isSeeThrough = !!row.notMine;
+  if (!isMainSpot || !friendsWithTask.length) return { isSeeThrough, squares: null };
+  return { isSeeThrough, squares: squadSquaresOf(friendsWithTask) };
+}
+
+/**
+ * The ticks a squadmate's task you don't have is drawn with: an objective counts as done only
+ * when every friend who has the task has done it, so its spot shows while anyone still needs it.
+ * (A count is the lowest of theirs; `true` beats any count.)
+ * @param {string} taskId
+ * @param {SquadFriend[]} friendsWithTask friendsAlsoDoing() for the task
+ * @returns {Record<string, true | number>}
+ */
+export function squadTicksOfTask(taskId, friendsWithTask) {
+  const ticksOfEach = friendsWithTask.map((friend) => ticksOfSharedTask(ownValue(sharedTasksOf(friend), taskId)));
+  if (!ticksOfEach.length) return {};
+  /** @type {Record<string, true | number>} */
+  const together = {};
+  for (const objectiveId of Object.keys(ticksOfEach[0])) {
+    if (!GAME_ID.test(objectiveId)) continue; // only game ids (never "__proto__")
+    const values = ticksOfEach.map((ticks) => ownValue(ticks, objectiveId));
+    if (values.some((value) => value !== true && typeof value !== "number")) continue;
+    const counts = values.filter((value) => typeof value === "number");
+    together[objectiveId] = counts.length ? Math.min(...counts) : true;
+  }
+  return together;
+}
+
+// ---------------------------------------------------------------- friends' positions (ticket 17)
+
+// Owner's decision (issue #17): a friend's position is fully opaque for 5 minutes, then drawn half
+// see-through, and not drawn at all once it is over 30 minutes old. (Their copy also clears it when
+// their raid ends or they change maps.) It moves only when they take a screenshot.
+export const FRIEND_POSITION_FADES_AFTER_MS = 5 * MINUTE_MS;
+export const FRIEND_POSITION_GOES_AFTER_MS = 30 * MINUTE_MS;
+
+// The page redraws friends' positions with one one-shot timer at the next fade or hide moment.
+// Never sooner than this (so an odd time from a friend can't make it spin), never later than
+// the longest wait a browser timer takes (about 24.8 days; a longer one fires at once).
+const MIN_POSITION_REFRESH_DELAY_MS = 1000;
+const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
+
+/**
+ * A friend's position as the page uses it: `{map, x, y, z, yaw, t}` with a map key the server
+ * accepts and finite numbers (coordinates within ±1e6 like a stroke's), or null when there is
+ * none or it isn't shaped like that. Read with own-property lookups: a friend can send anything.
+ * @param {SquadFriend} friend
+ * @returns {FriendPosition | null}
+ */
+export function friendPositionOf(friend) {
+  const position = ownValue(ownValue(friend, "share"), "pos");
+  if (!position || typeof position !== "object" || Array.isArray(position)) return null;
+  const map = ownValue(position, "map");
+  if (typeof map !== "string" || !SAFE_ID.test(map)) return null;
+  const x = ownValue(position, "x");
+  const y = ownValue(position, "y");
+  const z = ownValue(position, "z");
+  const yaw = ownValue(position, "yaw");
+  const t = ownValue(position, "t");
+  const isUsableNumber = (value) => isNumberWithin(value, -MAX_COORDINATE, MAX_COORDINATE);
+  const areCoordinatesUsable = [x, y, z, yaw].every(isUsableNumber);
+  if (!areCoordinatesUsable || typeof t !== "number" || !Number.isFinite(t)) return null;
+  return { map, x, y, z, yaw, t };
+}
+
+/**
+ * How a position is drawn for its age: "fresh" (up to 5 min: fully opaque), "faded" (over 5 min:
+ * half see-through) or "gone" (over 30 min: not drawn). A friend's clock can be a little ahead of
+ * yours, so an age below 0 counts as 0.
+ * @param {FriendPosition} position
+ * @param {number} nowMs
+ * @returns {"fresh" | "faded" | "gone"}
+ */
+export function friendPositionLook(position, nowMs) {
+  const ageMs = Math.max(0, nowMs - position.t);
+  if (ageMs <= FRIEND_POSITION_FADES_AFTER_MS) return "fresh";
+  if (ageMs <= FRIEND_POSITION_GOES_AFTER_MS) return "faded";
+  return "gone";
+}
+
+/**
+ * A friend's position when it is recent enough to show (30 minutes or less), else null.
+ * @param {SquadFriend} friend
+ * @param {number} nowMs
+ * @returns {FriendPosition | null}
+ */
+export function currentFriendPosition(friend, nowMs) {
+  const position = friendPositionOf(friend);
+  if (!position || friendPositionLook(position, nowMs) === "gone") return null;
+  return position;
+}
+
+/**
+ * The friends to draw on this map: their ◎ Pos switch is on, and their current position is on
+ * this map. Each with whether it is faded (over 5 minutes old).
+ * @param {SquadFriend[]} friends
+ * @param {SavedState} saved
+ * @param {string} mapKey the open map
+ * @param {number} nowMs
+ * @returns {{ friend: SquadFriend, position: FriendPosition, isFaded: boolean }[]}
+ */
+export function friendPositionsOnMap(friends, saved, mapKey, nowMs) {
+  const shown = [];
+  for (const friend of friends) {
+    if (!friendPrefsOf(saved, friend.playerId).position) continue;
+    const position = currentFriendPosition(friend, nowMs);
+    if (!position || position.map !== mapKey) continue;
+    shown.push({ friend, position, isFaded: friendPositionLook(position, nowMs) === "faded" });
+  }
+  return shown;
+}
+
+/**
+ * "on Customs" for a friend's chip: their ◎ Pos switch is on and their current position is on
+ * another map than the open one. "" otherwise, and for a map key the maps config doesn't name.
+ * @param {SquadFriend} friend
+ * @param {SavedState} saved
+ * @param {string | null} mapKey the open map
+ * @param {Record<string, string>} mapNameByKey display names from maps-config.json
+ * @param {number} nowMs
+ */
+export function friendElsewhereText(friend, saved, mapKey, mapNameByKey, nowMs) {
+  if (!friendPrefsOf(saved, friend.playerId).position) return "";
+  const position = currentFriendPosition(friend, nowMs);
+  if (!position || position.map === mapKey) return "";
+  const mapName = ownValue(mapNameByKey, position.map);
+  return typeof mapName === "string" && mapName ? `on ${mapName}` : "";
+}
+
+/**
+ * The tooltip on a friend's marker: "Mike · 2 min ago". Worked out when you point at the marker,
+ * so it is never a stale "just now".
+ * @param {SquadFriend} friend
+ * @param {FriendPosition} position
+ * @param {number} nowMs
+ */
+export function friendPositionTooltip(friend, position, nowMs) {
+  return `${friendDisplayName(friend.name)} · ${timeAgo(position.t, nowMs)}`;
+}
+
+/**
+ * How long until any friend's position next changes how it looks (fades at 5 min, goes at
+ * 30 min), so the page can redraw then with one one-shot timer instead of a loop. Every friend
+ * with a current position counts, on any map and whatever their switch: their chip changes too
+ * ("on Customs", the dimmed ◎ Pos). Null when nothing will change.
+ * @param {SquadFriend[]} friends
+ * @param {number} nowMs
+ * @returns {number | null} ms to wait, at least 1 s and at most what a browser timer takes
+ */
+export function msUntilNextFriendPositionChange(friends, nowMs) {
+  let nextChangeMs = null;
+  for (const friend of friends) {
+    const position = friendPositionOf(friend);
+    if (!position) continue;
+    const changeMs = nextLookChangeAt(position, nowMs);
+    if (changeMs === null) continue;
+    if (nextChangeMs === null || changeMs < nextChangeMs) nextChangeMs = changeMs;
+  }
+  if (nextChangeMs === null) return null;
+  const waitMs = Math.ceil(nextChangeMs - nowMs);
+  return Math.min(Math.max(waitMs, MIN_POSITION_REFRESH_DELAY_MS), MAX_TIMER_DELAY_MS);
+}
+
+/**
+ * The first moment (ms since 1970) a position looks different from now, or null once it is gone.
+ * @param {FriendPosition} position
+ * @param {number} nowMs
+ */
+function nextLookChangeAt(position, nowMs) {
+  const look = friendPositionLook(position, nowMs);
+  if (look === "fresh") return position.t + FRIEND_POSITION_FADES_AFTER_MS + 1;
+  if (look === "faded") return position.t + FRIEND_POSITION_GOES_AFTER_MS + 1;
+  return null;
+}
+
+/**
+ * What a friend's chip shows about their position: the map of their current position, or "".
+ * Two views with the same text need no new chips.
+ * @param {SquadFriend} friend
+ * @param {number} nowMs
+ */
+function positionShownOnChip(friend, nowMs) {
+  const position = currentFriendPosition(friend, nowMs);
+  return position ? position.map : "";
 }
 
 // ---------------------------------------------------------------- my share
@@ -535,10 +858,13 @@ export function shouldSendShareAtStart(view) {
 
 /**
  * @typedef {object} SquadChange What a new `squad` event changed.
- * @property {boolean} chipsChanged someone's name, colour, online state (or "last seen"), or who is in the squad
+ * @property {boolean} chipsChanged someone's name, colour, online state (or "last seen"), the map
+ *   of their current position, or who is in the squad
  * @property {boolean} settingsChanged the status line, or your own profile / settings
  * @property {string[]} drawingsChanged friends whose strokes on the open map (or colour) changed
  * @property {string[]} tasksChanged friends whose shared tasks, name or colour changed
+ * @property {string[]} positionsChanged friends whose position on the open map (or name or colour)
+ *   changed, or who came to this map or left it
  */
 
 /**
@@ -547,17 +873,28 @@ export function shouldSendShareAtStart(view) {
  * @param {SquadView | null} before
  * @param {SquadView} after
  * @param {string | null} mapKey the open map, or null
+ * @param {number} nowMs (a position over 30 minutes old counts as none)
  * @returns {SquadChange}
  */
-export function describeSquadChange(before, after, mapKey) {
+export function describeSquadChange(before, after, mapKey, nowMs) {
   if (!before) return everythingChanged(after, mapKey);
-  const change = { chipsChanged: false, settingsChanged: false, drawingsChanged: [], tasksChanged: [] };
+  /** @type {SquadChange} */
+  const change = {
+    chipsChanged: false,
+    settingsChanged: false,
+    drawingsChanged: [],
+    tasksChanged: [],
+    positionsChanged: [],
+  };
   const own = (view) => JSON.stringify([view.status, view.me, view.settings]);
   change.settingsChanged = own(before) !== own(after);
   const friendsBefore = new Map(before.friends.map((friend) => [friend.playerId, friend]));
   const friendsAfter = new Map(after.friends.map((friend) => [friend.playerId, friend]));
   for (const playerId of new Set([...friendsBefore.keys(), ...friendsAfter.keys()])) {
-    compareFriend(change, friendsBefore.get(playerId), friendsAfter.get(playerId), mapKey);
+    const friendBefore = friendsBefore.get(playerId);
+    const friendAfter = friendsAfter.get(playerId);
+    compareFriend(change, friendBefore, friendAfter, mapKey);
+    comparePositions(change, friendBefore, friendAfter, mapKey, nowMs);
   }
   return change;
 }
@@ -570,7 +907,40 @@ export function describeSquadChange(before, after, mapKey) {
  */
 function everythingChanged(after, mapKey) {
   const ids = after.friends.map((friend) => friend.playerId);
-  return { chipsChanged: true, settingsChanged: true, drawingsChanged: mapKey ? ids : [], tasksChanged: ids };
+  const onThisMap = mapKey ? ids : [];
+  return {
+    chipsChanged: true,
+    settingsChanged: true,
+    drawingsChanged: onThisMap,
+    tasksChanged: ids,
+    positionsChanged: onThisMap,
+  };
+}
+
+/**
+ * Add what differs about one friend's position to `change`: their marker on the open map is
+ * redrawn when it is (or was) on this map and the position, name or colour differ; their chip
+ * when the map it shows ("on Customs") differs. The position is compared itself, not the share's
+ * rev, so a position is never missed.
+ * @param {SquadChange} change
+ * @param {SquadFriend | undefined} before
+ * @param {SquadFriend | undefined} after
+ * @param {string | null} mapKey
+ * @param {number} nowMs
+ */
+function comparePositions(change, before, after, mapKey, nowMs) {
+  if (!before || !after) return; // a friend who came or left is redrawn whole (compareFriend)
+  const hasNewMapOnChip = positionShownOnChip(before, nowMs) !== positionShownOnChip(after, nowMs);
+  if (hasNewMapOnChip) change.chipsChanged = true;
+  if (!mapKey) return;
+  const positionBefore = friendPositionOf(before);
+  const positionAfter = friendPositionOf(after);
+  const wasHere = !!positionBefore && positionBefore.map === mapKey;
+  const isHere = !!positionAfter && positionAfter.map === mapKey;
+  if (!wasHere && !isHere) return;
+  const hasNewLook = before.name !== after.name || before.color !== after.color;
+  const hasMoved = JSON.stringify(positionBefore) !== JSON.stringify(positionAfter);
+  if (hasNewLook || hasMoved) change.positionsChanged.push(after.playerId);
 }
 
 /**
@@ -586,6 +956,7 @@ function compareFriend(change, before, after, mapKey) {
     change.chipsChanged = true;
     if (mapKey) change.drawingsChanged.push(playerId);
     change.tasksChanged.push(playerId);
+    if (mapKey) change.positionsChanged.push(playerId);
     return;
   }
   const hasNewLook = before.name !== after.name || before.color !== after.color;

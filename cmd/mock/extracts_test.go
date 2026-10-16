@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-const extractListRequest = `{"model":"gpt-5.4-mini","input":[{"role":"user","content":[` +
+const extractListRequest = `{"model":"gpt-6-luna","input":[{"role":"user","content":[` +
 	`{"type":"input_text","text":"Read the extract list in this screenshot."},` +
 	`{"type":"input_image","image_url":"data:,"}]}]}`
 
@@ -27,7 +27,7 @@ func TestAnExtractListScreenshotGetsThePresetListUntilSetExtractsReplacesIt(t *t
 func TestExtractReadsAreMarkedInTheLogAndTaskScansAreNot(t *testing.T) {
 	mock := newTestMock(t)
 	send(mock, "POST", "/v1/responses", extractListRequest, goodKey)
-	scanRequest := `{"model":"gpt-5.4-mini","input":[{"role":"user","content":[` +
+	scanRequest := `{"model":"gpt-6-luna","input":[{"role":"user","content":[` +
 		`{"type":"input_text","text":"Read the task rows in this screenshot."},{"type":"input_image","image_url":"data:,"}]}]}`
 	send(mock, "POST", "/v1/responses", scanRequest, goodKey)
 

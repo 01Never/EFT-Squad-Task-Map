@@ -17,7 +17,6 @@ type Files struct {
 	V2Backup     string // squad-task-map-data.v2-backup.json: untouched copy before the v2 → v3 migration
 	Settings     string // squad-task-map-settings.json
 	Pending      string // squad-task-map-pending.json: game events waiting for the page to acknowledge them
-	WikiCache    string // squad-task-map-wikicache.json
 	Instance     string // squad-task-map-instance.json: which port the running copy listens on
 	UpdateNotice string // squad-task-map-update-notice.json: release notes handed to the copy an update starts
 	SquadCache   string // squad-task-map-squad.json: my last share and friends' last shares (ticket 05)
@@ -39,7 +38,6 @@ func FilesIn(dir string) Files {
 		V2Backup:     join("squad-task-map-data.v2-backup.json"),
 		Settings:     join("squad-task-map-settings.json"),
 		Pending:      join("squad-task-map-pending.json"),
-		WikiCache:    join("squad-task-map-wikicache.json"),
 		Instance:     join("squad-task-map-instance.json"),
 		UpdateNotice: join("squad-task-map-update-notice.json"),
 		SquadCache:   join("squad-task-map-squad.json"),

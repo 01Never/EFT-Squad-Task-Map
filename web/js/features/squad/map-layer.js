@@ -1,24 +1,29 @@
 // @ts-check
-// What the squad draws on the map: each friend's drawings (read-only, in the friend's colour,
-// under your own) and, for friends whose tasks you show, small markers for the tasks you don't
-// have. Neither layer can be clicked, and neither touches your task list, readiness, Bring list,
-// selection or saved data. Everything here came from friends, so numbers are checked before they
-// reach an SVG attribute and colours go through safeFriendColor().
+// What the squad draws on the map of its own: each friend's drawings (read-only, in the friend's
+// colour, under your own) and friends' positions (ticket 17: a small disc with a heading arrow and
+// their name, under your own marker). Neither can be clicked (a friend's position only answers a
+// pointer with its "Mike · 2 min ago" tooltip), and neither touches your task list, readiness, Bring
+// list, selection, view or saved data. Everything here came from friends, so numbers are checked
+// before they reach an SVG attribute, colours go through safeFriendColor() and names are set as
+// text. Squadmates' tasks are task markers (features/tasks/map-layer.js, ticket 27).
 import { app } from "../../app/state.js";
-import { shownGameMode } from "../../app/current-list.js";
 import { createSvgElement } from "../../app/dom.js";
 import { applyView } from "../../map/view.js";
-import { spotsOfPart } from "../tasks/map-layer.js";
-import { friendsShowingDrawings, friendsShowingTasks } from "./friends.js";
-import { safeFriendColor, friendsOwnTasksOnMap, openPartsOnMap, ownValue } from "./rules.js";
+import { floorBadge, arrowRotation } from "../../map/projection.js";
+import { allFriends, friendsShowingDrawings } from "./friends.js";
+import { renderSquadChipsInPlace } from "./panel.js";
+import {
+  safeFriendColor,
+  friendDisplayName,
+  ownValue,
+  friendPositionsOnMap,
+  friendPositionTooltip,
+  msUntilNextFriendPositionChange,
+} from "./rules.js";
 import { warnOnce } from "./safe.js";
 
-/** @import { SquadFriend, Stroke } from "../../app/types.js" */
+/** @import { SquadFriend, Stroke, FriendPosition } from "../../app/types.js" */
 
-// A friend's marker is smaller than yours (a task spot is 8.5), a plain dot in the friend's colour.
-const FRIEND_MARKER_RADIUS = 5;
-// Two friends on the same spot are drawn this many screen pixels apart.
-const FRIEND_MARKER_SPREAD_PIXELS = 6;
 // Used when a stroke's width isn't a usable number (game units).
 const FALLBACK_STROKE_WIDTH = 2;
 
@@ -116,72 +121,189 @@ function svgPointsOfStroke(stroke) {
   return pairs.join(" ");
 }
 
-// ---------------------------------------------------------------- friends' other tasks
+// ---------------------------------------------------------------- friends' positions (ticket 17)
+
+// A friend's position is clearly smaller than yours (your disc is 12 with a white edge): a disc
+// in their colour with a dark edge, the same heading arrow scaled down, and their name.
+const FRIEND_PLAYER_RADIUS = 8;
+const FRIEND_PLAYER_ARROW = "M0,-5.3L3.7,1.3H1.2V5.3H-1.2V1.3H-3.7Z";
+// Over 5 minutes old: half see-through. A static attribute, never animated (SPEC §7.3, fourth case).
+const FADED_FRIEND_PLAYER_OPACITY = 0.5;
+const SVG_FONT = "bender, Arial, sans-serif";
+
+/** The one timer for the next time a friend's position fades or goes (null when none is due). */
+let positionRefreshTimer = /** @type {ReturnType<typeof setTimeout> | null} */ (null);
 
 /**
- * Small markers for the open parts of tasks a shown friend has and you don't, on the open map,
- * in the friend's colour. Drawn under your own markers; not clickable.
+ * Draw the friends whose position is on the open map (their ◎ Pos switch on, not over 30 minutes
+ * old), then set the timer for the next fade or hide moment. Friends' positions never move your
+ * view and never feed Find me, Follow, auto-center or the closest extract: those read only your
+ * own position (app.gps).
  */
-export function renderFriendTaskMarkers() {
+export function renderFriendPlayers() {
   const mapView = app.mapView;
-  const layer = mapView.layers.friendTasks;
+  if (!mapView) return;
+  const layer = mapView.layers.friendPlayers;
   layer.innerHTML = "";
-  const friends = friendsShowingTasks();
-  friends.forEach((friend, friendIndex) => {
-    try {
-      drawFriendTaskMarkers(layer, friend, friendIndex, friends.length);
-    } catch (error) {
-      warnOnce("task markers", error);
+  try {
+    for (const shown of friendPositionsOnMap(allFriends(), app.saved, mapView.key, Date.now())) {
+      drawFriendPlayerSafely(layer, shown.friend, shown.position, shown.isFaded);
     }
-  });
+  } finally {
+    scheduleFriendPositionRefresh();
+  }
 }
 
-/** Redraw the friends' markers and put them at screen size (after a change that isn't a full redraw). */
-export function renderFriendTaskMarkersAndApplyView() {
-  renderFriendTaskMarkers();
-  applyView();
+/** Redraw friends' positions and put them at screen size (a change that isn't a full redraw). */
+export function renderFriendPlayersAndApplyView() {
+  renderFriendPlayers();
+  if (app.mapView) applyView();
 }
 
 /**
+ * Set the one timer for the next moment a friend's position fades (5 min) or goes (30 min),
+ * replacing the one before. It is not a loop: it fires once, redraws, and sets the next one only
+ * if another change is coming. Called after every redraw of the positions and every `squad` event.
+ */
+export function scheduleFriendPositionRefresh() {
+  clearTimeout(positionRefreshTimer);
+  positionRefreshTimer = null;
+  if (!app.mapView) return;
+  const waitMs = msUntilNextFriendPositionChange(allFriends(), Date.now());
+  if (waitMs === null) return;
+  positionRefreshTimer = setTimeout(onFriendPositionAged, waitMs);
+}
+
+/** A friend's position just faded or went: redraw it and the chips ("on Customs", ◎ Pos). */
+function onFriendPositionAged() {
+  positionRefreshTimer = null;
+  if (!app.mapView) return; // the next map you open draws (and times) them
+  renderSquadChipsInPlace();
+  renderFriendPlayersAndApplyView();
+}
+
+/**
+ * drawFriendPlayer, but a friend whose data breaks it is skipped (and noted once in the console).
  * @param {SVGGElement} layer
  * @param {SquadFriend} friend
- * @param {number} friendIndex which of the shown friends this is (spreads markers on one spot)
- * @param {number} friendCount
+ * @param {FriendPosition} position checked by rules.js friendPositionOf()
+ * @param {boolean} isFaded
  */
-function drawFriendTaskMarkers(layer, friend, friendIndex, friendCount) {
-  const mapView = app.mapView;
-  const color = safeFriendColor(friend.color);
-  const spreadPixels = (friendIndex - (friendCount - 1) / 2) * FRIEND_MARKER_SPREAD_PIXELS;
-  const myMode = shownGameMode();
-  const theirTasks = friendsOwnTasksOnMap(friend, app.saved, myMode, app.taskById, mapView.key);
-  for (const { task, ticks } of theirTasks) {
-    for (const part of openPartsOnMap(task, ticks, mapView.key)) {
-      for (const spot of spotsOfPart(task, part, ticks)) {
-        drawFriendMarker(layer, spot, color, spreadPixels);
-      }
-    }
+function drawFriendPlayerSafely(layer, friend, position, isFaded) {
+  try {
+    drawFriendPlayer(layer, friend, position, isFaded);
+  } catch (error) {
+    warnOnce("positions", error);
   }
 }
 
 /**
- * One small dot at a spot: filled for an exact spot, white with a coloured edge for a possible one.
+ * One friend's position: `g.friend-player[data-friend]` holding a disc that turns with their
+ * heading and, upright beside it, their name and floor badge. Mirrors your own marker
+ * (features/find-me/map-layer.js): the same projection, arrow rotation and floor badge rule.
  * @param {SVGGElement} layer
- * @param {{ x: number, y: number, kind: string }} spot
- * @param {string} color
- * @param {number} spreadPixels
+ * @param {SquadFriend} friend
+ * @param {FriendPosition} position
+ * @param {boolean} isFaded
  */
-function drawFriendMarker(layer, spot, color, spreadPixels) {
-  const group = createSvgElement(
+function drawFriendPlayer(layer, friend, position, isFaded) {
+  const mapView = app.mapView;
+  const [svgX, svgY] = mapView.projection.toSvg(position.x, position.z);
+  if (!Number.isFinite(svgX) || !Number.isFinite(svgY)) return;
+  const color = safeFriendColor(friend.color);
+  const marker = createSvgElement(
     "g",
-    { class: "sc friend-marker", "data-x": spot.x, "data-y": spot.y, "data-ox": spreadPixels, "pointer-events": "none" },
+    {
+      class: isFaded ? "friend-player faded" : "friend-player",
+      "data-friend": friend.playerId,
+      opacity: isFaded ? FADED_FRIEND_PLAYER_OPACITY : null,
+      "pointer-events": "none",
+    },
     layer,
   );
-  const isPossible = spot.kind === "possible";
-  const circle = {
-    r: FRIEND_MARKER_RADIUS,
-    fill: isPossible ? "#fff" : color,
-    stroke: isPossible ? color : "#000",
-    "stroke-width": isPossible ? 2.4 : 1.6,
+  const headingDegrees = arrowRotation(mapView.config, position.yaw).toFixed(1);
+  drawFriendDisc(marker, svgX, svgY, headingDegrees, color, friend, position);
+  const floor = floorBadge(mapView.config, position.x, position.y, position.z);
+  drawFriendLabel(marker, svgX, svgY, color, friendDisplayName(friend.name), floor);
+}
+
+/**
+ * The part that turns with the friend's heading: their disc and arrow. The disc is the only thing
+ * that takes the pointer, for its tooltip, which is worked out each time you point at it.
+ * @param {SVGGElement} marker
+ * @param {number} svgX
+ * @param {number} svgY
+ * @param {string} headingDegrees
+ * @param {string} color
+ * @param {SquadFriend} friend
+ * @param {FriendPosition} position
+ */
+function drawFriendDisc(marker, svgX, svgY, headingDegrees, color, friend, position) {
+  const discAttributes = { class: "sc", "data-x": svgX, "data-y": svgY, "data-r": headingDegrees };
+  const disc = createSvgElement("g", discAttributes, marker);
+  const dotAttributes = {
+    class: "friend-player-dot",
+    r: FRIEND_PLAYER_RADIUS,
+    fill: color,
+    stroke: "#000",
+    "stroke-width": 1.5,
+    "pointer-events": "visiblePainted",
   };
-  createSvgElement("circle", circle, group);
+  const dot = createSvgElement("circle", dotAttributes, disc);
+  const tooltip = createSvgElement("title", {}, dot);
+  tooltip.textContent = friendPositionTooltip(friend, position, Date.now());
+  dot.addEventListener("pointerenter", () => {
+    tooltip.textContent = friendPositionTooltip(friend, position, Date.now());
+  });
+  // a thin dark edge keeps the white arrow readable on a light friend colour
+  const arrow = {
+    d: FRIEND_PLAYER_ARROW,
+    fill: "#fff",
+    stroke: "#000",
+    "stroke-width": 1.2,
+    "paint-order": "stroke",
+  };
+  createSvgElement("path", arrow, disc);
+}
+
+/**
+ * The part that stays upright: the friend's name in their colour and, off the ground floor, the
+ * floor badge at the disc's top right (SPEC §7.3).
+ * @param {SVGGElement} marker
+ * @param {number} svgX
+ * @param {number} svgY
+ * @param {string} color
+ * @param {string} name already cleaned by friendDisplayName(); set as text
+ * @param {string | null} floor
+ */
+function drawFriendLabel(marker, svgX, svgY, color, name, floor) {
+  const upright = createSvgElement("g", { class: "sc", "data-x": svgX, "data-y": svgY }, marker);
+  const labelAttributes = {
+    class: "friend-player-name",
+    x: 12,
+    y: 4,
+    "font-size": 11,
+    "font-weight": 700,
+    "font-family": SVG_FONT,
+    fill: color,
+    stroke: "#000",
+    "stroke-width": 2.6,
+    "paint-order": "stroke",
+  };
+  const label = createSvgElement("text", labelAttributes, upright);
+  label.textContent = name;
+  if (!floor) return;
+  const badge = { cx: 7.5, cy: -7.5, r: 4.8, fill: "#000", stroke: "#fff", "stroke-width": 1 };
+  createSvgElement("circle", badge, upright);
+  const floorAttributes = {
+    x: 7.5,
+    y: -5,
+    "text-anchor": "middle",
+    "font-size": 7,
+    "font-weight": 700,
+    "font-family": SVG_FONT,
+    fill: "#fff",
+  };
+  const floorText = createSvgElement("text", floorAttributes, upright);
+  floorText.textContent = floor;
 }

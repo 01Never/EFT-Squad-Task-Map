@@ -1,5 +1,5 @@
 // Package openai is a small client for the OpenAI API (Responses API with strict JSON schemas),
-// shared by the task scan and AI Categorize. The API key stays on this PC and is only ever sent
+// shared by the task scan and the extracts reader. The API key stays on this PC and is only ever sent
 // to api.openai.com (or the offline mock while testing: STM_OPENAI_API).
 package openai
 
@@ -19,9 +19,9 @@ import (
 )
 
 // DefaultModel is used when the user hasn't picked one.
-const DefaultModel = "gpt-5.4-mini"
+const DefaultModel = "gpt-6-luna"
 
-// requestTimeout: a vision or categorize call can take a while; this only stops a hung connection.
+// requestTimeout: a vision call can take a while; this only stops a hung connection.
 const requestTimeout = 5 * time.Minute
 
 // Client talks to the OpenAI API.

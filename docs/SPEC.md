@@ -222,13 +222,15 @@ For the boss list, use the boss names in json.tarkov.dev's map `bosses` data, or
 - `S.have[itemId]` is shared across maps. It resets to 0 at raid end (§10). Also add a "Reset all" button.
 
 ### 7.3 Map styling rules
-- **Fully opaque by default.** Only two things are ever semi-transparent: **not-ready** markers and zones, and **unmarked extracts** (§11). Use about 50% opacity, tuned by eye.
+- **Fully opaque by default.** Only four things are ever semi-transparent: **not-ready** markers and zones, **unmarked extracts** (§11), **squadmates' tasks you don't have** (friend-only markers and their zones, ticket 27), and **a friend's position older than 5 minutes** (ticket 17; it is gone after 30). Use about 50% opacity, tuned by eye.
 - **Not-ready marker:** semi-transparent, plus a **"!" badge at the top-left**.
+- **Friend-only marker:** a task a shown squadmate has and you don't is drawn exactly like your own (category shape and colour or item icon, same size, badges, zone), at the same ~50% opacity, with a solid zone outline (no dashes, no "!"). It sits under your own markers and can be clicked like its row.
 - **Badge positions:**
   - top-left: "!"
   - top-right: floor number or "B"
   - bottom-right: split
-  - bottom-left: reserved
+  - bottom-centre: squad squares, one small square per shown friend who has the task, in their colour with a thin black outline, up to four and then "+N"; only on each part's **main spot** (its first exact spot, or with only possible spots the one nearest their middle). The squares stay fully opaque on a see-through marker.
+  - bottom-left: free
 - **Zones:** draw each `TaskZone.outline` as a polygon, projected with `makeProj()`, in the category color with a light fill. Ready zones get a solid border; not-ready zones get a **dotted** border (`stroke-dasharray`). Keep the center marker. Zones without an outline keep just the marker.
 - **Floor for zones:** use `top`/`bottom` with the layer extents in `maps-config.json` when present. Otherwise use the position's y, as `floorBadge()` does now.
 

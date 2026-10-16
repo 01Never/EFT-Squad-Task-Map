@@ -1,117 +1,93 @@
 // Squad (ticket 05): three real copies of the app on the dev transport (no Tailscale): Alice, Bob
 // and Cara, each with its own data folder, app port and peer port, each in its own browser page.
 // Checks the acceptance list: drawings travel and undo, the per-friend toggle, task sharing on in
-// one copy and off in another, "Also:" lines, badges, the filter, the popup's progress, "Friends'
-// tasks", a friend going offline and coming back, and Leave.
+// one copy and off in another ("Share my tasks" is on by default since ticket 17), who has a task
+// (colour boxes), badges, the filter, the popup's progress, squadmates' tasks as crosshatched rows
+// of your own list (ticket 26: selectable, pinnable, never tickable; ☰ Tasks on by default) and as
+// see-through task markers with the friend's colour square under each part's main spot (ticket 27),
+// a friend going offline and coming back, and Leave. Friends' positions (ticket 17) are in
+// squad-positions.e2e.mjs.
 // STM_E2E_SHOTS=<dir> also saves screenshots there.
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import http from "node:http";
-import net from "node:net";
 import path from "node:path";
 import { test } from "node:test";
-import { browserSuite, Scenario, startApp, stateWithTasks, taskNamed, waitUntil } from "./harness.js";
+import { browserSuite, startApp, stateWithTasks, taskNamed } from "./harness.js";
+import { Player, FakeFriend, freePort, eventually, STREETS, SHOTS_DIR } from "./squad-players.js";
+import { partsOfTask } from "../../web/js/features/tasks/rules.js";
+import { DEFAULT_CATEGORIES } from "../../web/js/features/tasks/categories.js";
+import { requirementsOf } from "../../web/js/features/readiness/rules.js";
+import { markerShapePath } from "../../web/js/map/marker-shapes.js";
 
 browserSuite();
 
-const MAP = "streets-of-tarkov";
+const MAP = STREETS;
 const revision = taskNamed("Revision - Streets of Tarkov"); // three "mark" objectives
 const glory = taskNamed("Glory to CPSU");
 const ballet = taskNamed("Ballet Lover");
 const dandies = taskNamed("Dandies");
-const SHOTS_DIR = process.env.STM_E2E_SHOTS || "";
 
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const probe = net.createServer();
-    probe.once("error", reject);
-    probe.listen(0, "127.0.0.1", () => {
-      const { port } = /** @type {net.AddressInfo} */ (probe.address());
-      probe.close(() => resolve(port));
-    });
-  });
+/**
+ * The category a part of a squadmate's task lands in by default: the built-in for its kind of
+ * work ("<task id>:<kind>", or "<task id>:*" for a whole task).
+ * @param {string} partKey
+ */
+function defaultCategoryIdOf(partKey) {
+  const [taskId, kind] = partKey.split(":");
+  const task = taskNamedById(taskId);
+  const action = kind === "*" ? partsOfTask(task)[0].action : kind;
+  return DEFAULT_CATEGORIES.find((category) => category.builtin === action).id;
 }
 
-/** One friend: a scenario (app + browser page) joined to the squad over the dev transport. */
-class Player {
-  constructor(name, color, peerPort, otherPeerPorts, state) {
-    this.name = name;
-    this.color = color;
-    this.env = {
-      STM_SQUAD_DEV_LISTEN: `127.0.0.1:${peerPort}`,
-      STM_SQUAD_DEV_PEERS: otherPeerPorts.map((port) => `127.0.0.1:${port}`).join(","),
+function taskNamedById(taskId) {
+  return [revision, glory, ballet, dandies].find((task) => task.id === taskId);
+}
+
+/**
+ * Bob's start: Revision and Dandies, carrying what Revision's marks need, so its markers are ready
+ * (fully opaque) and only a squadmate's task is see-through.
+ */
+function bobsState() {
+  const state = stateWithTasks([revision.name, dandies.name]);
+  for (const objective of revision.objs) {
+    for (const requirement of requirementsOf(objective)) state.have[requirement.key] = 3;
+  }
+  return state;
+}
+
+// A task spot's radius in SVG units (map/markers.js).
+const TASK_MARKER_RADIUS = 8.5;
+
+/**
+ * Every task marker on a page's map: its part, whether it's a squadmate's task you don't have
+ * (.notmine), the opacity of its shape and badges, its shape, and the friend squares on it.
+ * @param {import("playwright-core").Page} page
+ */
+function mapMarkers(page) {
+  return page.$$eval("svg.map g.mk", (markers) => markers.map((marker) => {
+    const body = marker.querySelector(":scope > g");
+    const shape = body.querySelector(":scope > path");
+    return {
+      part: marker.getAttribute("data-part"),
+      isNotMine: marker.classList.contains("notmine"),
+      bodyOpacity: Number(body.getAttribute("opacity")),
+      markerOpacity: Number(getComputedStyle(marker).opacity),
+      shape: shape ? { d: shape.getAttribute("d"), fill: shape.getAttribute("fill"), stroke: shape.getAttribute("stroke") } : null,
+      squares: [...marker.querySelectorAll(":scope > .squad-square")].map((square) => square.getAttribute("fill")),
+      squaresInsideBody: body.querySelectorAll(".squad-square").length,
     };
-    this.scenario = new Scenario(`squad--${name.toLowerCase()}`, { state, env: this.env });
-  }
-
-  get page() {
-    return this.scenario.page;
-  }
-
-  async start() {
-    await this.scenario.start();
-    await this.scenario.openMap(MAP);
-  }
-
-  async openSettings() {
-    await this.page.click("#settings");
-    await this.page.waitForSelector("#sSquad");
-  }
-
-  async closeSettings() {
-    await this.page.click("#sClose");
-  }
-
-  /** Settings → Squad: paste an invite code and Join, then set the name and colour. */
-  async join() {
-    await this.openSettings();
-    await this.page.fill("#sSquadKey", "tskey-auth-dev-test");
-    await this.page.click("#sSquadJoin");
-    await this.page.waitForSelector("#sSquadName", { timeout: 30_000 });
-    await this.setProfile();
-    await this.closeSettings();
-  }
-
-  async setProfile() {
-    await this.page.fill("#sSquadName", this.name);
-    await this.answeredProfile(() => this.page.press("#sSquadName", "Tab"));
-    await this.answeredProfile(() => this.page.fill("#sSquadColor", this.color));
-  }
-
-  answeredProfile(action) {
-    return this.scenario.answered("PUT", "/api/squad/profile", action);
-  }
-
-  /** The player's id (from the server), to find its chip and toggles in the others' pages. */
-  async playerId() {
-    return (await this.scenario.api("/api/squad")).me.playerId;
-  }
-
-  chip(friendId) {
-    return this.page.locator(`.squad-chip[data-friend="${friendId}"]`);
-  }
-
-  /** The number of lines of a friend on the map. */
-  friendLines(friendId) {
-    return this.page.locator(`svg.map g[data-friend="${friendId}"] polyline`).count();
-  }
-
-  async shot(name) {
-    if (!SHOTS_DIR) return;
-    fs.mkdirSync(SHOTS_DIR, { recursive: true });
-    await this.page.evaluate(() => document.fonts.ready.then(() => true));
-    await this.page.screenshot({ path: path.join(SHOTS_DIR, name + ".png"), animations: "disabled" });
-  }
+  }));
 }
 
-async function eventually(check, what, timeout = 8000) {
-  await waitUntil(check, { timeout, interval: 100, what });
+/** The colour of the first friend box in a row, as the browser draws it. */
+function swatchColor(page, rowSelector) {
+  return page.locator(rowSelector + " .squad-swatch").first().evaluate((swatch) => getComputedStyle(swatch).backgroundColor);
 }
 
 test("three copies: drawings, task sharing, offline and back, and leaving", { timeout: 240_000 }, async (t) => {
   const ports = [await freePort(), await freePort(), await freePort()];
   const alice = new Player("Alice", "#e03131", ports[0], [ports[1], ports[2]], stateWithTasks([revision.name, glory.name, ballet.name]));
-  const bob = new Player("Bob", "#1c7ed6", ports[1], [ports[0], ports[2]], stateWithTasks([revision.name, dandies.name]));
+  const bob = new Player("Bob", "#1c7ed6", ports[1], [ports[0], ports[2]], bobsState());
   const cara = new Player("Cara", "#2f9e44", ports[2], [ports[0], ports[1]], stateWithTasks([glory.name]));
   const players = [alice, bob, cara];
   try {
@@ -171,59 +147,157 @@ test("three copies: drawings, task sharing, offline and back, and leaving", { ti
     assert.equal(await bob.friendLines(aliceId), 1, "switched on, Alice's line is back");
     await alice.page.click("#bdraw"); // leave draw mode
 
-    // ---- tasks: nothing is shared until it is switched on
-    await eventually(async () => (await bob.page.locator(".squad-tasks").count()) === 0, "no friends' tasks block yet");
-    assert.equal(await bob.page.locator(".also").count(), 0);
-    assert.equal(await bob.page.locator("svg.map .squad-dot").count(), 0);
-    await bob.page.click(`[data-squad-tasks="${aliceId}"]`);
-    assert.equal(await bob.page.locator(".also").count(), 0, "Alice isn't sharing tasks yet");
+    // ---- tasks: ☰ Tasks is on by default (ticket 26); "Share my tasks" and "Share my position" are
+    // on by default too (ticket 17), and the settings file says so
+    assert.equal(await bob.page.getAttribute(`[data-squad-tasks="${aliceId}"]`, "aria-pressed"), "true", "☰ Tasks on by default");
+    assert.equal(await bob.page.locator(".squad-tasks").count(), 0, "the old Friends' tasks block is gone");
+    // Cara keeps her tasks to herself here, so only Alice's show on Bob's list and map
+    await cara.openSettings();
+    await cara.answeredProfile(() => cara.page.uncheck("#sSquadShareTasks"));
+    await cara.closeSettings();
+    const caraShareOf = async (player) => (await player.scenario.api("/api/squad")).friends.find((friend) => friend.playerId === caraId)?.share;
+    await eventually(async () => (await caraShareOf(bob))?.tasks === null, "Bob has Cara's share without tasks");
 
     await alice.openSettings();
-    await alice.page.check("#sSquadShareTasks");
+    assert.equal(await alice.page.isChecked("#sSquadShareTasks"), true, "Share my tasks is on by default");
+    assert.equal(await alice.page.isChecked("#sSquadSharePosition"), true, "Share my position is on by default");
     await alice.closeSettings();
+    const aliceSquadSettings = alice.scenario.savedSettings().squad;
+    assert.equal(aliceSquadSettings.shareTasks, true, "both switches are written to the settings file");
+    assert.equal(aliceSquadSettings.sharePosition, true);
+    // Bob switches it off: the "off in another copy" case (Alice sees none of his tasks below)
+    await bob.openSettings();
+    await bob.answeredProfile(() => bob.page.uncheck("#sSquadShareTasks"));
+    await bob.closeSettings();
+    await eventually(() => bob.scenario.savedSettings().squad?.shareTasks === false, "an 'off' is written as false");
     const bobRow = `#panel .task[data-task="${revision.id}"]`;
-    await eventually(async () => (await bob.page.locator(bobRow + " .also").count()) === 1, "Bob's Revision row says 'Also: Alice'", 8000);
-    assert.equal((await bob.page.textContent(bobRow + " .also")).trim(), "Also: Alice");
-    assert.equal(await bob.page.locator(`#panel .task[data-task="${dandies.id}"] .also`).count(), 0, "Dandies isn't shared");
+    await eventually(async () => (await bob.page.locator(bobRow + " .squad-box").count()) === 1, "Bob's Revision row has Alice's box", 8000);
+    assert.equal((await bob.page.textContent(bobRow + " .squad-box")).trim(), "Alice");
+    assert.equal(await swatchColor(bob.page, bobRow), "rgb(224, 49, 49)", "the box is in Alice's colour");
+    assert.equal(await bob.page.locator(`#panel .task[data-task="${dandies.id}"] .squad-box`).count(), 0, "Dandies isn't shared");
+    assert.equal(await bob.page.locator(`${bobRow}.notmine`).count(), 0, "Revision is Bob's own row");
 
-    // badges: a dot in Alice's colour on each of Bob's Revision markers, and none on Dandies
-    const dots = await bob.page.locator("svg.map g.mk .squad-dot").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("fill")));
-    assert.ok(dots.length >= 1);
-    assert.ok(dots.every((fill) => fill === "#e03131"), "dots are in Alice's colour");
-    assert.equal(dots.length, revision.objs.length, "one dot on each of Revision's markers");
+    // ticket 27: Alice's square under the main spot of Revision (both have it), none on Dandies;
+    // Revision is Bob's, so fully opaque
+    const markers = await mapMarkers(bob.page);
+    const revisionMarkers = markers.filter((marker) => marker.part.startsWith(revision.id + ":"));
+    assert.equal(revisionMarkers.length, revision.objs.length);
+    assert.ok(revisionMarkers.every((marker) => !marker.isNotMine && marker.bodyOpacity === 1), "Revision is fully opaque");
+    assert.deepEqual(revisionMarkers.flatMap((marker) => marker.squares), ["#e03131"], "one square in Alice's colour, on the main spot only");
+    assert.ok(markers.filter((marker) => marker.part.startsWith(dandies.id + ":")).every((marker) => !marker.squares.length), "none on Dandies");
+    assert.equal(await bob.page.locator("svg.map .squad-dot").count(), 0, "the old bottom-left dots are gone");
 
-    // the "Friends' tasks" block: what Alice has that Bob doesn't (not Revision)
-    const block = bob.page.locator(".squad-tasks");
-    assert.equal(await block.count(), 1);
-    const blockText = await block.textContent();
-    assert.ok(blockText.includes(ballet.name) || blockText.includes(glory.name), "Alice's other tasks are listed");
-    assert.ok(!blockText.includes(revision.name), "a task Bob has is not repeated");
-    assert.ok(await bob.page.locator("svg.map .friend-marker").count() > 0, "smaller markers for Alice's other tasks");
-    // ... and none of it is on Bob's own list or in his saved data
-    assert.equal(await bob.page.locator(`#panel .tasks .task[data-task="${ballet.id}"]`).count(), 0);
-    assert.equal(bob.scenario.savedList().tasks[ballet.id], undefined);
+    // Alice's tasks Bob doesn't have are rows of his list: crosshatched, in their default category
+    const squadRows = bob.page.locator("#panel .cat .task.notmine");
+    const squadTaskIds = new Set(await squadRows.evaluateAll((rows) => rows.map((row) => row.getAttribute("data-task"))));
+    assert.ok(squadTaskIds.has(ballet.id) || squadTaskIds.has(glory.id), "Alice's other tasks are listed");
+    assert.ok(!squadTaskIds.has(revision.id) && !squadTaskIds.has(dandies.id), "Bob's own tasks are not repeated");
+    for (const placed of await squadRows.evaluateAll((rows) =>
+      rows.map((row) => ({ part: row.getAttribute("data-part"), cat: row.closest(".cat").getAttribute("data-cat"), image: getComputedStyle(row).backgroundImage })),
+    )) {
+      assert.equal(placed.cat, defaultCategoryIdOf(placed.part), `${placed.part} is in its default category`);
+      assert.match(placed.image, /repeating-linear-gradient/, `${placed.part} is crosshatched`);
+    }
+    const squadTask = squadTaskIds.has(ballet.id) ? ballet : glory;
+    const squadRow = `#panel .task.notmine[data-task="${squadTask.id}"]`;
+    assert.equal((await bob.page.textContent(squadRow + " .squad-box")).trim(), "Alice", "with Alice's box");
+    assert.match(await bob.page.textContent("#panel .phead"), /\+\d+ from squad/, "the header says how many are the squad's");
+    const headerCount = Number((await bob.page.textContent("#panel .phead small")).match(/^(\d+) task/)[1]);
+    assert.equal(headerCount, 2, "Bob's own count stays his two tasks");
+    // ticket 27: on the map they are task markers like Bob's own (the category's shape and
+    // colour), see-through, with Alice's opaque square under each part's main spot only
+    const friendOnlyMarkers = (await mapMarkers(bob.page)).filter((marker) => marker.isNotMine);
+    assert.ok(friendOnlyMarkers.length > 0, "Alice's other tasks are on Bob's map");
+    assert.equal(await bob.page.locator("svg.map .friend-marker").count(), 0, "the old small friend markers are gone");
+    const bobsCategories = bob.scenario.savedState().cats;
+    for (const marker of friendOnlyMarkers) {
+      assert.ok([ballet.id, glory.id].some((id) => marker.part.startsWith(id + ":")), `${marker.part} is one of Alice's tasks`);
+      const category = bobsCategories.find((candidate) => candidate.id === defaultCategoryIdOf(marker.part));
+      assert.equal(marker.shape.d, markerShapePath(category.icon, TASK_MARKER_RADIUS), `${marker.part} has its category's shape`);
+      const isPossibleSpot = marker.shape.fill === "#fff";
+      assert.equal(isPossibleSpot ? marker.shape.stroke : marker.shape.fill, category.color, `${marker.part} in its category's colour`);
+      assert.equal(marker.bodyOpacity, 0.5, `${marker.part} is see-through`);
+      assert.equal(marker.markerOpacity, 1, "the marker's group itself (and so its squares) is opaque");
+      assert.equal(marker.squaresInsideBody, 0);
+    }
+    const friendOnlyParts = new Set(friendOnlyMarkers.map((marker) => marker.part));
+    for (const part of friendOnlyParts) {
+      const squares = friendOnlyMarkers.filter((marker) => marker.part === part).flatMap((marker) => marker.squares);
+      assert.deepEqual(squares, ["#e03131"], `${part}: Alice's square under its main spot only`);
+    }
+    const squadMarker = bob.page.locator(`svg.map g.mk.notmine[data-part^="${squadTask.id}:"]`).first();
+    await squadMarker.click({ force: true });
+    await bob.page.waitForSelector(`${squadRow}.sel`);
+    assert.equal((await bob.page.textContent("#pop h3")).trim(), squadTask.name, "clicking it selects it");
+    assert.ok((await bob.page.locator("#fx > *").count()) > 0, "and flashes it");
+    await bob.shot("squad-markers");
+    await bob.page.keyboard.press("Escape");
+    assert.equal(bob.scenario.savedList().tasks[squadTask.id], undefined, "nothing in Bob's saved data");
+    if (SHOTS_DIR) await bob.page.evaluate(() => document.querySelector("#panel .cat").scrollIntoView());
+    await bob.shot("squad-rows-in-list");
+
+    // clicking selects it like his own: open, outlined, the popup; nothing can be ticked
+    await bob.page.click(squadRow + " .trow");
+    await bob.page.waitForSelector(`${squadRow}.sel .tbody`);
+    await bob.page.waitForSelector("#pop h3");
+    assert.equal((await bob.page.textContent("#pop h3")).trim(), squadTask.name);
+    assert.equal(await bob.page.locator(`${squadRow} [data-tickbox], #pop [data-tickbox], ${squadRow} [data-tick], #pop [data-tick]`).count(), 0, "no working tick controls");
+    const disabledTicks = await bob.page.locator(`${squadRow} .objs input, ${squadRow} .objs button, #pop .objs input, #pop .objs button`).evaluateAll((controls) =>
+      controls.map((control) => [control.disabled, control.title]),
+    );
+    assert.ok(disabledTicks.length > 0);
+    assert.ok(disabledTicks.every(([disabled, title]) => disabled && title === "Not on your task list"), "tick controls disabled");
+    assert.equal(await bob.page.locator(`${squadRow} [data-move], ${squadRow} [data-act="remove"], ${squadRow} [data-addsub]`).count(), 0, "no Move to, Remove or sub-tasks");
+    assert.match(await bob.page.textContent("#pop"), /Alice/, "the popup has Alice's box");
+    await bob.shot("squad-row-selected");
+
+    // pinning it: kept as a pin only, and listed under Pinned only
+    await bob.page.click(squadRow + " .pinb");
+    await eventually(() => bob.scenario.savedList().tasks[squadTask.id]?.pinned === true, "the pin is saved");
+    assert.equal(bob.scenario.savedList().tasks[squadTask.id].active, false, "not on Bob's list");
+    await bob.page.click('#panel [data-act="pinnedonly"]');
+    assert.deepEqual(
+      await bob.page.locator("#panel .cat .task").evaluateAll((rows) => [...new Set(rows.map((row) => row.getAttribute("data-task")))]),
+      [squadTask.id],
+      "Pinned only shows the pinned squad task",
+    );
+    await bob.page.click('#panel [data-act="pinnedonly"]');
+    await bob.page.click(squadRow + " .pinb");
+    await eventually(() => bob.scenario.savedList().tasks[squadTask.id]?.pinned === false, "unpinned");
+    await bob.page.keyboard.press("Escape");
 
     // Alice ticks one objective; Bob's popup says "Alice 1/3"
     await alice.page.click(`#panel .task[data-task="${revision.id}"] .trow`);
     await alice.page.check(`#panel [data-tickbox="${revision.objs[0].id}"]`);
     await bob.page.click(bobRow + " .trow");
     await eventually(async () => /Alice 1\/3/.test((await bob.page.textContent("#pop")) || ""), "Bob's popup shows Alice's progress", 8000);
-    const popup = await bob.page.textContent("#pop");
-    assert.match(popup, /Also: Alice/);
+    assert.equal((await bob.page.textContent("#pop .squad-boxes")).trim(), "Alice", "the popup has Alice's box");
     await bob.shot("popup-also");
 
-    // the filter: only tasks a shown friend also has
+    // the filter: only tasks a shown friend also has (Alice's own tasks stay, she has them)
     await bob.page.click('[data-act="squadonly"]');
-    assert.equal(await bob.page.locator("#panel .cat .task").count(), 1, "only Revision is listed");
-    assert.equal(await bob.page.locator("#panel .cat .task").first().getAttribute("data-task"), revision.id);
-    assert.equal(await bob.page.locator("svg.map g.mk").count(), revision.objs.length, "only Revision's markers");
+    const ownRows = "#panel .cat .task:not(.notmine)";
+    assert.equal(await bob.page.locator(ownRows).count(), 1, "only Revision of Bob's own");
+    assert.equal(await bob.page.locator(ownRows).first().getAttribute("data-task"), revision.id);
+    assert.ok(await bob.page.locator("#panel .cat .task.notmine").count() > 0, "Alice's tasks stay listed");
+    assert.equal(await bob.page.locator("svg.map g.mk:not(.notmine)").count(), revision.objs.length, "only Revision's markers of Bob's own");
+    assert.ok(await bob.page.locator("svg.map g.mk.notmine").count() > 0, "Alice's tasks stay on the map");
     await bob.page.click('[data-act="squadonly"]');
 
-    // Alice sees nothing of Bob's tasks (he shares none), even with his toggle on
-    await alice.page.click(`[data-squad-tasks="${bobId}"]`);
-    assert.equal(await alice.page.locator(".also").count(), 0);
-    assert.equal(await alice.page.locator(".squad-tasks").count(), 0);
+    // Alice sees nothing of Bob's tasks (he shares none), with his toggle on by default
+    assert.equal(await alice.page.locator("#panel .squad-boxes").count(), 0);
+    assert.equal(await alice.page.locator("#panel .task.notmine").count(), 0);
     await bob.shot("panel-chips-and-filter");
+
+    // Bob switches Alice's ☰ Tasks off: her rows and boxes go; on again, they're back
+    await bob.page.click(`[data-squad-tasks="${aliceId}"]`);
+    assert.equal(await bob.page.locator("#panel .task.notmine").count(), 0, "Alice's rows are gone");
+    assert.equal(await bob.page.locator("#panel .squad-boxes").count(), 0);
+    assert.equal(await bob.page.locator("svg.map g.mk.notmine, svg.map .squad-square").count(), 0, "her markers and squares are gone");
+    await eventually(() => bob.scenario.savedState().squad?.friends[aliceId]?.tasks === false, "the choice is saved");
+    await bob.page.click(`[data-squad-tasks="${aliceId}"]`);
+    assert.ok(await bob.page.locator("#panel .task.notmine").count() > 0, "back on");
+    assert.ok(await bob.page.locator("svg.map g.mk.notmine").count() > 0, "her markers are back");
 
     // ---- Cara goes offline: the others show "last seen"; she comes back with new data
     const caraSlug = cara.scenario.slug;
@@ -247,7 +321,7 @@ test("three copies: drawings, task sharing, offline and back, and leaving", { ti
     await alice.closeSettings();
     assert.equal(await alice.page.locator(".squad-chip").count(), 0);
     assert.equal(await alice.page.locator("svg.map g[data-friend]").count(), 0);
-    assert.equal(await alice.page.locator(".also, .squad-dot").count(), 0);
+    assert.equal(await alice.page.locator(".squad-boxes, .squad-square, .task.notmine, g.mk.notmine").count(), 0);
     const cache = JSON.parse(fs.readFileSync(path.join(alice.scenario.app.dataDir, "squad-task-map-squad.json"), "utf8"));
     assert.deepEqual(cache.friends || {}, {}, "friends' cache is cleared");
     assert.equal((await alice.scenario.api("/api/squad")).settings.joined, false);
@@ -259,31 +333,6 @@ test("three copies: drawings, task sharing, offline and back, and leaving", { ti
 });
 
 // ---------------------------------------------------------------- hostile friends (QA round 2)
-
-/** A friend that is only a peer API serving the share we give it, so its name and task ids are ours. */
-class FakeFriend {
-  constructor(id, name, tasks) {
-    this.share = { v: 1, player: { id, name, color: "#ff922b" }, rev: 1, updatedAt: 1000, draw: {}, tasks };
-  }
-
-  async start() {
-    this.port = await freePort();
-    this.server = http.createServer((req, res) => {
-      if (req.url === "/squad/v1/share") {
-        res.setHeader("Content-Type", "application/json");
-        return res.end(JSON.stringify(this.share));
-      }
-      res.writeHead(200, { "Content-Type": "text/event-stream" });
-      res.write(": hi\n\nevent: share\ndata: " + JSON.stringify(this.share) + "\n\n");
-    });
-    await new Promise((resolve) => this.server.listen(this.port, "127.0.0.1", resolve));
-  }
-
-  stop() {
-    this.server.close();
-    this.server.closeAllConnections();
-  }
-}
 
 test("a 32-wide name keeps the toggles and rows in the panel; friends with 'toString' task ids or a direction override are refused", { timeout: 180_000 }, async () => {
   // Real game ids are 24 hex characters; the server refuses a share with anything else (QA round 3).
@@ -311,7 +360,7 @@ test("a 32-wide name keeps the toggles and rows in the panel; friends with 'toSt
     const shownFriends = (await victim.scenario.api("/api/squad")).friends.map((friend) => friend.playerId);
     assert.deepEqual(shownFriends, [wide.share.player.id], "the 'toString' and direction-override friends are refused");
 
-    const ownTasks = () => victim.page.locator("#panel .cat .task").count();
+    const ownTasks = () => victim.page.locator("#panel .cat .task:not(.notmine)").count();
     const ownMarkers = () => victim.page.locator("svg.map g.mk").count();
     const [tasksBefore, markersBefore] = [await ownTasks(), await ownMarkers()];
     assert.ok(tasksBefore > 0 && markersBefore > 0, "the victim has a list and markers");
@@ -324,7 +373,8 @@ test("a 32-wide name keeps the toggles and rows in the panel; friends with 'toSt
           return box.width > 0 && box.left >= panel.left && box.right <= panel.right;
         });
       });
-      assert.deepEqual(fits, [true, true], `${what}: both toggles are inside the panel`);
+      // ✎ Draw, ☰ Tasks and (ticket 17) ◎ Pos
+      assert.deepEqual(fits, [true, true, true], `${what}: all three toggles are inside the panel`);
     };
     const panelDoesNotOverflow = async (what) => {
       const [scroll, client] = await victim.page.evaluate(() => [document.querySelector("#panel").scrollWidth, document.querySelector("#panel").clientWidth]);
@@ -333,8 +383,9 @@ test("a 32-wide name keeps the toggles and rows in the panel; friends with 'toSt
     await togglesInsidePanel("desktop");
     await victim.shot("chips-long-name");
 
-    // the wide friend's tasks on: "Also: WWW…" on the shared row wraps inside the panel
-    await victim.page.click(`[data-squad-tasks="${wide.share.player.id}"]`);
+    // the wide friend's tasks are on by default (ticket 26): the "WWW…" box on the shared row
+    // wraps inside the panel
+    await eventually(async () => (await victim.page.locator("#panel .squad-box").count()) >= 1, "the wide friend's box on Glory");
     await eventually(async () => (await victim.page.locator(".squad-chip").count()) === 1, "chip still there");
     await panelDoesNotOverflow("desktop, tasks on");
     await victim.page.setViewportSize({ width: 390, height: 800 });
@@ -367,9 +418,11 @@ test("'Shared with squad' left on while no shown friend shares tasks hides none 
   const fakes = [quiet, sharer];
   for (const fake of fakes) await fake.start();
   const state = stateWithTasks([revision.name, glory.name]);
-  state.squad = { friends: {}, sharedOnly: true }; // saved "on", as in the owner's file
+  // saved "on", as in the owner's file; Sam's ☰ Tasks saved off (☰ Tasks is on by default since
+  // ticket 26, and an explicit off is kept)
+  state.squad = { friends: { [sharer.share.player.id]: { drawings: true, tasks: false } }, sharedOnly: true };
   const owner = new Player("Owner", "#e03131", await freePort(), fakes.map((fake) => fake.port), state);
-  const ownTasks = () => owner.page.locator("#panel .cat .task").count();
+  const ownTasks = () => owner.page.locator("#panel .cat .task:not(.notmine)").count();
   const ownMarkers = () => owner.page.locator("svg.map g.mk").count();
   const filterChip = () => owner.page.locator('[data-act="squadonly"]');
   try {

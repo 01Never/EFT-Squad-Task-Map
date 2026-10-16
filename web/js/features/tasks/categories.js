@@ -22,12 +22,12 @@ export const DEFAULT_CATEGORIES = [
   { id: "unsorted", name: "Unsorted", color: "#c7c5b3", icon: "hexagon", builtin: "unsorted" },
 ];
 
-// Colours for categories you add (and AI Categorize adds without a colour), taken in turn by how
+// Colours for categories you add (without a colour of their own), taken in turn by how
 // many categories exist, so neighbours differ.
 export const NEW_CATEGORY_COLORS = ["#f783ac", "#ff922b", "#66d9e8", "#a9e34b", "#e599f7", "#ffe084", "#4dabf7"];
 
 /**
- * The owner's (or the AI's) choice for a part: the part's own key, else "*" (the whole task,
+ * The owner's choice for a part: the part's own key, else "*" (the whole task,
  * carried over from v1). Undefined when there's none.
  * @param {TaskEntry | undefined} entry
  * @param {Part} part
@@ -51,12 +51,23 @@ export function categoryOfPart(saved, list, task, part) {
     const chosen = saved.cats.find((category) => category.id === choice.cat);
     if (chosen) return chosen;
   }
+  return defaultCategoryOfPart(saved, part);
+}
+
+/**
+ * The category a part gets by the default rules alone: the built-in for its kind of work, else
+ * Unsorted. A squadmate's task you don't have (ticket 26) is always sorted this way.
+ * @param {SavedState} saved its categories
+ * @param {Part} part
+ * @returns {Category}
+ */
+export function defaultCategoryOfPart(saved, part) {
   const builtIn = saved.cats.find((category) => category.builtin === part.action);
   return builtIn || saved.cats.find((category) => category.builtin === "unsorted") || saved.cats[0];
 }
 
 /**
- * Whether you (or AI Categorize) moved this part by hand, so "reset" is offered.
+ * Whether you moved this part by hand, so "reset" is offered.
  * @param {TaskList} list
  * @param {Task} task
  * @param {Part} part
@@ -93,7 +104,7 @@ export function insertBeforeUnsorted(categories, category) {
 }
 
 /**
- * A new category made by you or by AI Categorize. Without a colour or shape of its own, it takes
+ * A new category made by you. Without a colour or shape of its own, it takes
  * the next one in turn.
  * @param {Category[]} categories the existing ones
  * @param {string} id
@@ -109,25 +120,33 @@ export function newCategory(categories, id, name, preferred = {}) {
 
 /**
  * Move a part into a category by hand. A whole task's v1 choice ("*") is replaced.
- * @param {TaskEntry} entry
+ * Refused for a task that isn't on your list (a squadmate's task, ticket 26).
+ * @param {TaskEntry | undefined} entry
  * @param {string} partKey
  * @param {Part | undefined} part
  * @param {string} categoryId
+ * @returns {boolean} false when refused
  */
 export function movePartTo(entry, partKey, part, categoryId) {
+  if (!entry || !entry.active) return false;
   entry.partCats = entry.partCats || {};
   if (part && !part.split) delete entry.partCats["*"];
   entry.partCats[partKey] = { cat: categoryId, manual: true };
+  return true;
 }
 
 /**
- * "reset": the part goes back to its default category.
- * @param {TaskEntry} entry
+ * "reset": the part goes back to its default category. Refused for a task that isn't on your list.
+ * @param {TaskEntry | undefined} entry
  * @param {string} partKey
+ * @returns {boolean} false when refused
  */
 export function resetPartCategory(entry, partKey) {
+  if (!entry || !entry.active) return false;
+  entry.partCats = entry.partCats || {};
   delete entry.partCats[partKey];
   delete entry.partCats["*"];
+  return true;
 }
 
 /**
@@ -181,4 +200,25 @@ export function restoreCategories(saved, list, snapshot) {
   for (const [taskId, partCats] of Object.entries(restored.pc)) {
     if (list.tasks[taskId]) list.tasks[taskId].partCats = /** @type {any} */ (partCats);
   }
+}
+
+/**
+ * The one-time reset to the default categories (issue #25, when AI Categorize was removed): every part
+ * of every game mode's list goes back to its default category, by clearing the moves. Every
+ * category stays (the ones the AI made are now empty custom categories). `catsResetAt` records
+ * that it ran, so it never runs again; a file that has it (a new one, or one already reset)
+ * is left alone. Changes the saved data in place.
+ * @param {SavedState} saved
+ * @param {number} now ms since 1970
+ * @returns {boolean} whether it ran (the caller then saves)
+ */
+export function resetPartCategoriesOnce(saved, now) {
+  if (saved.catsResetAt !== undefined) return false;
+  for (const list of Object.values(saved.modes)) {
+    for (const entry of Object.values(list.tasks)) {
+      entry.partCats = {};
+    }
+  }
+  saved.catsResetAt = now;
+  return true;
 }

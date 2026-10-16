@@ -47,6 +47,8 @@ A scan makes the list of the mode shown match the game (see Scan tasks above) an
 
 **Upgrading from an earlier 2.x:** your one list was kept as the list of the mode Settings had when you first opened the new version; the other two modes start empty (scan to fill them). The program also keeps an untouched copy of your old file as `squad-task-map-data.v2-backup.json`. Going back to an older version won't read the new file correctly; use that copy for that.
 
+**Upgrading to the version without AI Categorize:** the AI Categorize box is gone; tasks still sort into the default categories by themselves. Once, the first time you open the new version, every part moved by hand or by the AI goes back to its default category (in all three game modes). Your categories all stay, including any the AI made (now empty, delete them if you like). Moving parts by hand, **Auto-sort** and **Re-sort everything** work as before. The OpenAI key stays, for Scan tasks and reading your extracts.
+
 ## Parts and categories
 Tasks that mix kinds of work are split into **parts**, and each part goes in its own category. For example, Dandies is "kills" (Scav / any kills) plus "placing" (Plant / stash). A split row shows **◫ part 1/2**. Tasks marked "(In one raid)" are never split, and **Don't split** in a task's details keeps one whole.
 
@@ -116,25 +118,30 @@ You need a **screenshot key** bound in Tarkov's control settings. The app warns 
 - **Center the map on me when I take a screenshot:** off by default. When on, every new position pans the map so you're in the middle, keeping your zoom, like a minimap. Same as **◎ Follow** on the map toolbar. If you're dragging the map when a screenshot comes in, it waits until you let go.
 - **Task markers:** **Item icons** (default) or **Category shapes only**. With icons, a spot where you place something shows that item (an MS2000 marker, a camera, a quest item, the item to stash) in a tile with the category colour as its border. If an icon can't be loaded, the marker shows its shape instead.
 - **Game data:** where it came from and **Update game data now**.
-- **OpenAI:** key, model and reasoning level.
+- **OpenAI:** key and model. Paste a key from platform.openai.com/api-keys (the account needs API credit). The default model is `gpt-6-luna`, used by Scan tasks and the extract reader (both at Low reasoning). If your OpenAI account can't use it, type another model; **Save & test** checks it. If you never chose a model, the app switches you from the old default (`gpt-5.4-mini`) to `gpt-6-luna` once, the first time you start 2.10.0; a model you picked yourself is kept.
 - **Read my extracts from my first raid screenshot:** only shown once you have an OpenAI key. On by default (after a one-time notice that explains what is sent). Untick it to stop sending that screenshot. See "Your extracts, read from a screenshot" below.
 - **Updates:** the version you're on and **Check for updates** (see "Updating" below).
 
-## Squad (see your friends' drawings and tasks)
-Friends who run the app can see each other's **drawings** live and, if each chooses, each other's **tasks**. There is no website and no server: the copies connect directly over a private network built into the program. Your squad leader sets that up once (next section); you only paste an invite code.
+## Squad (see your friends' drawings, positions and tasks)
+Friends who run the app can see each other's **drawings** live, each other's **last position** in a raid, and each other's **tasks**. There is no website and no server: the copies connect directly over a private network built into the program. Your squad leader sets that up once (next section); you only paste an invite code.
 
-**Join:** ⚙ Settings → **Squad**, paste the invite code, **Join**. It can take up to a minute and a half; if it fails the reason is shown. Once joined you see the status ("Connected · 3 of 4 friends online"), and can set **your name** and **your colour** (friends see your drawings in that colour) and turn **Share my tasks** on. It is **off** by default. **Leave squad** (after a confirm) logs this PC out of the squad network and forgets your friends' data. Leaving and joining again shows you to friends as a **new member**; they may need to switch your Tasks toggle on again (your old entry shows as offline in their list for a while). Friends nobody has seen for 30 days drop off the list by themselves.
+**Join:** ⚙ Settings → **Squad**, paste the invite code, **Join**. It can take up to a minute and a half; if it fails the reason is shown. Once joined you see the status ("Connected · 3 of 4 friends online"), and can set **your name** and **your colour** (friends see your drawings and your position in that colour). **Share my tasks** and **Share my position** sit under them; both are **on** by default, and you can switch either off at any time. When you update from a version before 2.10.0, the app switches both on once (it can't tell "off on purpose" from "never switched on") and prints one line on the console. If you don't want to share, switch them off again in ⚙ Settings → **Squad**. **Leave squad** (after a confirm) logs this PC out of the squad network and forgets your friends' data. Leaving and joining again shows you to friends as a **new member**; any switch they had turned off for you is on again (your old entry shows as offline in their list for a while). Friends nobody has seen for 30 days drop off the list by themselves.
 
-**In the task list:** a **Squad** box with a chip per friend: a colour dot, their name, "online" or "last seen 2 h", and two switches:
+**In the task list:** a **Squad** box with a chip per friend: a colour dot, their name, "online" or "last seen 2 h", and three switches:
 - **✎ Draw**: show that friend's drawings on the map, in their colour, under your own. On by default. They are read-only.
-- **☰ Tasks**: show that friend's tasks (only if they share them). Off by default. You share the list of the game mode you have shown, and you see a friend's tasks only when they have the same mode shown (their copy must be this version or newer; older copies don't say their mode and always show). A friend on another mode still shows their drawings; hover their ☰ Tasks to see which mode they're on.
+- **◎ Pos**: show that friend's position on the map (only if they share it and they are on the map you're looking at). On by default.
+- **☰ Tasks**: show that friend's tasks (only if they share them). **On** by default; if you switch it off for a friend, it stays off. You share the list of the game mode you have shown, and you see a friend's tasks only when they have the same mode shown (their copy must be this version or newer; older copies don't say their mode and always show). A friend on another mode still shows their drawings; hover their ☰ Tasks to see which mode they're on.
 
-With a friend's tasks on:
-- A task you both have shows **Also: Mike, Sam** in the list and in the map popup, a small dot in each friend's colour at the bottom left of its markers, and each friend's progress in the popup ("Mike 2/5 · Sam ✓").
-- **👥 Shared with squad** shows only those tasks, in the list and on the map. It is greyed out (and hides nothing) while none of the friends whose tasks you show is sharing them.
-- Tasks a friend has and you don't appear in a **Friends' tasks** block at the bottom of the list, and as smaller markers in their colour. They are only for looking: they never change your list, your Bring list or what is ready.
+While a friend's position is on a different map from yours, their chip says **on Customs** (that map's name) and **◎ Pos** is dimmed.
 
-A friend who is offline still shows what they last shared, with "last seen". No position is shared: your friends never see where you are in a raid.
+With a friend's tasks on, their tasks are part of your task list:
+- **Who has it:** every row (yours or theirs) shows a small **colour box and the name** of each friend who has that task. The map popup shows the same boxes and each friend's progress ("Mike 2/5 · Sam ✓"), and on the map a small **square in each friend's colour** sits under the marker (up to four, then "+2"). A task with several spots gets the squares once, under its main spot (the first exact spot, or the middle one of the possible spots).
+- **Tasks only your friends have** sit in the same categories as yours (the default ones: Mark, Retrieve, Scout & extract…, whatever you moved for yourself doesn't apply), after your own rows, with a **crosshatched** background: they aren't yours. You can click one (its spots flash and the map zooms to them), open it, read its objectives and wiki, see your friends' progress and **📌 pin** it (it then shows under **Pinned only**). You can't tick, count, finish, move it or add sub-tasks: those controls are greyed out ("Not on your task list"). They never count in your task numbers, your Bring list or what is ready; the panel header adds "+2 from squad". On the map they look exactly like your own markers (same shape, colour, item picture and badges) but **see-through**, under your own markers, with the friends' squares under them. Click one to select it, like its row. A spot stays on the map while any friend who has the task still needs it. A pinned friend's task that no friend has any more disappears from the list (the pin is kept for when it comes back).
+- **👥 Shared with squad** shows only the tasks a friend also has (and your friends' own tasks), in the list and on the map. It is greyed out (and hides nothing) while none of the friends whose tasks you show is sharing them.
+
+A friend who is offline still shows what they last shared, with "last seen".
+
+**Friends' positions:** a small dot in the friend's colour, with a heading arrow and their name, under your own **You** marker. It is their **last GPS position**: where they were when they took their last screenshot in the raid. It is not live tracking; it moves only when they take a screenshot. It shows only on the map you are on. For 5 minutes it is fully opaque, then half see-through, and after 30 minutes it is gone. Point at it for a tooltip like "Mike · 2 min ago". A friend's position is removed as soon as their raid ends or they load another map. If they close the app or leave the squad, their last dot stays where it was and is gone once it is 30 minutes old (sooner if their app comes back online). Friends on versions before 2.10.0 still work with you; you just don't see each other's positions until they update.
 
 ## Setting up a squad (once, for the squad leader)
 The squad runs on a free **Tailscale** account (the Personal plan; non-commercial use). Friends install nothing extra.
@@ -161,21 +168,15 @@ If something goes wrong (no internet, GitHub unreachable, no release yet, "This 
 
 **Going back:** the old exe stays next to the new one as `SquadTaskMap.previous.exe`; close the app, rename the two files and start it. Your data before each update is kept as `squad-task-map-data.before-<version>.json` (the newest three).
 
-## AI Categorize (OpenAI)
-The **🤖 AI Categorize** box in the panel sorts parts by your instructions, e.g. "Make a Key runs category for parts that need a key on this map". It checks each task's objectives and its wiki page, proposes moves with reasons, and you pick which to apply. **Undo** reverts an applied batch.
-
-**Setup:** **Add OpenAI key** and paste a key from platform.openai.com/api-keys (the account needs API credit). The default model is `gpt-5.4-mini`; Reasoning sets how hard it thinks.
-
 ## Privacy and cost
 - Everything stays on your PC except:
   - Game data downloads from **json.tarkov.dev**.
-  - Wiki pages from **escapefromtarkov.fandom.com** (AI Categorize).
   - Item icons from **assets.tarkov.dev**: the app downloads each icon once (on the first view) into `squad-task-map-icons/` and shows it from there afterwards; your browser never contacts assets.tarkov.dev itself. Only the 24-character item id is sent.
   - **github.com**, only when you click **Check for updates** (or Download and restart). The app contacts GitHub only when you click Check for updates.
-  - Requests to **api.openai.com**: each scanned screenshot (shrunk to 2048 px); **the first in-raid screenshot of each raid** (also shrunk to 2048 px; up to 3 if the extract list wasn't on the first), so your extracts can be marked for you (Settings: "Read my extracts from my first raid screenshot", only with a key, you can turn it off); and for AI Categorize, task data plus wiki excerpts.
-- OpenAI is billed to your key's account. A scan costs roughly 1–2k input tokens per screenshot; reading your extracts about 1–2k per raid; an AI Categorize request roughly 5–30k.
+  - Requests to **api.openai.com**: each scanned screenshot (shrunk to 2048 px); **the first in-raid screenshot of each raid** (also shrunk to 2048 px; up to 3 if the extract list wasn't on the first), so your extracts can be marked for you (Settings: "Read my extracts from my first raid screenshot", only with a key, you can turn it off).
+- OpenAI is billed to your key's account. A scan costs roughly 1–2k input tokens per screenshot; reading your extracts about 1–2k per raid.
 - The OpenAI key is stored in plain text in `squad-task-map-settings.json` next to the exe, and only sent to api.openai.com.
-- **Squad (only if you join one):** your friends' copies get your **drawings** (all maps, every line) and your name and colour; your **active tasks with their ticks and progress** only if you turn **Share my tasks** on. Nothing else is shared: not your OpenAI key, folders, screenshots, settings, Bring list counts, categories, or your position. Only copies in your squad can connect (the network accepts only machines you let in with the invite code), and what a friend sends is only ever shown as drawings and text; it can't change your data. The data is encrypted between PCs. Tailscale can see that your PC is on its network and how it connects (it relays traffic through its own servers when two PCs can't connect directly, but it can't read it); log uploads to Tailscale are switched off in this program. If you never join a squad, none of this runs and nothing is sent.
+- **Squad (only if you join one):** your friends' copies get your **drawings** (all maps, every line) and your name and colour; your **active tasks with their ticks and progress** while **Share my tasks** is on; and your **last position** while **Share my position** is on. Both switches are **on** by default (⚙ Settings → **Squad**); the app sends nothing while a switch is off. The position is the map, the coordinates and facing read from the name of your last in-raid screenshot, and the time of that screenshot (never the screenshot itself); it is cleared when your raid ends or you load another map. Nothing else is shared: not your OpenAI key, folders, screenshots, settings, Bring list counts or categories. Only copies in your squad can connect (the network accepts only machines you let in with the invite code), and what a friend sends is only ever shown as drawings and text; it can't change your data. The data is encrypted between PCs. Tailscale can see that your PC is on its network and how it connects (it relays traffic through its own servers when two PCs can't connect directly, but it can't read it); log uploads to Tailscale are switched off in this program. If you never join a squad, none of this runs and nothing is sent, whatever the two switches say.
 - The program on 127.0.0.1 only answers its own page: only the app's own page can use it; other websites open in your browser can't.
 - The app deletes only two kinds of files: screenshots you confirmed in a scan, and GPS screenshots from the raid that just ended.
 
@@ -189,7 +190,6 @@ While idle the program uses practically no CPU (measured 0.00% of one core over 
 | `squad-task-map-settings.json` | Settings and OpenAI key (including whether to read your extracts from the first raid screenshot) |
 | `squad-task-map-gamedata-<mode>.json` | Downloaded game data per mode |
 | `squad-task-map-pending.json` | Game events waiting for the page (usually empty) |
-| `squad-task-map-wikicache.json` | Wiki pages, kept 7 days |
 | `squad-task-map-icons/` | Item icons (one small `<id>.webp` each), downloaded once from assets.tarkov.dev. Safe to delete: they download again when needed |
 | `squad-task-map-data.v1-backup.json` | Your v1 file, from the upgrade |
 | `squad-task-map-data.v2-backup.json` | Your file from before the one-list-per-game-mode update (2.9.0), kept once |

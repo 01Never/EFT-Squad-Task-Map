@@ -25,8 +25,8 @@
  * @property {SVGGElement} extracts
  * @property {SVGGElement} closestExtract
  * @property {SVGGElement} loot
- * @property {SVGGElement} friendTasks
  * @property {SVGGElement} taskMarkers
+ * @property {SVGGElement} friendPlayers
  * @property {SVGGElement} player
  */
 
@@ -43,7 +43,9 @@
  * @property {SubTask} [sub] for sub-task markers
  * @property {string} icon
  * @property {string} color
- * @property {string[]} [squadColors] colours of friends who also have this task (bottom-left dots)
+ * @property {boolean} [seeThrough] a squadmate's task you don't have: drawn at half opacity (ticket 27)
+ * @property {{ colors: string[], moreCount: number } | null} [squadSquares] friends who have the
+ *   task, as squares under the part's main spot (squad/rules.js: squadMarkerLook)
  * @property {{ url: string, hasAlternatives: boolean } | null} [iconItem] the item picture the marker shows instead of the shape (features/icons)
  * @property {boolean} [ready] false = you're missing something it needs
  * @property {boolean} [split]

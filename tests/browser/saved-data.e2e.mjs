@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import {
-  browserSuite, withScenario, readFixture, v1StateText, assertMatchesRecorded, writeRecording,
+  browserSuite, withScenario, readFixture, v1StateText, assertMatchesRecorded, writeRecording, stateWithTasks, taskNamed,
 } from "./harness.js";
 
 browserSuite();
@@ -50,7 +50,19 @@ function asV3(v2, settingsMode = "regular") {
   for (const mode of GAME_MODES) {
     modes[mode] = mode === settingsMode ? keptList : { tasks: {}, ticks: {}, used: {}, have: {}, subs: [] };
   }
+  delete shared.aiOpen; // the AI Categorize box is gone (ticket 25)
   return { ...shared, version: 3, modes };
+}
+
+/**
+ * Files with no catsResetAt get the one-time reset to the default categories (ticket 25): the
+ * time it ran can't be known, so check it is a recent number and take it out before comparing.
+ */
+function withoutResetTime(saved) {
+  assert.equal(typeof saved.catsResetAt, "number", "the one-time reset recorded when it ran");
+  assert.ok(Math.abs(Date.now() - saved.catsResetAt) < 5 * 60_000, "and it ran just now");
+  const { catsResetAt, ...rest } = saved;
+  return rest;
 }
 
 function recordSaved(name, saved) {
@@ -66,7 +78,7 @@ test("a v1 data file is migrated on load and saved exactly as the recorded migra
     assert.ok(Object.keys(saved.modes.regular.tasks).length > 0, "the v1 list is the PvP list (Settings)");
     assert.equal(saved.showScanBanner, true, "the page asks for a scan after a migration");
     recordSaved("v1-data", saved);
-    assertMatchesRecorded("roundtrip-v1-data", saved);
+    assertMatchesRecorded("roundtrip-v1-data", withoutResetTime(saved));
   });
 });
 
@@ -90,7 +102,7 @@ test("a v2 data file with missing fields is filled in with the defaults", async 
     assert.deepEqual(saved.prefs["streets-of-tarkov"].extMarked, {});
     for (const entry of Object.values(saved.modes.regular.tasks)) assert.deepEqual(Object.keys(entry).sort(), ["active", "addedAt", "gamePct", "noSplit", "partCats", "pinned", "scannedAt", "source"]);
     recordSaved("partial-v2-state", saved);
-    assertMatchesRecorded("roundtrip-partial-v2-state", saved);
+    assertMatchesRecorded("roundtrip-partial-v2-state", withoutResetTime(saved));
   });
 });
 
@@ -148,9 +160,47 @@ test("a copy of a real data file (STM_E2E_STATE) saves back unchanged", { skip: 
       }
       assert.deepStrictEqual(after, before, `${where} changed`);
     };
+    // Ticket 25: aiOpen is dropped, and a file without catsResetAt has its part moves cleared.
+    delete input.aiOpen;
+    if (input.catsResetAt === undefined) {
+      for (const list of isV2 ? [input] : Object.values(input.modes || {})) {
+        for (const entry of Object.values(list.tasks || {})) entry.partCats = {};
+      }
+      input.catsResetAt = saved.catsResetAt;
+    }
     // A v2 file comes back as v3 with its list under the Settings mode ("regular" here).
     compare(isV2 ? asV3(input) : input, saved, "data");
     if (added.length) t.diagnostic(`fields the page added: ${added.join(", ")}`);
     if (!input.prefs?.[openedMap]) t.diagnostic(`(${openedMap}'s view settings were added by opening it)`);
+  });
+});
+
+test("the one-time reset (ticket 25): part moves are cleared in every mode, categories stay, and a later move survives a reload", async (t) => {
+  const glory = taskNamed("Glory to CPSU");
+  const state = stateWithTasks([glory.name]);
+  delete state.catsResetAt; // a file from before the reset
+  state.cats.splice(state.cats.length - 1, 0, { id: "c-key-runs", name: "Key runs", color: "#4dabf7", icon: "star", visible: true, builtin: null });
+  state.tasks[glory.id].partCats = { [glory.id + ":go"]: { cat: "c-key-runs", manual: true } };
+  state.aiOpen = false;
+  await withScenario(t, { state }, async (s) => {
+    const page = s.page;
+    await s.saving(() => s.openMap("streets-of-tarkov"));
+    const saved = s.savedState();
+    assert.equal(typeof saved.catsResetAt, "number", "the reset is recorded");
+    assert.equal("aiOpen" in saved, false, "aiOpen is dropped");
+    assert.deepEqual(s.savedList().tasks[glory.id].partCats, {}, "the move is cleared");
+    assert.ok(saved.cats.some((category) => category.id === "c-key-runs"), "the category stays, empty");
+    const row = `#panel .task[data-part="${glory.id}:go"]`;
+    assert.equal(await page.$eval(row, (element) => element.closest(".cat").dataset.cat), "b-go");
+
+    // A new hand move is kept: reloading doesn't run the reset again.
+    await page.click(row + " .trow");
+    await s.saving(() => page.selectOption(`#panel select[data-move="${glory.id}:go"]`, "c-key-runs"));
+    const resetAt = s.savedState().catsResetAt;
+    await s.reload();
+    await s.waitForMap("streets-of-tarkov");
+    assert.deepEqual(s.savedList().tasks[glory.id].partCats, { [glory.id + ":go"]: { cat: "c-key-runs", manual: true } });
+    assert.equal(s.savedState().catsResetAt, resetAt);
+    assert.deepEqual(s.requests.filter((line) => /\/api\/ai\/(categorize|job)/.test(line)), [], "no AI Categorize requests");
   });
 });
