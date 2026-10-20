@@ -115,10 +115,15 @@ export {};
  * @property {number} [rotation] degrees
  * @property {number[][]} bounds
  * @property {number[][]} [svgBounds]
- * @property {string} baseLayer
+ * @property {string} baseLayer the map art's group id of the base level
+ * @property {"overlay" | "stacked"} [levelStyle] how the levels' pictures combine (ticket 31):
+ *   "overlay" (absent: every map before The Lab) draws a floor over the always-shown base;
+ *   "stacked" shows exactly one level's picture, the base included (features/levels)
+ * @property {string} [baseLevelName] the base level's name in the level picker (absent: "Ground")
  * @property {number[]} [heightRange]
  * @property {MapFloorLayer[]} layers
  * @property {MapLabel[]} labels
+ * @property {(string | null)[][]} [svgGroups] the map art's groups: [id, the group it shows with or null]
  */
 
 /**
@@ -223,6 +228,8 @@ export {};
  * @property {boolean} labels place names shown
  * @property {boolean} drawOn drawings shown
  * @property {Record<string, true>} [loot] loot chips that are on (features/loot, ticket 08); absent = none
+ * @property {string} [level] the level picker's choice (features/levels, ticket 31): "follow",
+ *   "base" or a level's svgLayer id; absent = the map's default ("follow" on stacked maps, else "base")
  */
 
 /**

@@ -58,3 +58,25 @@ test("the find-me pulse causes no main-thread paint or layout", async (t) => {
     assert.equal(work.Layout, 0, "no main-thread Layout");
   });
 });
+
+// Ticket 31: The Lab's art is three big pictures, one shown at a time (features/levels).
+test("The Lab, idle and during the find-me pulse after a level switch, causes no main-thread paint or layout", async (t) => {
+  await withScenario(t, { state: readFixture("fresh-v2-state.json") }, async (s) => {
+    const page = s.page;
+    await s.openMap("the-lab");
+    await page.mouse.move(1, 1);
+    await sleep(1000);
+    const idle = await mainThreadRenderingWork(page, TRACE_MS);
+    t.diagnostic(`The Lab idle: ${JSON.stringify(idle)}`);
+    assert.equal(idle.Paint, 0, "no main-thread Paint while idle");
+    assert.equal(idle.Layout, 0, "no main-thread Layout while idle");
+
+    await s.dropGpsAndWait(-112.3, -3.11, -344.04); // Technical: follow me switches the picture
+    await sleep(1000);
+    const pulse = await mainThreadRenderingWork(page, TRACE_MS);
+    t.diagnostic(`The Lab find-me pulse: ${JSON.stringify(pulse)}`);
+    assert.equal(await page.locator(".findme-ring").count(), 3, "the pulse ran during the trace");
+    assert.equal(pulse.Paint, 0, "no main-thread Paint");
+    assert.equal(pulse.Layout, 0, "no main-thread Layout");
+  });
+});

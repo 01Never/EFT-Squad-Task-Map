@@ -78,7 +78,8 @@
  * @property {ViewBox} homeView the whole map, as first shown
  * @property {ViewBox} viewBox what's on screen now
  * @property {{ toSvg: (x: number, z: number) => number[], toGame: (svgX: number, svgY: number) => number[], unit: number }} projection
- * @property {string} floor "ground" or the map art's group id of the floor shown
+ * @property {string | null} levelShown the level whose picture shows: "base" or a level's svgLayer id
+ *   (features/levels; the picker's choice is in prefs[map].level)
  * @property {"pan" | "draw" | "place"} mode
  * @property {string | null} placingSubTaskId the sub-task whose marker is being placed
  * @property {string | null} selectedPartKey

@@ -63,6 +63,15 @@ Default categories: **Boss hunts, PMC kills, Scav / any kills, Mark, Plant / sta
 - The selected task's markers keep flashing (a white ring) until you pick another task, click an empty spot on the map, close the popup or press **Esc**.
 - **Hide ▸** (top of the list) gives the map the whole window, handy with the map on half the screen. **◂ Tasks** (top-right of the map) brings the list back. The map keeps its zoom either way. Clicking a marker while the list is hidden still shows the task in the popup.
 
+### Levels and floors
+On maps with floors (Customs, Streets, Factory, Interchange, Shoreline, Ground Zero, The Lab) the dropdown at the end of the map toolbar picks what the map shows:
+- **A level by name** (Ground, 2nd Floor, Underground…; on The Lab **1st Level**, **Second Level**, **Technical**): the map shows that level and stays on it. A new screenshot still moves your marker to where you are, but the map doesn't switch level: your choice wins.
+- **All levels (follow me):** each new GPS screenshot's height decides your level and the map switches to it. Before your first screenshot it shows the base level (Ground, or The Lab's 1st Level).
+
+On most maps a floor is drawn over the ground, so the ground stays visible. On **The Lab** each level is a complete picture of its own, so choosing Technical shows only Technical. Place names follow the level shown. Your marker's badge always shows your real floor ("2", "B"…), whatever level the map shows. Task markers, extracts and loot of every level stay on the map, each with its floor badge.
+
+The app remembers your choice per map. The Lab starts on **All levels (follow me)**; the other maps start on their ground level, as before.
+
 ## Ticking things off
 Each objective has a checkbox, or −/+ for counted ones (kills, items). Ticks are yours: the game doesn't tick them. A finished part drops off the map and goes to the category's **Done** list.
 
@@ -203,6 +212,7 @@ To back up or move to another PC, copy `squad-task-map-data.json` (and the setti
 ## Credits
 - Map art: Shebuka and contributors, the-hideout/tarkov-dev-svg-maps (CC BY-NC-SA 4.0; non-commercial use only).
 - The Labyrinth's map art: the map images from tarkov.dev, stitched from their map tiles.
+- The Lab's map art: the map images from tarkov.dev, stitched from their map tiles.
 - Map projection, palette and Bender font: the tarkov.dev project (the-hideout/tarkov-dev, MIT).
 - Game data: tarkov.dev (community).
 - Log and screenshot formats learned from TarkovMonitor (GPL-3.0); no code copied.

@@ -3,6 +3,8 @@
 // src/pages/map/index.jsx (MIT): getCRS / applyRotation / pos + L.svgOverlay placement.
 // Verified against tarkov.dev test vectors (projection.test.js). Keep every formula exactly as is.
 
+import { levelOfPosition } from "../features/levels/rules.js";
+
 /** @import { MapConfig } from "../app/types.js" */
 
 /**
@@ -68,9 +70,10 @@ export function makeProj(config, viewBox) {
 }
 
 /**
- * The floor badge ("2", "3", "B"…) for a game position, from the map's floor layers: the first
- * layer whose height range (and, if it has them, area bounds) contains the position.
- * null means ground level (or no height known).
+ * The floor badge ("2", "3", "B"…) for a game position: the badge of the level it's on
+ * (features/levels/rules.js levelOfPosition: the first layer whose height range, and, if it has
+ * them, area bounds, contain the position). null means the base level (or no height known).
+ * It's your real level, whatever level the map shows.
  * @param {MapConfig} config
  * @param {number} x
  * @param {number | null | undefined} y height
@@ -78,33 +81,24 @@ export function makeProj(config, viewBox) {
  * @returns {string | null}
  */
 export function floorBadge(config, x, y, z) {
-  if (y == null) return null;
-  for (const layer of config.layers) {
-    for (const extent of layer.extents) {
-      const [bottom, top] = extent.height;
-      if (y < bottom || y >= top) continue;
-      if (extent.bounds && !extent.bounds.some((area) => isInsideArea(x, z, area))) continue;
-      return badgeName(layer.name);
-    }
-  }
-  return null;
+  const level = levelOfPosition(config, x, y, z);
+  if (!level) return null;
+  return badgeName(level.name);
 }
 
-/** Whether (x, z) is inside a rectangle given by two corners. */
-function isInsideArea(x, z, area) {
-  const isInsideX = x >= Math.min(area[0][0], area[1][0]) && x <= Math.max(area[0][0], area[1][0]);
-  const isInsideZ = z >= Math.min(area[0][1], area[1][1]) && z <= Math.max(area[0][1], area[1][1]);
-  return isInsideX && isInsideZ;
-}
+// Level names that spell their number out (The Lab's "Second Level") get that number as badge.
+const NUMBER_OF_ORDINAL_WORD = { first: "1", second: "2", third: "3", fourth: "4", fifth: "5" };
 
 /**
- * A floor layer's badge: its first digit ("2nd floor" → "2"), "B" for anything underground,
- * else its first letter.
+ * A floor layer's badge: its first digit ("2nd floor" → "2"), the number of an ordinal word
+ * ("Second Level" → "2"), "B" for anything underground, else its first letter.
  * @param {string} layerName
  */
 export function badgeName(layerName) {
   const digit = layerName.match(/(\d)/);
   if (digit) return digit[1];
+  const ordinalWord = layerName.match(/\b(first|second|third|fourth|fifth)\b/i);
+  if (ordinalWord) return NUMBER_OF_ORDINAL_WORD[ordinalWord[1].toLowerCase()];
   if (/under|bunker|tunnel|garage|basement|technical|sewer/i.test(layerName)) return "B";
   return layerName[0].toUpperCase();
 }

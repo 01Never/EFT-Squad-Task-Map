@@ -5,6 +5,7 @@ import { app } from "../app/state.js";
 import { createSvgElement } from "../app/dom.js";
 import { mapPrefs } from "../app/map-prefs.js";
 import { applyView } from "./view.js";
+import { layerOfLevelShown } from "../features/levels/rules.js";
 
 /** @import { MapLabel, MapFloorLayer } from "../app/types.js" */
 
@@ -42,7 +43,7 @@ export function renderPlaceNames() {
   if (!mapPrefs(mapView.key).labels) return;
   const config = mapView.config;
   const mapTopHeight = config.heightRange ? config.heightRange[1] : GROUND_LABEL_MAX_BOTTOM_METERS;
-  const floorLayer = config.layers.find((floor) => floor.svgLayer === mapView.floor);
+  const floorLayer = layerOfLevelShown(config, mapView.levelShown);
   for (const label of config.labels) {
     if (!isPlaceNameShown(label, floorLayer, mapTopHeight)) continue;
     drawPlaceName(layer, label);
