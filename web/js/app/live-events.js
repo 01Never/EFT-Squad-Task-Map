@@ -23,6 +23,7 @@ import {
   switchToMapIfFollowing,
 } from "../features/find-me/map-layer.js";
 import { renderClosestExtract } from "../features/extracts/map-layer.js";
+import { followLevelOfNewPosition } from "../features/levels/map-layer.js";
 import { onCaptureChanged } from "../features/scan/panel.js";
 import { onUpdatesChanged, onStreamConnected } from "../features/updates/panel.js";
 import { onSquadChanged } from "../features/squad/live-event.js";
@@ -159,7 +160,8 @@ function onRaidMapKnown(event) {
 
 /**
  * A new position from a GPS screenshot: the pulse starts; with "Follow my position" the raid's
- * map opens; on the open map you, the closest extract and (by the auto-center rule) the view update.
+ * map opens; on the open map the level shown (with "follow me"), you, the closest extract and (by
+ * the auto-center rule) the view update.
  * @param {GpsEvent} event
  */
 function onPositionReceived(event) {
@@ -170,6 +172,7 @@ function onPositionReceived(event) {
   const mapView = app.mapView;
   const isOnOpenMap = mapView && (!event.gps.map || event.gps.map === mapView.key);
   if (isOnOpenMap) {
+    followLevelOfNewPosition(); // only with "All levels (follow me)"; a chosen level stays
     renderPlayer();
     renderClosestExtract();
     moveViewForNewPosition();

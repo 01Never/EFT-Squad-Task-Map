@@ -6,6 +6,7 @@
 import { DEFAULT_CATEGORIES } from "../features/tasks/categories.js";
 import { DEFAULT_SHOWN_EXTRACT_KINDS } from "../features/extracts/rules.js";
 import { cleanLootChoices } from "../features/loot/rules.js";
+import { cleanLevelChoice } from "../features/levels/rules.js";
 import { GAME_MODES, DEFAULT_GAME_MODE, knownGameMode } from "./game-modes.js";
 
 /** @import { SavedState, TaskList, TaskEntry, Category, MapPrefs } from "./types.js" */
@@ -124,6 +125,13 @@ export function fillMissingFields(saved) {
     // Loot choices (ticket 08) are absent until you change one; absent means no loot shown, so
     // older files load unchanged. A damaged value keeps only the chips that are on.
     if (mapPrefs.loot !== undefined) mapPrefs.loot = cleanLootChoices(mapPrefs.loot);
+    // The level picker's choice (ticket 31) is absent until you pick one; absent means the
+    // map's default (features/levels/rules.js savedLevelChoice). A damaged value is dropped.
+    if (mapPrefs.level !== undefined) {
+      const level = cleanLevelChoice(mapPrefs.level);
+      if (level === undefined) delete mapPrefs.level;
+      else mapPrefs.level = level;
+    }
   }
   return saved;
 }

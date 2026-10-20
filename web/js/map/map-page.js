@@ -1,9 +1,10 @@
 // @ts-check
 // The map page: opening a map (its art, the toolbar, the overlays, the panel beside it), closing
-// it, redrawing everything on it in order, the floor picker and the map's modes (pan, draw, place a
-// pin). What each layer draws belongs to its feature; the layer order is in layers.js.
+// it, redrawing everything on it in order and the map's modes (pan, draw, place a pin). What each
+// layer draws belongs to its feature; the layer order is in layers.js. The level (floor) picker
+// is features/levels.
 import { app } from "../app/state.js";
-import { escapeHtml, findElement } from "../app/dom.js";
+import { findElement } from "../app/dom.js";
 import { showCrumbs } from "../app/crumbs.js";
 import { mapKeyOfAddress } from "../app/addresses.js";
 import { shownGameMode } from "../app/current-list.js";
@@ -22,6 +23,7 @@ import { renderLoot } from "../features/loot/map-layer.js";
 import { renderDrawings, renderDrawingBar, bindDrawing } from "../features/drawing/map-layer.js";
 import { renderPlayer, bindFindMe } from "../features/find-me/map-layer.js";
 import { renderFriendDrawings, renderFriendPlayers } from "../features/squad/map-layer.js";
+import { renderLevelPicker, onLevelPicked, showLevelForChoice } from "../features/levels/map-layer.js";
 
 /** @import { MapConfig, MapInfo } from "../app/types.js" */
 
@@ -48,7 +50,7 @@ export async function openMap(mapKey) {
   const homeView = { x: artBox.x, y: artBox.y, w: artBox.width, h: artBox.height };
   app.mapView = newMapView(mapKey, config, svg, homeView);
   bindMapPage();
-  renderFloorPicker();
+  renderLevelPicker();
   renderMapPage();
   fitViewTo(homeView, 0);
   if (app.gps && app.gps.map === mapKey) {
@@ -76,7 +78,7 @@ function newMapView(mapKey, config, svg, homeView) {
     homeView,
     viewBox: { ...homeView },
     projection: makeProj(config, viewBoxArray),
-    floor: "ground",
+    levelShown: null, // set by renderLevelPicker()
     mode: "pan",
     placingSubTaskId: null,
     selectedPartKey: null,
@@ -91,8 +93,8 @@ function newMapView(mapKey, config, svg, homeView) {
 }
 
 /**
- * The map art as an element: no fixed size (it fills the stage), the base layer always shown and
- * the other floors hidden until picked.
+ * The map art as an element: no fixed size (it fills the stage), the base layer shown and the
+ * other levels hidden until the level picker (features/levels) shows the right ones.
  * @param {string} artText
  * @param {MapConfig} config
  * @returns {SVGSVGElement}
@@ -135,7 +137,7 @@ function renderMapPageFrame() {
     <div class="grp" id="drawbar" hidden></div></div><div class="hint" id="hint"></div><div class="gpsbar" id="gpsbar" hidden><span id="gpsbar-you"></span><span id="gpsbar-closest"></span></div><div class="pop" id="pop"></div><button class="showpanel" id="showpanel" title="Show the task list">◂ Tasks</button></div><aside id="panel"></aside></div>`;
 }
 
-/** Zoom in / out / reset, 📍 Find me, ◎ Follow, ✎ Draw, 📌 Pinned only, and the floor picker. */
+/** Zoom in / out / reset, 📍 Find me, ◎ Follow, ✎ Draw, 📌 Pinned only, and the level picker. */
 function renderToolbar() {
   return `<div class="grp"><button id="zin" title="Zoom in">+</button><button id="zout" title="Zoom out">−</button><button id="zfit" title="Reset view">⤢</button><button id="bfindme" disabled>📍<span class="lbl"> Find me</span></button><button id="bfollow" aria-pressed="false" title="Center the map on me at each screenshot (keeps your zoom)">◎<span class="lbl"> Follow</span></button><button id="bdraw" aria-pressed="false" title="Draw on the map">✎<span class="lbl"> Draw</span></button><button id="bpin" title="Show only pinned tasks">📌<span class="lbl"> Pinned only</span></button><span id="floors" style="display:flex;align-items:center"></span></div>`;
 }
@@ -145,7 +147,7 @@ function bindMapPage() {
   bindMapInput();
   bindDrawing();
   findElement("#bpin").onclick = togglePinnedOnly;
-  findElement("#floors").addEventListener("change", onFloorPicked);
+  findElement("#floors").addEventListener("change", onLevelPicked);
   bindPopup();
   findElement("#showpanel").onclick = () => setPanelHidden(false);
   listenForMapKeys();
@@ -162,6 +164,7 @@ function bindMapPage() {
 export function renderMapPage() {
   if (!app.mapView) return;
   renderPanel();
+  showLevelForChoice(); // with "follow me", your position may have changed or gone (raid end)
   renderPlaceNames();
   renderExtracts();
   renderLoot();
@@ -172,34 +175,6 @@ export function renderMapPage() {
   renderPlayer();
   renderPopup();
   findElement("#bpin").setAttribute("aria-pressed", String(!!app.saved.pinnedOnly));
-}
-
-// ---------------------------------------------------------------- floors
-
-/** The floor picker (only for maps with floor layouts) and which floor's art shows. */
-function renderFloorPicker() {
-  const mapView = app.mapView;
-  const floors = mapView.config.layers.filter((layer) => layer.svgLayer);
-  const picker = findElement("#floors");
-  if (floors.length) {
-    const options = floors.map(
-      (floor) => `<option value="${escapeHtml(floor.svgLayer)}" ${mapView.floor === floor.svgLayer ? "selected" : ""}>${escapeHtml(floor.name)}</option>`,
-    );
-    picker.innerHTML = `<select title="Show a floor's layout">${[`<option value="ground">Ground</option>`, ...options].join("")}</select>`;
-  } else {
-    picker.innerHTML = "";
-  }
-  mapView.svg.querySelectorAll(".lyr:not(.base)").forEach((group) => group.classList.toggle("off", group.id !== mapView.floor));
-}
-
-/**
- * A floor was picked: show its layout, and the place names on it.
- * @param {Event} event
- */
-function onFloorPicked(event) {
-  app.mapView.floor = /** @type {HTMLSelectElement} */ (event.target).value;
-  renderFloorPicker();
-  renderPlaceNames();
 }
 
 // ---------------------------------------------------------------- modes

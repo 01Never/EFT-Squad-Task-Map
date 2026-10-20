@@ -1,0 +1,158 @@
+{
+ "map": "the-lab",
+ "svg": "Labs.svg",
+ "about": "Where tarkov.dev's tile layer (assets.tarkov.dev/maps/labs_v4/{1st,2nd,technical}/{z}/{x}/{y}.png, tileSize 175: each 256-px tile image covers 175 Leaflet pixels) puts each real game position: tile_pixel = 2^zoom * (0.575*x' + 281.2, -0.575*y' + 193.7) with (x', y') the game position (x, z) turned by 270 degrees (Leaflet L.CRS.Simple with tarkov.dev's transform). The art is those tiles at zoom 4, stitched at 256 px per tile (so a Leaflet pixel p is image pixel p*256/175) and cropped to the map bounds starting at crop.left/top (image pixels); each level's <image> is placed so one SVG unit is one Leaflet pixel. Positions are real Lab objects in testdata/jsontarkovdev; y is kept for the levels.",
+ "zoom": 4,
+ "tile_size": 175,
+ "tile_image_size": 256,
+ "crop": {
+  "left": 162,
+  "top": 671
+ },
+ "vectors": [
+  {
+   "name": "Extract lab_Hangar_Gate",
+   "game": {
+    "x": -170.49,
+    "y": 5.54,
+    "z": -218.87
+   },
+   "tile_pixel": {
+    "x": 2485.596,
+    "y": 1530.692
+   }
+  },
+  {
+   "name": "Extract lab_Elevator_Med",
+   "game": {
+    "x": -112.3,
+    "y": -3.11,
+    "z": -344.04
+   },
+   "tile_pixel": {
+    "x": 1334.032,
+    "y": 2066.04
+   }
+  },
+  {
+   "name": "Extract lab_Vent",
+   "game": {
+    "x": -145.06,
+    "y": -2.46,
+    "z": -396.83
+   },
+   "tile_pixel": {
+    "x": 848.364,
+    "y": 1764.648
+   }
+  },
+  {
+   "name": "Extract lab_Elevator_Cargo",
+   "game": {
+    "x": -111.79,
+    "y": 5.38,
+    "z": -408.55
+   },
+   "tile_pixel": {
+    "x": 740.54,
+    "y": 2070.732
+   }
+  },
+  {
+   "name": "Extract lab_Elevator_Main",
+   "game": {
+    "x": -282.69,
+    "y": -2.81,
+    "z": -334.73
+   },
+   "tile_pixel": {
+    "x": 1419.684,
+    "y": 498.452
+   }
+  },
+  {
+   "name": "Extract lab_Parking_Gate",
+   "game": {
+    "x": -231.46,
+    "y": 6.19,
+    "z": -457.77
+   },
+   "tile_pixel": {
+    "x": 287.716,
+    "y": 969.768
+   }
+  },
+  {
+   "name": "Extract lab_Under_Storage_Collector",
+   "game": {
+    "x": -122.89,
+    "y": -3.66,
+    "z": -258.32
+   },
+   "tile_pixel": {
+    "x": 2122.656,
+    "y": 1968.612
+   }
+  },
+  {
+   "name": "Loot container 1",
+   "game": {
+    "x": -95.00014,
+    "y": 0.30369854,
+    "z": -433.996979
+   },
+   "tile_pixel": {
+    "x": 506.4278,
+    "y": 2225.1987
+   }
+  },
+  {
+   "name": "Loot container 41",
+   "game": {
+    "x": -225.412979,
+    "y": 0.017001152,
+    "z": -311.122
+   },
+   "tile_pixel": {
+    "x": 1636.8776,
+    "y": 1025.4006
+   }
+  },
+  {
+   "name": "Loot container 121",
+   "game": {
+    "x": -185.76622,
+    "y": 0.7358084,
+    "z": -315.1457
+   },
+   "tile_pixel": {
+    "x": 1599.8596,
+    "y": 1390.1508
+   }
+  },
+  {
+   "name": "Loot container 201",
+   "game": {
+    "x": -194.1512,
+    "y": 4.34043026,
+    "z": -400.766571
+   },
+   "tile_pixel": {
+    "x": 812.1475,
+    "y": 1313.009
+   }
+  },
+  {
+   "name": "Loot container 319",
+   "game": {
+    "x": -139.548233,
+    "y": 0.177807808,
+    "z": -361.0752
+   },
+   "tile_pixel": {
+    "x": 1177.3082,
+    "y": 1815.3563
+   }
+  }
+ ]
+}

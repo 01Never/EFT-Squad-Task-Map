@@ -43,6 +43,8 @@ Each game mode keeps its own task list. On a map, see a marker for every objecti
 
 Click a marker or a row to select a task: its spots flash on the map, and the popup and the list show every objective with ticks and counters, the wiki link, sub-tasks and pins.
 
+Maps: Streets of Tarkov, Ground Zero, Customs, Factory, Interchange, The Lab, The Labyrinth, Lighthouse, Reserve, Shoreline and Woods. On maps with floors, the level picker shows one floor, or **All levels (follow me)** switches to the level of your newest screenshot; on The Lab each level (1st, Second, Technical) is its own picture.
+
 ![A selected task with its popup and details](docs/images/task-selected.png)
 
 ### Where you are, and your way out
@@ -110,6 +112,7 @@ The icon and version info come from `rsrc_windows_amd64.syso`, made from `winres
 
 - Map art: Shebuka and contributors, [the-hideout/tarkov-dev-svg-maps](https://github.com/the-hideout/tarkov-dev-svg-maps) (CC BY-NC-SA 4.0; non-commercial use only).
 - The Labyrinth's map art: the map images from [tarkov.dev](https://tarkov.dev) (the-hideout/tarkov-dev, MIT project), stitched from their map tiles.
+- The Lab's map art: the map images from [tarkov.dev](https://tarkov.dev), stitched from their map tiles.
 - Map projection, palette and Bender font: the [tarkov.dev](https://github.com/the-hideout/tarkov-dev) project (MIT).
 - Game data: tarkov.dev (community).
 - Log and screenshot formats learned from TarkovMonitor (GPL-3.0); no code copied.

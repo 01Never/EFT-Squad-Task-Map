@@ -25,7 +25,7 @@ export function countTasksPerMap(tasks, mapKeys, partsOf, ticks) {
 
 /**
  * Your tasks that don't show on any map card: hand-ins and builds with nothing on a map
- * (`offMap`, by name), and tasks only on maps without art here, such as Labs (`onOtherMaps`).
+ * (`offMap`, by name), and tasks only on maps without art here, such as Icebreaker (`onOtherMaps`).
  * @param {Task[]} tasks your active tasks
  * @param {string[]} mapKeys the maps with a card
  */

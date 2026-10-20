@@ -15,7 +15,7 @@ A single-user app that runs on the owner's PC and serves a web page on `http://1
 | `server.ts` | Bun HTTP server, bound to 127.0.0.1 only, with ports 7777–7799 tried in order. Serves the page, map SVGs, the Bender font and game data. Saves state to `squad-task-map-data.json` and settings to `squad-task-map-settings.json`, both next to the exe. Has TarkovTracker endpoints (`/api/tt/*`), OpenAI endpoints (`/api/ai/*`) and `/api/refresh` (downloads a newer game-data snapshot). |
 | `ai.ts` | AI Categorize: fetches and cleans Tarkov wiki pages, then calls the OpenAI **Responses API** with a strict JSON schema and a `get_wiki_page` tool. Supports a model name and a reasoning-effort setting. |
 | `web/index.html` | The whole front end in one file: map rendering (SVG pan, zoom and pinch), markers, panel, categories, sub-tasks, drawing, AI chat, TarkovTracker and manual-list task sources. Styled after tarkov.dev (gunmetal/gold, Bender font). |
-| `assets/` | Map SVGs (10 maps), `maps-config.json` (projection, layers and labels from tarkov.dev's `maps.json`), `game-data.json` (a tarkov.dev data snapshot from 2026-09-20, taken from the tarkovtaskmap GitHub project), `fonts.json`. |
+| `assets/` | Map SVGs (11 maps), `maps-config.json` (projection, layers and labels from tarkov.dev's `maps.json`), `game-data.json` (a tarkov.dev data snapshot from 2026-09-20, taken from the tarkovtaskmap GitHub project), `fonts.json`. |
 
 Features that already work and **must keep working**:
 - Map picker
@@ -56,7 +56,7 @@ Test hooks already in `server.ts`/`ai.ts`: `STM_DATA_DIR`, `PORT`, `STM_OPENAI_A
 9. **GPS:** an in-raid screenshot updates your position on the map.
 10. **Raid lifecycle:** after each raid, reset "have" counts and delete that raid's GPS screenshots.
 
-Non-goals: multiplayer, the hosted VPS version, and Labs/Terminal maps (no aligned SVG).
+Non-goals: multiplayer, the hosted VPS version, and the Terminal map (no aligned art). (The Lab and The Labyrinth have art stitched from tarkov.dev's map tiles since tickets 31 and 11.)
 
 ---
 
@@ -233,6 +233,18 @@ For the boss list, use the boss names in json.tarkov.dev's map `bosses` data, or
   - bottom-left: free
 - **Zones:** draw each `TaskZone.outline` as a polygon, projected with `makeProj()`, in the category color with a light fill. Ready zones get a solid border; not-ready zones get a **dotted** border (`stroke-dasharray`). Keep the center marker. Zones without an outline keep just the marker.
 - **Floor for zones:** use `top`/`bottom` with the layer extents in `maps-config.json` when present. Otherwise use the position's y, as `floorBadge()` does now.
+
+### 7.4 Levels and the level picker (ticket 31)
+- **A level** is a map's base (`baseLayer`) or one of its `layers` with a picture (`svgLayer`). A position is on the first layer whose height range contains its y (bottom included, top not) and, when the range lists areas, whose areas contain its (x, z); otherwise on the base. That rule gives both the floor badge (`floorBadge()`) and the level "follow me" shows (`features/levels/rules.js levelOfPosition`).
+- **Two styles, by config** (`levelStyle` in `maps-config.json`; no map is named in the code):
+  - `"overlay"` (the default, every map before The Lab): the base art always shows; a level's art is drawn over it.
+  - `"stacked"` (The Lab): each level, the base included, is a complete picture; the map shows exactly one.
+- **The picker** (the floor dropdown in the map toolbar, only on maps with level pictures) lists **All levels (follow me)**, the base level by name (`baseLevelName`, default "Ground"; The Lab "1st Level"), then each level with a picture.
+  - A level by name: the map shows it and stays on it. A new GPS position moves your marker, never the level. The user's choice always wins.
+  - **All levels (follow me):** each new position's level is shown (overlay: the base plus that level). No position yet, or a level without a picture → the base level. The switch happens on the `gps` event; no timers.
+- **Remembered per map** in `prefs[map].level` (`"follow"`, `"base"` or a level's `svgLayer`), written when you pick. Absent → the map's default: stacked maps follow you, overlay maps show their base (as before). No saved-data version change.
+- Place names follow the level shown (`isPlaceNameShown`). Your marker's badge is your real level whatever level is shown. Task markers, extracts and loot of every level stay on the map with their badges.
+- **The Lab** (tarkov.dev's `the-lab`): base 1st Level (heights −0.9 to 3); Second Level from 3 m up inside its area `[[-101, -422], [-271, -270]]`; Technical below −0.9 m. A high spot outside the area (the hangar) is the 1st level.
 
 ---
 

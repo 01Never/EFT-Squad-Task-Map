@@ -10,7 +10,7 @@ list is empty), and a folded list of your tasks that aren't on any map card.
 **The rules** (`rules.js`):
 - A card counts your tasks with a part on that map that isn't done (`countTasksPerMap()`).
 - Not on a card (`tasksNotOnAMapCard()`): hand-in and build tasks with nothing on a map (sorted by
-  name), and tasks only on maps this app has no art for (Labs). Their found-in-raid
+  name), and tasks only on maps this app has no art for (such as Icebreaker). Their found-in-raid
   items still appear in every map's Bring list.
 
 **Flow:** the address `#/<mode>/maps` (or `#/<mode>/map/<unknown>`) → `app/routing.js` → `showPicker()`

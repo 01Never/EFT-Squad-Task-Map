@@ -43,7 +43,7 @@ function renderDataInUse() {
 
 /**
  * The raid's map name as the top bar shows it: the name from maps-config.json, or the key for a
- * map this app has no art for. (Unlike app/game-data.js mapDisplayName, Labs shows as its key.)
+ * map this app has no art for.
  * @param {string} mapKey
  */
 function mapNameForNav(mapKey) {
